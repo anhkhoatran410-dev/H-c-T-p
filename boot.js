@@ -1,4 +1,4 @@
-// Safety boot: never leave the public app on a blank screen if an external dependency is slow.
+// Safety boot: never leave the public app stuck on the initial loading screen.
 (function () {
   const SUPABASE_URL = "https://mlqaeginqsgqacdqdzbm.supabase.co";
   const SUPABASE_KEY = "sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi";
@@ -29,20 +29,26 @@
   }
 
   async function recover() {
-    await sleep(1800);
+    await sleep(1200);
     const app = document.getElementById("app");
     if (!app) return;
-    if (!app.innerHTML.trim() && typeof render === "function") {
+
+    // app.js may still be waiting for an external library. Render the public shell now.
+    if (typeof render === "function") {
       try { await render(); } catch (_) {}
     }
-    if (!app.innerHTML.trim()) {
-      app.innerHTML = '<main class="container"><div class="card"><h1>🎓 STUDY TEST AI</h1><p class="muted">Đang khởi động hệ thống...</p><button class="btn" onclick="location.reload()">Tải lại trang</button></div></main>';
-    }
+
+    // Load exams independently so the page can become usable even when Supabase JS CDN is slow.
     if (typeof exams !== "undefined" && exams.length === 0) {
       const loaded = await fallbackLoadExams();
       if (loaded && typeof render === "function") {
         try { await render(); } catch (_) {}
       }
+    }
+
+    // If app.js failed before defining render(), show a useful error instead of a blank/forever-loading page.
+    if (typeof render !== "function") {
+      app.innerHTML = '<main class="container"><div class="card"><h1>🎓 STUDY TEST AI</h1><p class="danger-text">Không tải được phần giao diện. Hãy tải lại trang.</p><button class="btn" onclick="location.reload()">↻ Tải lại</button></div></main>';
     }
   }
 

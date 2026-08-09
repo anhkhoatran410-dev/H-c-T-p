@@ -100,7 +100,7 @@ function examCard(e){
  if(now<open)status=`<span class="danger-text">Chưa mở</span>`;
  else if(now>close)status=`<span class="danger-text">Đã đóng</span>`;
  else status=`<span class="success">Đang mở</span>`;
- return `<div class="exam"><div><span class="pill">${e.questions.length} câu</span> <span class="pill">⏱ ${e.duration} phút</span>
+ return `<div class="exam"><div><span class="pill">${e.question_count || e.questions?.length || 0} câu</span> <span class="pill">⏱ ${e.duration} phút</span>
  <h3>${esc(e.title)}</h3><div class="muted">${status}${done?` · Đã làm: ${done.score}%`:``}</div></div>
  <div class="actions"><button class="btn" ${now<open||now>close?"disabled":""} onclick="startExam('${e.id}')">${done?"Làm lại":"Bắt đầu"}</button></div></div>`;
 }

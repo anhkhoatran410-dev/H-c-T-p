@@ -27,6 +27,49 @@ let data=JSON.parse(localStorage.getItem(KEY)||"null")||defaultData;
 function save(){localStorage.setItem(KEY,JSON.stringify(data))}
 let state={page:"home",candidate:"",exam:null,answers:{},startedAt:0,timer:null};
 
+// Supabase online sync
+const SUPABASE_URL="https://mlqaeginqsgqacdqdzbm.supabase.co";
+const SUPABASE_KEY="sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi";
+let db=null;
+function loadSupabase(){
+ return new Promise((resolve,reject)=>{
+  if(window.supabase){db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);return resolve(db)}
+  const s=document.createElement("script");
+  s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+  s.onload=()=>{db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);resolve(db)};
+  s.onerror=()=>reject(new Error("Không tải được Supabase JS"));
+  document.head.appendChild(s);
+ });
+}
+async function syncResultOnline(r){
+ try{
+  await loadSupabase();
+  let participantId=null;
+  const lookup=await db.from("participants").select("id").eq("name",r.candidate).limit(1).maybeSingle();
+  if(!lookup.error && lookup.data) participantId=lookup.data.id;
+  if(!participantId){
+   const ins=await db.from("participants").insert({name:r.candidate}).select("id").single();
+   if(ins.error) throw ins.error;
+   participantId=ins.data.id;
+  }
+  const a=await db.from("attempts").insert({
+   participant_id:participantId,exam_id:r.examId,exam_title:r.examTitle,
+   score:r.score,correct:r.correct,total:r.total,time_sec:r.timeSec,submitted_at:r.submittedAt
+  }).select("id").single();
+  if(a.error) throw a.error;
+  const attemptId=a.data?.id;
+  if(attemptId){
+   const rows=Object.entries(state.answers).map(([i,selected])=>({
+    attempt_id:attemptId,question_index:Number(i),selected_option:Number(selected),
+    is_correct:state.exam?.questions?.[Number(i)]?.a===Number(selected)
+   }));
+   if(rows.length){const ans=await db.from("answers").insert(rows);if(ans.error) console.warn("answers sync:",ans.error)}
+  }
+  console.log("Supabase: đã lưu kết quả");
+ }catch(e){console.warn("Supabase sync failed:",e)}
+}
+loadSupabase().catch(()=>{});
+
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function header(admin=false){
  return `<header class="top"><div class="brand">🎓 STUDY TEST AI</div>
@@ -75,7 +118,7 @@ function submitExam(auto){
  e.questions.forEach((q,i)=>{if(state.answers[i]===q.a)correct++});
  let pct=Math.round(correct/e.questions.length*100);
  data.results.push({id:Date.now(),examId:e.id,examTitle:e.title,candidate:state.candidate,score:pct,correct,total:e.questions.length,timeSec:Math.min(Math.floor((Date.now()-state.startedAt)/1000),e.duration*60),submittedAt:new Date().toISOString(),auto});
- save();state.lastResult=data.results.at(-1);state.page="result";render();
+ save();state.lastResult=data.results.at(-1);syncResultOnline(state.lastResult);state.page="result";render();
 }
 function resultPage(){let r=state.lastResult;return `<main class="container"><div class="card"><h1>🎉 Hoàn thành</h1><p class="muted" style="text-align:center">${esc(r.candidate)} · ${esc(r.examTitle)}</p><div class="score">${r.score}%</div><p style="text-align:center;font-size:18px">Đúng <b>${r.correct}/${r.total}</b> câu · ${Math.floor(r.timeSec/60)} phút ${r.timeSec%60}s</p><p style="text-align:center">${r.auto?"⏰ Hết giờ, hệ thống đã tự động nộp bài.":"Bài đã được nộp thành công."}</p><div style="text-align:center"><button class="btn" onclick="go('history')">Xem lịch sử</button><button class="btn secondary" onclick="go('home')">Về trang chủ</button></div></div></main>`}
 function historyPage(){let rs=data.results.filter(r=>r.candidate===state.candidate);return `<main class="container"><div class="card"><h1>📊 Lịch sử làm bài</h1><p>Thí sinh: <b>${esc(state.candidate||"Chưa nhập tên")}</b></p>${rs.length?rs.slice().reverse().map(r=>`<div class="exam"><div><b>${esc(r.examTitle)}</b><div class="muted">${new Date(r.submittedAt).toLocaleString("vi-VN")}</div></div><strong>${r.score}%</strong></div>`).join(""):"<p class='muted'>Chưa có kết quả.</p>"}</div></main>`}

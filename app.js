@@ -1,14 +1,29 @@
 const SUPABASE_URL="https://mlqaeginqsgqacdqdzbm.supabase.co";
 const SUPABASE_KEY="sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi";
 let db=null;
-async function loadSupabase(){if(db)return db;if(!window.supabase)await new Promise((r,j)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";s.onload=r;s.onerror=()=>j(new Error("Không tải được Supabase JS"));document.head.appendChild(s)});db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);return db}
+async function loadSupabase(){
+  if(db)return db;
+  if(!window.supabase)await new Promise((resolve,reject)=>{
+    const s=document.createElement("script");
+    s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+    let done=false;
+    const finish=(fn,v)=>{if(done)return;done=true;clearTimeout(timer);fn(v)};
+    const timer=setTimeout(()=>finish(reject,new Error("Không tải được Supabase JS")),8000);
+    s.onload=()=>finish(resolve);
+    s.onerror=()=>finish(reject,new Error("Không tải được Supabase JS"));
+    document.head.appendChild(s);
+  });
+  if(!window.supabase)throw new Error("Supabase JS unavailable");
+  db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  return db;
+}
 const DEVICE_KEY="study_device_id_v2";
 const state={page:"home",candidate:"",code:"",subject:"",exam:null,answers:{},startedAt:0,timer:null,lastResult:null,history:[],review:null,thread:null,messages:[]};let exams=[];
 function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function deviceId(){let id=localStorage.getItem(DEVICE_KEY);if(!id){id=crypto.randomUUID?crypto.randomUUID():"dev_"+Date.now()+"_"+Math.random().toString(36).slice(2);localStorage.setItem(DEVICE_KEY,id)}return id}
 async function clientMeta(){try{const r=await fetch("/api/client-meta");return await r.json()}catch{return {ip:null,userAgent:navigator.userAgent}}}
 async function registerDevice(){try{await loadSupabase();const meta=await clientMeta();await db.from("user_devices").upsert({device_id:deviceId(),last_seen:new Date().toISOString(),last_ip:meta.ip,user_agent:meta.userAgent},{onConflict:"device_id"})}catch(e){console.warn("registerDevice",e)}}
-async function loadExams(){try{await loadSupabase();const {data,error}=await db.from("exams").select("*").eq("status","active").order("created_at",{ascending:false});if(error)throw error;exams=(data||[]).map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}))}catch(e){console.error(e);exams=[]}}
+async function loadExams(){try{await loadSupabase();const {data,error}=await db.from("exams").select("*").eq("status","active").order("created_at",{ascending:false});if(error)throw error;exams=(data||[]).map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}))}catch(e){console.error("loadExams",e);exams=[]}}
 async function loadHistory(){try{await loadSupabase();const {data,error}=await db.from("user_attempts").select("*").eq("device_id",deviceId()).order("created_at",{ascending:false});if(error)throw error;state.history=data||[]}catch(e){console.warn("history",e);state.history=[]}}
 function header(){return `<header class="top"><div class="brand">🎓 STUDY TEST AI</div><div class="nav"><button onclick="go('home')">Trang chủ</button><button onclick="go('history')">📊 Lịch sử</button><button onclick="go('support')">💬 Hỗ trợ</button><button onclick="go('admin')">Admin</button></div></header>`}
 function page(){
@@ -45,6 +60,8 @@ async function loadMessages(){try{const t=await ensureThread();const {data}=awai
 async function sendSupport(){const input=document.getElementById("supportInput");const text=input?.value.trim();if(!text)return;const t=await ensureThread();await loadSupabase();await db.from("support_messages").insert({thread_id:t.id,sender:"user",message:text});input.value="";await loadMessages();render()}
 function supportPage(){return `<main class="container"><div class="card"><h1>💬 Liên hệ Admin</h1><p class="muted">Mã thiết bị: ${esc(deviceId().slice(0,8))} · Tin nhắn được lưu lại.</p><div style="display:grid;gap:8px;max-height:420px;overflow:auto;margin:14px 0">${(state.messages||[]).map(m=>`<div style="padding:10px;border-radius:10px;background:${m.sender==="admin"?"#eef6ff":"#f5f5f5"};margin-left:${m.sender==="admin"?"0":"20%"}"><b>${m.sender==="admin"?"Admin":"Bạn"}</b><div>${esc(m.message)}</div><small class="muted">${new Date(m.created_at).toLocaleString("vi-VN")}</small></div>`).join("")||"<p class='muted'>Chưa có tin nhắn.</p>"}</div><div style="display:flex;gap:8px"><input id="supportInput" placeholder="Mô tả lỗi bạn gặp..." onkeydown="if(event.key==='Enter')sendSupport()"><button class="btn" onclick="sendSupport()">Gửi</button></div><button class="btn secondary" onclick="go('home')">Quay lại</button></div></main>`}
 async function go(p){state.page=p;if(p==="home")await loadExams();if(p==="history")await loadHistory();if(p==="support")await loadMessages();render()}
-async function render(){document.getElementById("app").innerHTML=header()+page()}
+async function render(){const app=document.getElementById("app");if(app)app.innerHTML=header()+page()}
 state.candidate=localStorage.getItem("study_candidate")||"";state.code=localStorage.getItem("study_code")||"";
-(async()=>{await registerDevice();await loadExams();await loadHistory();await render()})();
+// Render immediately so the public page never blocks on Supabase/CDN.
+render();
+(async()=>{try{await registerDevice();await loadExams();await loadHistory();await render()}catch(e){console.error("Startup",e);await render()}})();

@@ -1,92 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>STUDY — Admin</title>
+<title>Study Test AI</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="app">
-  <aside>
-    <div class="logo">🎓 STUDY</div>
-    <div class="admin">⚙️ Khu vực quản trị</div>
-    <nav>
-      <button class="nav active" data-tab="dashboard">📊 Tổng quan</button>
-      <button class="nav" data-tab="create">📤 Tạo bài kiểm tra</button>
-      <button class="nav" data-tab="tests">📚 Bài kiểm tra</button>
-      <button class="nav" data-tab="students">👥 Người tham gia</button>
-    </nav>
-  </aside>
-
-  <main>
-    <section id="dashboard" class="tab active">
-      <h1>Tổng quan</h1>
-      <p class="muted">Quản lý bài kiểm tra của STUDY</p>
-      <div class="stats">
-        <div><b id="statTests">0</b><span>Bài kiểm tra</span></div>
-        <div><b id="statStudents">0</b><span>Người tham gia</span></div>
-        <div><b id="statAttempts">0</b><span>Lượt làm bài</span></div>
-      </div>
-      <div class="panel">
-        <h2>🚀 Bắt đầu nhanh</h2>
-        <p>Tải tài liệu lên, chọn môn và thiết lập bài kiểm tra.</p>
-        <button class="primary" onclick="openTab('create')">+ Tạo bài kiểm tra</button>
-      </div>
-    </section>
-
-    <section id="create" class="tab">
-      <h1>Tạo bài kiểm tra</h1>
-      <p class="muted">Bản V1: tạo khung bài từ tài liệu. AI sẽ được nối ở bước tiếp theo.</p>
-      <div class="panel form">
-        <label>Tài liệu</label>
-        <input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv">
-        <small id="fileName">Chưa chọn file</small>
-
-        <label>Môn học</label>
-        <select id="subject">
-          <option>Toán</option><option>Tiếng Anh</option><option>Ngữ Văn</option>
-        </select>
-
-        <label>Tên bài kiểm tra</label>
-        <input id="title" placeholder="Ví dụ: Từ vựng Unit 1">
-
-        <div class="grid">
-          <div><label>Độ khó</label><select id="level"><option>Dễ</option><option>Trung bình</option><option>Khó</option></select></div>
-          <div><label>Thời gian (phút)</label><input id="minutes" type="number" min="1" value="45"></div>
-        </div>
-
-        <label>Số câu</label>
-        <input id="questions" type="number" min="1" value="20">
-
-        <label>Dạng câu hỏi</label>
-        <select id="type">
-          <option>Tự động theo môn</option>
-          <option>Trắc nghiệm 4 đáp án</option>
-          <option>Đúng / Sai</option>
-          <option>Trả lời ngắn</option>
-        </select>
-
-        <button class="primary" id="createBtn">🤖 Tạo bài kiểm tra</button>
-        <p id="msg" class="message"></p>
-      </div>
-    </section>
-
-    <section id="tests" class="tab">
-      <h1>Bài kiểm tra</h1>
-      <p class="muted">Các bài đã tạo trên trình duyệt này.</p>
-      <div id="testList"></div>
-    </section>
-
-    <section id="students" class="tab">
-      <h1>Người tham gia</h1>
-      <div class="panel">
-        <p>V1 chưa có Database online nên danh sách người dùng thật sẽ được nối ở bước Supabase.</p>
-        <p>Kiến trúc đã chừa sẵn khu vực để theo dõi: tên, bài đã làm, điểm, thời gian và lịch sử.</p>
-      </div>
-    </section>
-  </main>
-</div>
+<div id="app"></div>
 <script src="app.js"></script>
 </body>
 </html>

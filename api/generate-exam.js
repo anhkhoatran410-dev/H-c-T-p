@@ -35,7 +35,6 @@ export default async function handler(req, res) {
       true_false: "Đúng/Sai gồm đúng 4 mệnh đề",
       short: "Trả lời ngắn, đáp án tối đa 4 ký tự để nhập vào 4 ô"
     };
-
     const requestedTypes = selectedTypes.map(t => typeNames[t]).join("; ");
 
     const instructions = `
@@ -137,16 +136,16 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
         error.questions = normalized;
         throw error;
       }
-
       return normalized;
     };
 
     async function callGemini(prompt, includeFile) {
-      const rawKey = String(process.env.GEMINI_API_KEY || "").trim();
-      const key = rawKey.replace(/^['"`\s]+|['"`\s]+$/g, "");
+      const rawKey = String(process.env.GEMINI_API_KEY || "");
+      const key = rawKey.replace(/[\u0000-\u0020\u007f-\u009f]/g, "").replace(/^['"`]+|['"`]+$/g, "");
       if (!key) throw new Error("GEMINI_API_KEY chưa được cấu hình.");
       if (!/^[\x00-\x7F]+$/.test(key)) {
-        throw new Error("GEMINI_API_KEY chứa ký tự không hợp lệ. Hãy dán lại API key Gemini vào Vercel.");
+        const bad = [...key].findIndex(ch => ch.charCodeAt(0) > 255);
+        throw new Error(`GEMINI_API_KEY chứa ký tự Unicode không hợp lệ${bad >= 0 ? ` tại vị trí ${bad}` : ""}. Hãy dán lại API key Gemini vào Vercel.`);
       }
 
       const parts = [{ text: prompt }];
@@ -160,24 +159,22 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
       }
 
       const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "x-goog-api-key": key,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts }],
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: schema,
-              temperature: 0.25
-            }
-          })
-        }
-      );
+      // Use the documented ?key= form here. It avoids the Fetch/Headers ByteString
+      // conversion path that can throw before the request reaches Google when a
+      // secret contains an unexpected non-ASCII character.
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+            temperature: 0.25
+          }
+        })
+      });
 
       const raw = await response.text();
       let data = {};
@@ -218,7 +215,7 @@ ${inputText}`;
       questions = cleanQuestions(repaired.questions);
     }
 
-    console.log("Exam generated and validated by Gemini (v2)");
+    console.log("Exam generated and validated by Gemini (v3)");
     return res.status(200).json({ questions, provider: "gemini", validated: true });
   } catch (e) {
     console.error("generate-exam:", e);

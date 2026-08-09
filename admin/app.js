@@ -54,21 +54,47 @@ document.getElementById("file").onchange=e=>{
   document.getElementById("fileName").textContent=e.target.files[0]?.name||"Chưa chọn file";
 };
 
-document.getElementById("createBtn").onclick=()=>{
-  const file=document.getElementById("file").files[0];
-  const title=document.getElementById("title").value.trim();
-  const msg=document.getElementById("msg");
-  if(!file) return msg.textContent="⚠️ Hãy chọn tài liệu.";
-  if(!title) return msg.textContent="⚠️ Hãy đặt tên bài kiểm tra.";
-  const test={
-    id:crypto.randomUUID(),title,subject:subject.value,level:level.value,
-    minutes:Number(minutes.value),questions:Number(questions.value),
-    type:type.value,sourceFile:file.name,createdAt:new Date().toISOString(),status:"Bản nháp"
-  };
-  const tests=getTests(); tests.unshift(test); saveTests(tests);
-  msg.textContent="✅ Đã tạo khung bài kiểm tra.";
-  document.getElementById("title").value="";
-  renderTests(); updateStats();
+document.getElementById("createBtn").onclick = async () => {
+  const file = document.getElementById("file").files[0];
+  const title = document.getElementById("title").value.trim();
+  const msg = document.getElementById("msg");
+
+  if (!file) return msg.textContent = "⚠️ Hãy chọn tài liệu.";
+  if (!title) return msg.textContent = "⚠️ Hãy đặt tên bài kiểm tra.";
+
+  try {
+    await loadSupabase();
+
+    const exam = {
+      title: title,
+      subject: document.getElementById("subject").value,
+      difficulty: document.getElementById("level").value,
+      duration: Number(document.getElementById("minutes").value),
+      question_count: Number(document.getElementById("questions").value),
+      status: "Bản nháp"
+    };
+
+    const { data, error } = await db
+      .from("exams")
+      .insert(exam)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    msg.textContent = "✅ Đã lưu bài kiểm tra vào Supabase.";
+
+    document.getElementById("title").value = "";
+
+    renderTests();
+    updateStats();
+
+    console.log("Exam đã tạo:", data);
+
+  } catch (e) {
+    console.error(e);
+    msg.textContent = "❌ Không lưu được: " + e.message;
+  }
 };
 
 async function renderTests(){

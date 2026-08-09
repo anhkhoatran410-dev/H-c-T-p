@@ -3,7 +3,6 @@
 
 create extension if not exists pgcrypto;
 
--- 1) Persisted history/participants must be readable by the browser client.
 grant select, insert, update on public.user_attempts to anon, authenticated;
 grant select, insert, update on public.participants to anon, authenticated;
 grant select on public.exams to anon, authenticated;
@@ -25,32 +24,23 @@ create policy participants_update on public.participants for update to anon, aut
 drop policy if exists exams_select on public.exams;
 create policy exams_select on public.exams for select to anon, authenticated using (status = 'active');
 
--- 2) Older support migration only allowed user/admin. Bot/system are now valid senders.
-drop constraint if exists support_messages_sender_check on public.support_messages;
 alter table public.support_messages drop constraint if exists support_messages_sender_check;
 alter table public.support_messages add constraint support_messages_sender_check check (sender in ('user','admin','bot','system'));
 
--- 3) Message attachments. A message can contain text, an image/GIF, or a sticker.
 alter table public.support_messages add column if not exists attachment_url text;
 alter table public.support_messages add column if not exists attachment_type text;
 alter table public.support_messages add column if not exists attachment_name text;
 alter table public.support_messages add column if not exists sticker text;
 
--- 4) Public Supabase Storage bucket for support images/GIFs.
 insert into storage.buckets (id, name, public)
 values ('support-media', 'support-media', true)
 on conflict (id) do update set public = true;
 
 drop policy if exists support_media_read on storage.objects;
 drop policy if exists support_media_insert on storage.objects;
-create policy support_media_read
-on storage.objects for select to anon, authenticated
-using (bucket_id = 'support-media');
-create policy support_media_insert
-on storage.objects for insert to anon, authenticated
-with check (bucket_id = 'support-media');
+create policy support_media_read on storage.objects for select to anon, authenticated using (bucket_id = 'support-media');
+create policy support_media_insert on storage.objects for insert to anon, authenticated with check (bucket_id = 'support-media');
 
--- 5) Realtime for support messages/threads/media metadata.
 do $$
 begin
   if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='support_messages') then
@@ -64,7 +54,6 @@ end $$;
 alter table public.support_messages replica identity full;
 alter table public.support_threads replica identity full;
 
--- 6) Keep thread summaries and unread counters correct for bot/admin/user messages.
 create or replace function public.support_touch_thread()
 returns trigger
 language plpgsql
@@ -83,12 +72,8 @@ end;
 $$;
 
 drop trigger if exists support_touch_thread_trigger on public.support_messages;
-create trigger support_touch_thread_trigger
-after insert on public.support_messages
-for each row execute function public.support_touch_thread();
+create trigger support_touch_thread_trigger after insert on public.support_messages for each row execute function public.support_touch_thread();
 
--- 7) Make existing active exams safe for the public client after the policy above.
 update public.exams set status='active' where status is null;
 
--- NOTE: exam deletion is performed through the authenticated Admin API, not by granting
--- anonymous DELETE on exams. This keeps the destructive action behind the admin session.
+-- Exam deletion is handled through the authenticated Admin API, not anonymous DELETE.

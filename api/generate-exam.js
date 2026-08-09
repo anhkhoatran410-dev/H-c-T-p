@@ -58,7 +58,7 @@ QUY TẮC DẠNG CÂU:
 - Các trường không dùng cho loại câu nào thì để [] hoặc "" hoặc 0.
 
 ĐỊNH DẠNG TRẢ VỀ BẮT BUỘC:
-Chỉ trả về JSON thuần, KHÔNG markdown, KHÔNG ```json, KHÔNG giải thích bên ngoài JSON.
+Chỉ trả về JSON thuần, KHÔNG markdown, KHÔNG giải thích bên ngoài JSON.
 Cấu trúc chính xác:
 {
   "questions": [
@@ -134,25 +134,18 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
     const parseJsonResponse = (text) => {
       const raw = String(text || "").trim();
       if (!raw) throw new Error("Gemini không trả về nội dung JSON.");
-
       const candidates = [
         raw,
         raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
       ];
-
       const firstObject = raw.indexOf("{");
       const lastObject = raw.lastIndexOf("}");
-      if (firstObject >= 0 && lastObject > firstObject) {
-        candidates.push(raw.slice(firstObject, lastObject + 1));
-      }
-
+      if (firstObject >= 0 && lastObject > firstObject) candidates.push(raw.slice(firstObject, lastObject + 1));
       for (const candidate of candidates) {
         try {
           const parsed = JSON.parse(candidate);
           if (parsed && typeof parsed === "object") return parsed;
-        } catch {
-          // Try the next candidate.
-        }
+        } catch {}
       }
       throw new Error("Gemini trả về JSON không hợp lệ.");
     };
@@ -165,40 +158,21 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
         const bad = [...key].findIndex(ch => ch.charCodeAt(0) > 255);
         throw new Error(`GEMINI_API_KEY chứa ký tự Unicode không hợp lệ${bad >= 0 ? ` tại vị trí ${bad}` : ""}. Hãy dán lại API key Gemini vào Vercel.`);
       }
-
       const parts = [{ text: prompt }];
       if (includeFile && fileData) {
-        parts.push({
-          inlineData: {
-            mimeType: mimeType || "application/pdf",
-            data: String(fileData).replace(/^data:[^;]+;base64,/, "")
-          }
-        });
+        parts.push({ inlineData: { mimeType: mimeType || "application/pdf", data: String(fileData).replace(/^data:[^;]+;base64,/, "") } });
       }
-
       const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.25
-          }
-        })
+        body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.25 } })
       });
-
       const raw = await response.text();
       let data = {};
-      try {
-        data = raw ? JSON.parse(raw) : {};
-      } catch {
-        throw new Error(`Gemini trả về dữ liệu không hợp lệ (${response.status}).`);
-      }
+      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`Gemini trả về dữ liệu không hợp lệ (${response.status}).`); }
       if (!response.ok) throw new Error(data?.error?.message || `Gemini lỗi HTTP ${response.status}.`);
-
       const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
       return parseJsonResponse(text);
     }
@@ -209,22 +183,12 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
       questions = cleanQuestions(first.questions);
     } catch (firstError) {
       console.warn("Lần tạo đầu chưa đạt, chuyển sang AI tự sửa:", firstError);
-      const repairPrompt = `${instructions}
-
-ĐÂY LÀ KẾT QUẢ LẦN TRƯỚC BỊ LỖI:
-${JSON.stringify(firstError.questions || { questions: [] })}
-
-LỖI PHÁT HIỆN:
-${(firstError.problems || [firstError.message]).join("\n")}
-
-Hãy TỰ SỬA TOÀN BỘ lỗi và trả lại một đề hoàn chỉnh. Không được bỏ câu. Không được đổi số lượng. Không được thêm loại câu ngoài ${selectedTypes.join(", ")}.
-
-${inputText}`;
+      const repairPrompt = `${instructions}\n\nĐÂY LÀ KẾT QUẢ LẦN TRƯỚC BỊ LỖI:\n${JSON.stringify(firstError.questions || { questions: [] })}\n\nLỖI PHÁT HIỆN:\n${(firstError.problems || [firstError.message]).join("\n")}\n\nHãy TỰ SỬA TOÀN BỘ lỗi và trả lại một đề hoàn chỉnh. Không được bỏ câu. Không được đổi số lượng. Không được thêm loại câu ngoài ${selectedTypes.join(", ")}.\n\n${inputText}`;
       const repaired = await callGemini(repairPrompt, false);
       questions = cleanQuestions(repaired.questions);
     }
 
-    console.log("Exam generated and validated by Gemini (v4)");
+    console.log("Exam generated and validated by Gemini (v5-schema-free)");
     return res.status(200).json({ questions, provider: "gemini", validated: true });
   } catch (e) {
     console.error("generate-exam:", e);

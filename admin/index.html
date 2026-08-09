@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -18,7 +18,6 @@
       <button class="nav" data-tab="students">👥 Người tham gia</button>
     </nav>
   </aside>
-
   <main>
     <section id="dashboard" class="tab active">
       <h1>Tổng quan</h1>
@@ -30,17 +29,17 @@
       </div>
       <div class="panel">
         <h2>🚀 Bắt đầu nhanh</h2>
-        <p>Tải tài liệu lên, chọn môn và thiết lập bài kiểm tra.</p>
+        <p>Upload tài liệu, chọn số câu và dạng câu. AI sẽ đọc tài liệu rồi tự tạo đề.</p>
         <button class="primary" onclick="openTab('create')">+ Tạo bài kiểm tra</button>
       </div>
     </section>
 
     <section id="create" class="tab">
       <h1>Tạo bài kiểm tra</h1>
-      <p class="muted">Bản V1: tạo khung bài từ tài liệu. AI sẽ được nối ở bước tiếp theo.</p>
+      <p class="muted">AI tự đọc tài liệu và tạo câu hỏi bám theo nội dung file.</p>
       <div class="panel form">
         <label>Tài liệu</label>
-        <input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv">
+        <input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.rtf">
         <small id="fileName">Chưa chọn file</small>
 
         <label>Môn học</label>
@@ -49,38 +48,40 @@
         </select>
 
         <label>Tên bài kiểm tra</label>
-        <input id="title" placeholder="Ví dụ: Từ vựng Unit 1">
+        <input id="title" placeholder="Ví dụ: Hàm số - ôn tập chương 1">
 
         <div class="grid">
-          <div><label>Độ khó</label><select id="level"><option>Dễ</option><option>Trung bình</option><option>Khó</option></select></div>
+          <div><label>Độ khó</label><select id="level"><option>Dễ</option><option selected>Trung bình</option><option>Khó</option></select></div>
           <div><label>Thời gian (phút)</label><input id="minutes" type="number" min="1" value="45"></div>
         </div>
 
         <label>Số câu</label>
-        <input id="questions" type="number" min="1" value="20">
+        <input id="questions" type="number" min="1" max="100" value="20">
 
         <label>Dạng câu hỏi</label>
-        <select id="type">
-          <option>Tự động theo môn</option>
-          <option>Trắc nghiệm 4 đáp án</option>
-          <option>Đúng / Sai</option>
-          <option>Trả lời ngắn</option>
-        </select>
+        <div id="questionTypes" style="display:grid;gap:10px;margin:8px 0 16px">
+          <label><input type="checkbox" name="questionType" value="mcq" checked> Trắc nghiệm 4 lựa chọn</label>
+          <label><input type="checkbox" name="questionType" value="true_false" checked> Đúng / Sai</label>
+          <label><input type="checkbox" name="questionType" value="short" checked> Trả lời ngắn (4 ô)</label>
+        </div>
 
-        <button class="primary" id="createBtn">🤖 Tạo bài kiểm tra</button>
+        <button class="primary" id="createBtn">🤖 AI đọc file & tạo bài</button>
         <p id="msg" class="message"></p>
       </div>
     </section>
 
     <section id="tests" class="tab">
       <h1>Bài kiểm tra</h1>
-      <p class="muted">Các bài đã tạo trên trình duyệt này.</p>
+      <p class="muted">Các bài đã lưu trên Supabase.</p>
       <div id="testList"></div>
     </section>
 
     <section id="students" class="tab">
       <h1>Người tham gia</h1>
-      <p id="onlineStatus" class="muted">Đang kết nối Supabase...</p><div id="studentList" class="panel"><p class="muted">Đang tải dữ liệu...</p></div><h2 style="margin-top:24px">📈 Lượt làm bài</h2><div id="attemptList"></div>
+      <p id="onlineStatus" class="muted">Đang kết nối Supabase...</p>
+      <div id="studentList" class="panel"><p class="muted">Đang tải dữ liệu...</p></div>
+      <h2 style="margin-top:24px">📈 Lượt làm bài</h2>
+      <div id="attemptList"></div>
     </section>
   </main>
 </div>

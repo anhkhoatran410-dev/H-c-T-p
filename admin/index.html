@@ -1,90 +1,11 @@
 <!doctype html>
 <html lang="vi">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>STUDY — Admin</title>
-<link rel="stylesheet" href="style.css?v=20260809-2">
-</head>
-<body>
-<div class="app">
-  <aside>
-    <div class="logo">🎓 STUDY</div>
-    <div class="admin">⚙️ Khu vực quản trị</div>
-    <nav>
-      <button class="nav active" data-tab="dashboard">📊 Tổng quan</button>
-      <button class="nav" data-tab="create">📤 Tạo bài kiểm tra</button>
-      <button class="nav" data-tab="tests">📚 Bài kiểm tra</button>
-      <button class="nav" data-tab="students">👥 Người tham gia</button>
-    </nav>
-  </aside>
-  <main>
-    <section id="dashboard" class="tab active">
-      <h1>Tổng quan</h1>
-      <p class="muted">Quản lý bài kiểm tra của STUDY</p>
-      <div class="stats">
-        <div><b id="statTests">0</b><span>Bài kiểm tra</span></div>
-        <div><b id="statStudents">0</b><span>Người tham gia</span></div>
-        <div><b id="statAttempts">0</b><span>Lượt làm bài</span></div>
-      </div>
-      <div class="panel">
-        <h2>🚀 Bắt đầu nhanh</h2>
-        <p>Upload tài liệu, chọn số câu và dạng câu. AI sẽ đọc tài liệu rồi tự tạo đề.</p>
-        <button class="primary" onclick="openTab('create')">+ Tạo bài kiểm tra</button>
-      </div>
-    </section>
-
-    <section id="create" class="tab">
-      <h1>Tạo bài kiểm tra</h1>
-      <p class="muted">AI tự đọc tài liệu và tạo câu hỏi bám theo nội dung file.</p>
-      <div class="panel form">
-        <label>Tài liệu</label>
-        <input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.rtf">
-        <small id="fileName">Chưa chọn file</small>
-
-        <label>Môn học</label>
-        <select id="subject">
-          <option>Toán</option><option>Tiếng Anh</option><option>Ngữ Văn</option>
-        </select>
-
-        <label>Tên bài kiểm tra</label>
-        <input id="title" placeholder="Ví dụ: Hàm số - ôn tập chương 1">
-
-        <div class="grid">
-          <div><label>Độ khó</label><select id="level"><option>Dễ</option><option selected>Trung bình</option><option>Khó</option></select></div>
-          <div><label>Thời gian (phút)</label><input id="minutes" type="number" min="1" value="45"></div>
-        </div>
-
-        <label>Số câu</label>
-        <input id="questions" type="number" min="1" max="100" value="20">
-
-        <label>Dạng câu hỏi</label>
-        <div id="questionTypes" style="display:grid;gap:10px;margin:8px 0 16px">
-          <label><input type="checkbox" name="questionType" value="mcq" checked> Trắc nghiệm 4 lựa chọn</label>
-          <label><input type="checkbox" name="questionType" value="true_false" checked> Đúng / Sai</label>
-          <label><input type="checkbox" name="questionType" value="short" checked> Trả lời ngắn (4 ô)</label>
-        </div>
-
-        <button class="primary" id="createBtn">🤖 AI đọc file & tạo bài</button>
-        <p id="msg" class="message"></p>
-      </div>
-    </section>
-
-    <section id="tests" class="tab">
-      <h1>Bài kiểm tra</h1>
-      <p class="muted">Các bài đã lưu trên Supabase.</p>
-      <div id="testList"></div>
-    </section>
-
-    <section id="students" class="tab">
-      <h1>Người tham gia</h1>
-      <p id="onlineStatus" class="muted">Đang kết nối Supabase...</p>
-      <div id="studentList" class="panel"><p class="muted">Đang tải dữ liệu...</p></div>
-      <h2 style="margin-top:24px">📈 Lượt làm bài</h2>
-      <div id="attemptList"></div>
-    </section>
-  </main>
-</div>
-<script src="app.js?v=20260809-3"></script>
-</body>
-</html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>STUDY — Admin</title><link rel="stylesheet" href="style.css?v=20260809-4"></head>
+<body><div class="app"><aside><div class="logo">🎓 STUDY</div><div class="admin">⚙️ Khu vực quản trị</div><nav>
+<button class="nav active" data-tab="dashboard">📊 Tổng quan</button><button class="nav" data-tab="create">📤 Tạo bài kiểm tra</button><button class="nav" data-tab="tests">📚 Bài kiểm tra</button><button class="nav" data-tab="students">👥 Người tham gia</button><button class="nav" data-tab="support">💬 Tin nhắn hỗ trợ</button></nav></aside><main>
+<section id="dashboard" class="tab active"><h1>Tổng quan</h1><p class="muted">Quản lý bài kiểm tra của STUDY</p><div class="stats"><div><b id="statTests">0</b><span>Bài kiểm tra</span></div><div><b id="statStudents">0</b><span>Người tham gia</span></div><div><b id="statAttempts">0</b><span>Lượt làm bài</span></div></div><div class="panel"><h2>🚀 Bắt đầu nhanh</h2><p>Upload tài liệu, chọn số câu và dạng câu. AI sẽ đọc tài liệu rồi tự tạo đề.</p><button class="primary" onclick="openTab('create')">+ Tạo bài kiểm tra</button></div></section>
+<section id="create" class="tab"><h1>Tạo bài kiểm tra</h1><p class="muted">AI tự đọc tài liệu và tạo câu hỏi bám theo nội dung file.</p><div class="panel form"><label>Tài liệu</label><input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.rtf,image/*"><small id="fileName">Chưa chọn file</small><label>Môn học</label><select id="subject"><option>Toán</option><option>Tiếng Anh</option><option>Ngữ Văn</option></select><label>Tên bài kiểm tra</label><input id="title" placeholder="Ví dụ: Hàm số - ôn tập chương 1"><div class="grid"><div><label>Độ khó</label><select id="level"><option>Dễ</option><option selected>Trung bình</option><option>Khó</option></select></div><div><label>Thời gian (phút)</label><input id="minutes" type="number" min="1" value="45"></div></div><label>Số câu</label><input id="questions" type="number" min="1" max="100" value="20"><label>Dạng câu hỏi</label><div id="questionTypes" style="display:grid;gap:10px;margin:8px 0 16px"><label><input type="checkbox" name="questionType" value="mcq" checked> Trắc nghiệm 4 lựa chọn</label><label><input type="checkbox" name="questionType" value="true_false" checked> Đúng / Sai</label><label><input type="checkbox" name="questionType" value="short" checked> Trả lời ngắn (4 ô)</label></div><button class="primary" id="createBtn">🤖 AI đọc file & tạo bài</button><p id="msg" class="message"></p></div></section>
+<section id="tests" class="tab"><h1>Bài kiểm tra</h1><p class="muted">Các bài đã lưu trên Supabase.</p><div id="testList"></div></section>
+<section id="students" class="tab"><h1>Người tham gia</h1><p id="onlineStatus" class="muted">Đang kết nối Supabase...</p><div id="studentList" class="panel"><p class="muted">Đang tải dữ liệu...</p></div><h2 style="margin-top:24px">📈 Lượt làm bài</h2><div id="attemptList"></div></section>
+<section id="support" class="tab"><h1>💬 Tin nhắn hỗ trợ</h1><p class="muted">Người dùng có thể nhắn lỗi và Admin trả lời trực tiếp.</p><div id="supportThreads" class="panel">Đang tải...</div><div id="supportChat" class="panel" style="margin-top:16px">Chọn một cuộc trò chuyện.</div></section>
+</main></div><script src="app.js?v=20260809-4"></script></body></html>

@@ -65,15 +65,35 @@ document.getElementById("createBtn").onclick = async () => {
   try {
     await loadSupabase();
 
-    const exam = {
-      title: title,
-      subject: document.getElementById("subject").value,
-      difficulty: document.getElementById("level").value,
-      duration: Number(document.getElementById("minutes").value),
-      question_count: Number(document.getElementById("questions").value),
-      status: "Bản nháp"
-    };
+    const { data, error } = await db
+      .from("exams")
+      .insert({
+        title: title,
+        subject: document.getElementById("subject").value,
+        difficulty: document.getElementById("level").value,
+        duration: Number(document.getElementById("minutes").value),
+        question_count: Number(document.getElementById("questions").value),
+        status: "active"
+      })
+      .select()
+      .single();
 
+    if (error) throw error;
+
+    msg.textContent = "✅ Đã tạo bài kiểm tra trên Supabase.";
+
+    document.getElementById("title").value = "";
+    document.getElementById("file").value = "";
+    document.getElementById("fileName").textContent = "Chưa chọn file";
+
+    renderTests();
+    updateStats();
+
+  } catch (e) {
+    console.error(e);
+    msg.textContent = "❌ Không tạo được: " + e.message;
+  }
+};
     const { data, error } = await db
       .from("exams")
       .insert(exam)

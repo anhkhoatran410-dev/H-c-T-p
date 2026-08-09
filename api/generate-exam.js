@@ -218,7 +218,7 @@ ${inputText}`;
       questions = cleanQuestions(repaired.questions);
     }
 
-    console.log("Exam generated and validated by Gemini");
+    console.log("Exam generated and validated by Gemini (v2)");
     return res.status(200).json({ questions, provider: "gemini", validated: true });
   } catch (e) {
     console.error("generate-exam:", e);

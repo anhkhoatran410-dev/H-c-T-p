@@ -89,16 +89,22 @@ async function createExam(){
     let documentText="";
     try{documentText=await extractDocumentText(file);}catch(ex){console.warn("Không trích xuất được văn bản:",ex)}
 
-    // Vercel Functions giới hạn request body 4.5 MB. Ưu tiên gửi text đã trích xuất
-    // để file PDF/DOCX lớn không bị lỗi "Request Entity Too Large".
+    // Vercel Functions giới hạn request body 4.5 MB. Không gửi base64 của file
+    // lớn qua function vì base64 làm payload phình thêm khoảng 33%.
+    // Ưu tiên gửi phần text đã trích xuất để request luôn nhỏ.
     if(documentText){
       documentText=documentText.trim();
-      if(documentText.length>350000) documentText=documentText.slice(0,350000)+"\n[Đã cắt phần vượt quá giới hạn xử lý]";
+      const MAX_TEXT_CHARS=180000;
+      if(documentText.length>MAX_TEXT_CHARS){
+        documentText=documentText.slice(0,MAX_TEXT_CHARS)+"\n[Đã giới hạn phần văn bản gửi lên để tránh vượt giới hạn request của Vercel]";
+      }
     }
 
     let fileData="";
     if(!documentText){
-      if(file.size>3000000) throw new Error("File quá lớn để gửi trực tiếp. PDF/DOCX cần có thể trích xuất được chữ; hãy thử file PDF có text hoặc file nhỏ hơn 3 MB.");
+      // Với PDF/DOCX không trích xuất được chữ, chỉ cho phép file nhỏ.
+      // File lớn cần OCR/Storage riêng thay vì nhét base64 vào JSON request.
+      if(file.size>2500000) throw new Error("File không trích xuất được chữ và quá lớn. Hãy dùng PDF có thể bôi đen/copy chữ, hoặc file nhỏ hơn 2.5 MB.");
       msg.textContent="⏳ Đang chuẩn bị file...";
       fileData=await fileToBase64(file);
     }
@@ -107,7 +113,12 @@ async function createExam(){
     const aiRes=await fetch("/api/generate-exam",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:file.name,mimeType:file.type||"application/pdf",fileData,documentText,subject,difficulty,questionCount,types})});
     const raw=await aiRes.text();
     let ai={};
-    try{ai=raw?JSON.parse(raw):{}}catch{throw new Error(`Server trả về dữ liệu không hợp lệ (${aiRes.status}). ${raw.slice(0,250)}`)}
+    try{ai=raw?JSON.parse(raw):{}}catch{
+      if(aiRes.status===413 || /request entity too large|payload too large/i.test(raw)){
+        throw new Error("Request quá lớn. Hãy dùng PDF có text hoặc tài liệu ngắn hơn.");
+      }
+      throw new Error(`Server trả về dữ liệu không hợp lệ (${aiRes.status}). ${raw.slice(0,250)}`);
+    }
     if(!aiRes.ok) throw new Error(ai.error||"AI không tạo được đề");
     const questions=ai.questions||[];
     if(questions.length!==questionCount) throw new Error(`AI tạo ${questions.length}/${questionCount} câu.`);

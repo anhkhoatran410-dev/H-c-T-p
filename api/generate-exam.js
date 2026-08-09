@@ -55,37 +55,29 @@ QUY TẮC DẠNG CÂU:
 - true_false: q là câu dẫn; statements phải có ĐÚNG 4 mệnh đề; answers phải có ĐÚNG 4 giá trị boolean tương ứng từng mệnh đề.
 - short: q là câu hỏi; answer là đáp án chính xác dạng chuỗi, tối đa 4 ký tự để học sinh nhập bằng 4 ô. Có thể dùng số, dấu âm, dấu chấm, dấu phẩy hoặc dấu / nếu cần. Không viết lời giải vào answer.
 - explanation luôn phải giải thích ngắn gọn cách kiểm tra đáp án.
-- Các trường không dùng cho loại câu nào thì để [] hoặc "" hoặc 0 theo schema.
+- Các trường không dùng cho loại câu nào thì để [] hoặc "" hoặc 0.
+
+ĐỊNH DẠNG TRẢ VỀ BẮT BUỘC:
+Chỉ trả về JSON thuần, KHÔNG markdown, KHÔNG ```json, KHÔNG giải thích bên ngoài JSON.
+Cấu trúc chính xác:
+{
+  "questions": [
+    {
+      "type": "mcq | true_false | short",
+      "q": "...",
+      "opts": ["...", "...", "...", "..."],
+      "a": 0,
+      "statements": ["...", "...", "...", "..."],
+      "answers": [true, false, true, false],
+      "answer": "...",
+      "explanation": "..."
+    }
+  ]
+}
 
 MÔN: ${subject || "Tự xác định từ tài liệu"}
 ĐỘ KHÓ: ${difficulty || "Trung bình"}
 `;
-
-    const schema = {
-      type: "object",
-      properties: {
-        questions: {
-          type: "array",
-          minItems: count,
-          maxItems: count,
-          items: {
-            type: "object",
-            properties: {
-              type: { type: "string", enum: ["mcq", "true_false", "short"] },
-              q: { type: "string" },
-              opts: { type: "array", items: { type: "string" }, maxItems: 4 },
-              a: { type: "integer", minimum: 0, maximum: 3 },
-              statements: { type: "array", items: { type: "string" }, maxItems: 4 },
-              answers: { type: "array", items: { type: "boolean" }, maxItems: 4 },
-              answer: { type: "string", maxLength: 4 },
-              explanation: { type: "string" }
-            },
-            required: ["type", "q", "opts", "a", "statements", "answers", "answer", "explanation"]
-          }
-        }
-      },
-      required: ["questions"]
-    };
 
     const inputText = documentText
       ? `Tên file: ${fileName || "tài liệu"}\n\nNỘI DUNG TÀI LIỆU:\n${documentText}`
@@ -139,6 +131,32 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
       return normalized;
     };
 
+    const parseJsonResponse = (text) => {
+      const raw = String(text || "").trim();
+      if (!raw) throw new Error("Gemini không trả về nội dung JSON.");
+
+      const candidates = [
+        raw,
+        raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim()
+      ];
+
+      const firstObject = raw.indexOf("{");
+      const lastObject = raw.lastIndexOf("}");
+      if (firstObject >= 0 && lastObject > firstObject) {
+        candidates.push(raw.slice(firstObject, lastObject + 1));
+      }
+
+      for (const candidate of candidates) {
+        try {
+          const parsed = JSON.parse(candidate);
+          if (parsed && typeof parsed === "object") return parsed;
+        } catch {
+          // Try the next candidate.
+        }
+      }
+      throw new Error("Gemini trả về JSON không hợp lệ.");
+    };
+
     async function callGemini(prompt, includeFile) {
       const rawKey = String(process.env.GEMINI_API_KEY || "");
       const key = rawKey.replace(/[\u0000-\u0020\u007f-\u009f]/g, "").replace(/^['"`]+|['"`]+$/g, "");
@@ -159,9 +177,6 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
       }
 
       const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-      // Use the documented ?key= form here. It avoids the Fetch/Headers ByteString
-      // conversion path that can throw before the request reaches Google when a
-      // secret contains an unexpected non-ASCII character.
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
       const response = await fetch(url, {
         method: "POST",
@@ -170,7 +185,6 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
           contents: [{ role: "user", parts }],
           generationConfig: {
             responseMimeType: "application/json",
-            responseSchema: schema,
             temperature: 0.25
           }
         })
@@ -186,12 +200,7 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
       if (!response.ok) throw new Error(data?.error?.message || `Gemini lỗi HTTP ${response.status}.`);
 
       const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
-      if (!text) throw new Error("Gemini không trả về nội dung JSON.");
-      try {
-        return JSON.parse(text);
-      } catch {
-        throw new Error("Gemini trả về JSON không hợp lệ.");
-      }
+      return parseJsonResponse(text);
     }
 
     let questions;
@@ -215,7 +224,7 @@ ${inputText}`;
       questions = cleanQuestions(repaired.questions);
     }
 
-    console.log("Exam generated and validated by Gemini (v3)");
+    console.log("Exam generated and validated by Gemini (v4)");
     return res.status(200).json({ questions, provider: "gemini", validated: true });
   } catch (e) {
     console.error("generate-exam:", e);

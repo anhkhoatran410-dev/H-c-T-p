@@ -53,95 +53,79 @@ export default async function handler(req, res) {
       return questions;
     };
 
-    async function callOpenAI() {
-      const key = String(process.env.OPENAI_API_KEY || "").trim();
-      if (!key) throw new Error("OPENAI_API_KEY chưa được cấu hình.");
-
-      const content = documentText
-        ? [{ type: "input_text", text: inputText }]
-        : [
-            { type: "input_text", text: inputText },
-            { type: "input_file", filename: fileName || "document", file_data: `data:${mimeType || "application/pdf"};base64,${fileData}` }
-          ];
-
-      const response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: process.env.OPENAI_MODEL || "gpt-5-mini",
-          instructions,
-          input: [{ role: "user", content }],
-          text: { format: { type: "json_schema", name: "exam", strict: true, schema } }
-        })
-      });
-
-      const raw = await response.text();
-      let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`OpenAI trả về dữ liệu không hợp lệ (${response.status}).`); }
-      if (!response.ok) throw new Error(data?.error?.message || `OpenAI lỗi HTTP ${response.status}.`);
-      if (!data.output_text) throw new Error("OpenAI không trả về nội dung JSON.");
-
-      let parsed;
-      try { parsed = JSON.parse(data.output_text); } catch { throw new Error("OpenAI trả về JSON không hợp lệ."); }
-      return validate(parsed);
-    }
-
     async function callGemini() {
-      const key = String(process.env.GEMINI_API_KEY || "").trim();
+      // Gemini is the only provider used by this endpoint.
+      // Clean accidental surrounding quotes/backticks/spaces from the Vercel env value.
+      const rawKey = String(process.env.GEMINI_API_KEY || "").trim();
+      const key = rawKey.replace(/^['"`\s]+|['"`\s]+$/g, "");
+
       if (!key) throw new Error("GEMINI_API_KEY chưa được cấu hình.");
+      if (!/^[\x00-\x7F]+$/.test(key)) {
+        throw new Error("GEMINI_API_KEY chứa ký tự không hợp lệ. Hãy dán lại đúng API key Gemini vào Vercel, không kèm chữ hoặc ký tự tiếng Việt.");
+      }
 
       const parts = [{ text: `${instructions}\n\n${inputText}` }];
       if (!documentText && fileData) {
-        parts.push({ inlineData: { mimeType: mimeType || "application/pdf", data: fileData } });
+        parts.push({
+          inlineData: {
+            mimeType: mimeType || "application/pdf",
+            data: String(fileData).replace(/^data:[^;]+;base64,/, "")
+          }
+        });
       }
 
       const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: "POST",
-        headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: schema
-          }
-        })
-      });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: "POST",
+          headers: {
+            "x-goog-api-key": key,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: schema
+            }
+          })
+        }
+      );
 
       const raw = await response.text();
       let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`Gemini trả về dữ liệu không hợp lệ (${response.status}).`); }
-      if (!response.ok) throw new Error(data?.error?.message || `Gemini lỗi HTTP ${response.status}.`);
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        throw new Error(`Gemini trả về dữ liệu không hợp lệ (${response.status}).`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error?.message || `Gemini lỗi HTTP ${response.status}.`);
+      }
 
       const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
       if (!text) throw new Error("Gemini không trả về nội dung JSON.");
 
       let parsed;
-      try { parsed = JSON.parse(text); } catch { throw new Error("Gemini trả về JSON không hợp lệ."); }
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new Error("Gemini trả về JSON không hợp lệ.");
+      }
+
       return validate(parsed);
-    }
-
-    const errors = [];
-
-    try {
-      const questions = await callOpenAI();
-      console.log("Exam generated by OpenAI");
-      return res.status(200).json({ questions, provider: "openai" });
-    } catch (e) {
-      console.warn("OpenAI failed, falling back to Gemini:", e);
-      errors.push(`OpenAI: ${e.message}`);
     }
 
     try {
       const questions = await callGemini();
-      console.log("Exam generated by Gemini fallback");
+      console.log("Exam generated by Gemini");
       return res.status(200).json({ questions, provider: "gemini" });
     } catch (e) {
-      console.error("Gemini fallback failed:", e);
-      errors.push(`Gemini: ${e.message}`);
+      console.error("Gemini generation failed:", e);
+      return res.status(502).json({ error: `Gemini lỗi: ${e.message || "Lỗi không xác định."}` });
     }
-
-    return res.status(502).json({ error: `Cả hai AI đều lỗi. ${errors.join(" | ")}` });
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: e.message || "Lỗi máy chủ." });

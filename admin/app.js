@@ -143,15 +143,29 @@ if (createBtn) {
         Number(document.getElementById("questions")?.value || 0);
 
 
-      const exam = {
-        title: title,
-        subject: subject,
-        difficulty: difficulty,
-        duration: duration,
-        question_count: questionCount,
-        status: "active"
-      };
+      const questions = Array.from(
+  { length: questionCount },
+  (_, i) => ({
+    q: `Câu hỏi ${i + 1}`,
+    opts: [
+      "Đáp án A",
+      "Đáp án B",
+      "Đáp án C",
+      "Đáp án D"
+    ],
+    a: 0
+  })
+);
 
+const exam = {
+  title: title,
+  subject: subject,
+  difficulty: difficulty,
+  duration: duration,
+  question_count: questionCount,
+  questions: questions,
+  status: "active"
+};
 
       const { data, error } = await db
         .from("exams")

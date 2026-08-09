@@ -151,30 +151,86 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
     };
 
     async function callGemini(prompt, includeFile) {
+      // Gemini API key must be sent as an HTTP header. This avoids URL/header
+      // encoding problems and, importantly, prevents accidental Unicode in a
+      // pasted Vercel secret from reaching fetch as a ByteString.
       const rawKey = String(process.env.GEMINI_API_KEY || "");
-      const key = rawKey.replace(/[\u0000-\u0020\u007f-\u009f]/g, "").replace(/^['"`]+|['"`]+$/g, "");
-      if (!key) throw new Error("GEMINI_API_KEY chưa được cấu hình.");
-      if (!/^[\x00-\x7F]+$/.test(key)) {
-        const bad = [...key].findIndex(ch => ch.charCodeAt(0) > 255);
-        throw new Error(`GEMINI_API_KEY chứa ký tự Unicode không hợp lệ${bad >= 0 ? ` tại vị trí ${bad}` : ""}. Hãy dán lại API key Gemini vào Vercel.`);
+      const key = rawKey
+        .replace(/^['"`]+|['"`]+$/g, "")
+        .replace(/[\u0000-\u0020\u007f-\u009f]/g, "")
+        .trim();
+
+      if (!key) throw new Error("GEMINI_API_KEY chưa được cấu hình trên Vercel.");
+      const badIndex = [...key].findIndex(ch => ch.charCodeAt(0) > 127);
+      if (badIndex >= 0) {
+        throw new Error(`GEMINI_API_KEY trên Vercel chứa ký tự không hợp lệ tại vị trí ${badIndex}. Hãy xóa secret cũ và dán lại API key Gemini chỉ gồm ký tự ASCII.`);
       }
+
       const parts = [{ text: prompt }];
       if (includeFile && fileData) {
-        parts.push({ inlineData: { mimeType: mimeType || "application/pdf", data: String(fileData).replace(/^data:[^;]+;base64,/, "") } });
+        parts.push({
+          inlineData: {
+            mimeType: mimeType || "application/pdf",
+            data: String(fileData).replace(/^data:[^;]+;base64,/, "")
+          }
+        });
       }
-      const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", temperature: 0.25 } })
-      });
-      const raw = await response.text();
-      let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`Gemini trả về dữ liệu không hợp lệ (${response.status}).`); }
-      if (!response.ok) throw new Error(data?.error?.message || `Gemini lỗi HTTP ${response.status}.`);
-      const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
-      return parseJsonResponse(text);
+
+      const configuredModel = String(process.env.GEMINI_MODEL || "gemini-2.5-flash").trim();
+      const models = [configuredModel, "gemini-2.5-flash-lite"].filter((m, i, a) => m && a.indexOf(m) === i);
+      let lastError = null;
+
+      for (const model of models) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const response = await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "x-goog-api-key": key
+              },
+              body: JSON.stringify({
+                contents: [{ role: "user", parts }],
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  temperature: 0.25
+                }
+              })
+            });
+
+            const raw = await response.text();
+            let data = {};
+            try {
+              data = raw ? JSON.parse(raw) : {};
+            } catch {
+              throw new Error(`Gemini trả về dữ liệu không hợp lệ (HTTP ${response.status}).`);
+            }
+
+            if (!response.ok) {
+              const message = data?.error?.message || `Gemini lỗi HTTP ${response.status}.`;
+              const err = new Error(`Gemini ${response.status}: ${message}`);
+              err.status = response.status;
+              throw err;
+            }
+
+            const text = data?.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
+            return parseJsonResponse(text);
+          } catch (err) {
+            lastError = err;
+            const status = Number(err?.status || 0);
+            const retryable = status === 429 || status >= 500 || !status;
+            if (!retryable || attempt === 1) break;
+            await new Promise(r => setTimeout(r, 700 * (attempt + 1)));
+          }
+        }
+
+        // If the configured model is unavailable, try the lightweight fallback.
+        if (Number(lastError?.status || 0) === 400 || Number(lastError?.status || 0) === 404) continue;
+        break;
+      }
+
+      throw lastError || new Error("Không gọi được Gemini.");
     }
 
     let questions;
@@ -188,7 +244,7 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
       questions = cleanQuestions(repaired.questions);
     }
 
-    console.log("Exam generated and validated by Gemini (v5-schema-free)");
+    console.log("Exam generated and validated by Gemini (v6-auth-retry)");
     return res.status(200).json({ questions, provider: "gemini", validated: true });
   } catch (e) {
     console.error("generate-exam:", e);

@@ -1,165 +1,68 @@
-const SUPABASE_URL = "https://mlqaeginqsgqacdqdzbm.supabase.co";
-const SUPABASE_KEY = "sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi";
-let db = null;
+const SUPABASE_URL="https://mlqaeginqsgqacdqdzbm.supabase.co";
+const SUPABASE_KEY="sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi";
+let db=null;
+const ADMIN_TOKEN_KEY="study_admin_session_v2";
+const admin={tab:"dashboard",thread:null,threads:[],accounts:[],messages:[],channel:null,poll:null,assistant:[]};
 
-function loadSupabase(){
-  return new Promise((resolve,reject)=>{
-    if(window.supabase){ db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY); return resolve(db); }
-    const s=document.createElement("script");
-    s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-    s.onload=()=>{db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);resolve(db)};
-    s.onerror=()=>reject(new Error("Không tải được Supabase JS"));
-    document.head.appendChild(s);
-  });
-}
-function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
-function openTab(id){
-  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
-  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
-  document.getElementById(id)?.classList.add("active");
-  document.querySelector(`[data-tab="${id}"]`)?.classList.add("active");
-  if(id==="tests") renderTests();
-  if(id==="students") loadOnline();
-  if(id==="dashboard") updateStats();
-}
-document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
+const $=id=>document.getElementById(id);
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+function toast(text){const t=$("toast");if(!t)return;t.textContent=text;t.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.classList.remove("show"),2600)}
+function token(){return sessionStorage.getItem(ADMIN_TOKEN_KEY)||""}
+async function loadSupabase(){if(db)return db;if(!window.supabase){await new Promise((resolve,reject)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";s.onload=resolve;s.onerror=()=>reject(new Error("Không tải được Supabase JS"));document.head.appendChild(s)})}db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);return db}
+function themeName(){return localStorage.getItem("study_admin_theme")||"light"}
+function setTheme(mode){document.body.classList.toggle("dark",mode==="dark");localStorage.setItem("study_admin_theme",mode)}
+function toggleTheme(){setTheme(document.body.classList.contains("dark")?"light":"dark")}
+function showApp(){setTheme(themeName());$("adminLogin").classList.add("hidden");$("adminApp").classList.remove("hidden");bootAdmin()}
+async function login(password){const r=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Đăng nhập thất bại");sessionStorage.setItem(ADMIN_TOKEN_KEY,data.token);showApp()}
+function logout(){sessionStorage.removeItem(ADMIN_TOKEN_KEY);location.reload()}
+function openTab(id){admin.tab=id;document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".nav-item[data-tab]").forEach(x=>x.classList.remove("active"));$(id)?.classList.add("active");document.querySelector(`[data-tab="${id}"]`)?.classList.add("active");const titles={dashboard:"Tổng quan",support:"Hỗ trợ",participants:"Người tham gia",history:"Lịch sử làm bài",tests:"Bài kiểm tra",accounts:"Tài khoản hỗ trợ",bot:"Bot tự động",assistant:"Admin Copilot"};$("pageTitle").textContent=titles[id]||"Admin";if(id==="dashboard")loadDashboard();if(id==="support")startSupportLive();if(id==="participants")loadParticipants();if(id==="history")loadHistory();if(id==="tests")renderTests();if(id==="accounts")loadAccounts();if(id==="bot"){loadAccounts();loadBotRules()}if(id==="assistant")loadAssistant()}
 
-document.getElementById("file")?.addEventListener("change",e=>{
-  document.getElementById("fileName").textContent=e.target.files[0]?.name||"Chưa chọn file";
-});
-
-function loadScript(src){
-  return new Promise((resolve,reject)=>{
-    const existing=[...document.scripts].find(s=>s.src===src);
-    if(existing){existing.addEventListener("load",()=>resolve());if(window.pdfjsLib||window.mammoth)resolve();return;}
-    const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=()=>reject(new Error(`Không tải được thư viện: ${src}`));document.head.appendChild(s);
-  });
-}
-
-async function extractPdfText(file){
-  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-  const data=await file.arrayBuffer();
-  const pdf=await window.pdfjsLib.getDocument({data}).promise;
-  const parts=[];
-  for(let i=1;i<=pdf.numPages;i++){
-    const page=await pdf.getPage(i);
-    const text=await page.getTextContent();
-    parts.push(`\n--- Trang ${i} ---\n`+text.items.map(x=>x.str||"").join(" "));
-  }
-  return parts.join("\n").trim();
-}
-
-async function extractDocumentText(file){
-  const name=(file.name||"").toLowerCase();
-  if(name.endsWith(".txt")||name.endsWith(".md")||name.endsWith(".csv")||name.endsWith(".rtf")) return await file.text();
-  if(name.endsWith(".pdf")||file.type==="application/pdf") return await extractPdfText(file);
-  if(name.endsWith(".docx")||file.type==="application/vnd.openxmlformats-officedocument.wordprocessingml.document"){
-    await loadScript("https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js");
-    const result=await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
-    return result.value||"";
-  }
-  return "";
-}
-
-function fileToBase64(file){
-  return new Promise((resolve,reject)=>{
-    const reader=new FileReader();
-    reader.onload=()=>resolve(String(reader.result||"").split(",")[1]||"");
-    reader.onerror=()=>reject(reader.error||new Error("Không đọc được file"));
-    reader.readAsDataURL(file);
-  });
-}
-
-async function createExam(){
-  const file=document.getElementById("file")?.files[0];
-  const title=document.getElementById("title")?.value.trim();
-  const msg=document.getElementById("msg");
-  const subject=document.getElementById("subject")?.value||"";
-  const difficulty=document.getElementById("level")?.value||"Trung bình";
-  const duration=Number(document.getElementById("minutes")?.value||0);
-  const questionCount=Number(document.getElementById("questions")?.value||0);
-  const types=[...document.querySelectorAll('input[name="questionType"]:checked')].map(x=>x.value);
-  if(!file) return msg.textContent="⚠️ Hãy chọn tài liệu.";
-  if(!title) return msg.textContent="⚠️ Hãy đặt tên bài kiểm tra.";
-  if(!questionCount) return msg.textContent="⚠️ Hãy nhập số câu.";
-  if(!types.length) return msg.textContent="⚠️ Chọn ít nhất một dạng câu hỏi.";
-  try{
-    msg.textContent="⏳ Đang đọc toàn bộ tài liệu trên trình duyệt...";
-    let documentText="";
-    try{documentText=await extractDocumentText(file);}catch(ex){console.warn("Không trích xuất được văn bản:",ex)}
-
-    // Vercel Functions giới hạn request body 4.5 MB. Không gửi base64 của file
-    // lớn qua function vì base64 làm payload phình thêm khoảng 33%.
-    // Ưu tiên gửi phần text đã trích xuất để request luôn nhỏ.
-    if(documentText){
-      documentText=documentText.trim();
-      const MAX_TEXT_CHARS=180000;
-      if(documentText.length>MAX_TEXT_CHARS){
-        documentText=documentText.slice(0,MAX_TEXT_CHARS)+"\n[Đã giới hạn phần văn bản gửi lên để tránh vượt giới hạn request của Vercel]";
-      }
-    }
-
-    let fileData="";
-    if(!documentText){
-      // Với PDF/DOCX không trích xuất được chữ, chỉ cho phép file nhỏ.
-      // File lớn cần OCR/Storage riêng thay vì nhét base64 vào JSON request.
-      if(file.size>2500000) throw new Error("File không trích xuất được chữ và quá lớn. Hãy dùng PDF có thể bôi đen/copy chữ, hoặc file nhỏ hơn 2.5 MB.");
-      msg.textContent="⏳ Đang chuẩn bị file...";
-      fileData=await fileToBase64(file);
-    }
-
-    msg.textContent="⏳ Đang nhờ AI tạo câu hỏi...";
-    const aiRes=await fetch("/api/generate-exam",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:file.name,mimeType:file.type||"application/pdf",fileData,documentText,subject,difficulty,questionCount,types})});
-    const raw=await aiRes.text();
-    let ai={};
-    try{ai=raw?JSON.parse(raw):{}}catch{
-      if(aiRes.status===413 || /request entity too large|payload too large/i.test(raw)){
-        throw new Error("Request quá lớn. Hãy dùng PDF có text hoặc tài liệu ngắn hơn.");
-      }
-      throw new Error(`Server trả về dữ liệu không hợp lệ (${aiRes.status}). ${raw.slice(0,250)}`);
-    }
-    if(!aiRes.ok) throw new Error(ai.error||"AI không tạo được đề");
-    const questions=ai.questions||[];
-    if(questions.length!==questionCount) throw new Error(`AI tạo ${questions.length}/${questionCount} câu.`);
-    await loadSupabase();
-    const {data,error}=await db.from("exams").insert({title,subject,difficulty,duration,question_count:questionCount,questions,status:"active"}).select().single();
-    if(error) throw error;
-    console.log("Exam đã tạo",data);
-    msg.textContent=`✅ Đã tạo ${questions.length} câu và lưu bài kiểm tra.`;
-    document.getElementById("title").value="";
-    document.getElementById("file").value="";
-    document.getElementById("fileName").textContent="Chưa chọn file";
-    await renderTests(); await updateStats();
-  }catch(e){console.error(e);msg.textContent="❌ "+e.message;}
-}
-document.getElementById("createBtn")?.addEventListener("click",createExam);
-
-async function renderTests(){
-  const box=document.getElementById("testList"); if(!box)return;
-  try{await loadSupabase();const {data,error}=await db.from("exams").select("*").order("created_at",{ascending:false});if(error)throw error;
-    box.innerHTML=data?.length?data.map(t=>`<div class="test"><div><h3>${esc(t.title||"Chưa đặt tên")}</h3><p>${esc(t.subject||"—")} · ${esc(t.difficulty||"—")} · ${Number(t.question_count||0)} câu · ${Number(t.duration||0)} phút</p></div><span class="badge">${esc(t.status||"active")}</span></div>`).join(""):"Chưa có bài kiểm tra.";
-  }catch(e){console.error(e);box.innerHTML="🔴 Không đọc được bài kiểm tra từ Supabase.";}
-}
-async function updateStats(){
+async function loadDashboard(){
   try{await loadSupabase();
-    const {data:exams}=await db.from("exams").select("id"); document.getElementById("statTests").textContent=exams?.length||0;
-    const {data:ps}=await db.from("participants").select("id"); document.getElementById("statStudents").textContent=ps?.length||0;
-    const {data:as}=await db.from("attempts").select("id"); document.getElementById("statAttempts").textContent=as?.length||0;
-  }catch(e){console.error(e)}
+    const [{data:exams},{data:people},{data:attempts},{data:threads}]=await Promise.all([
+      db.from("exams").select("id"),db.from("participants").select("id"),db.from("user_attempts").select("id"),db.from("support_threads").select("unread_admin")
+    ]);
+    $("statTests").textContent=exams?.length||0;$("statStudents").textContent=people?.length||0;$("statAttempts").textContent=attempts?.length||0;
+    const unread=(threads||[]).reduce((s,x)=>s+Number(x.unread_admin||0),0);$("statUnread").textContent=unread;$("unreadBadge").textContent=unread;$("unreadBadge").classList.toggle("show",unread>0);
+    $("recentActivity").innerHTML=(attempts||[]).slice(0,5).map(x=>`<div class="activity"><span class="activity-icon">📝</span><div><b>Lượt làm bài mới</b><small>${esc(new Date(x.created_at||Date.now()).toLocaleString("vi-VN"))}</small></div></div>`).join("")||`<div class="empty-chat"><span>✨</span><small>Chưa có hoạt động.</small></div>`;
+  }catch(e){toast("Không đọc được tổng quan: "+e.message)}
 }
-async function loadOnline(){
-  try{await loadSupabase();
-    const [{data:ps,error:pe},{data:as,error:ae}]=await Promise.all([db.from("participants").select("*").order("created_at",{ascending:false}),db.from("attempts").select("*").order("created_at",{ascending:false})]);
-    if(pe)throw pe;if(ae)throw ae;window.onlineParticipants=ps||[];window.onlineAttempts=as||[];
-    document.getElementById("onlineStatus").textContent="🟢 Supabase đã kết nối";renderStudents();
-  }catch(e){console.error(e);document.getElementById("onlineStatus").textContent="🔴 Chưa đọc được dữ liệu Supabase";renderStudents();}
+
+async function loadParticipants(){const box=$("participantRows");if(!box)return;try{await loadSupabase();const [{data:ps,error:pe},{data:as,error:ae}]=await Promise.all([db.from("participants").select("*").order("created_at",{ascending:false}),db.from("user_attempts").select("*").order("created_at",{ascending:false})]);if(pe)throw pe;if(ae)throw ae;box.innerHTML=(ps||[]).map(p=>{const code=p.code||"—";const rows=(as||[]).filter(a=>String(a.student_code||a.device_id||"")===String(code));const latest=rows[0];return `<tr><td><b>${esc(p.name||"Không tên")}</b></td><td>${esc(code)}</td><td>${rows.length}</td><td><span class="badge">${latest?Number(latest.score||0)+"%":"—"}</span></td><td>${latest?esc(new Date(latest.created_at).toLocaleString("vi-VN")):"—"}</td></tr>`}).join("")||`<tr><td colspan="5">Chưa có người tham gia.</td></tr>`}catch(e){box.innerHTML=`<tr><td colspan="5" class="danger-text">${esc(e.message)}</td></tr>`}}
+
+async function loadHistory(){const box=$("historyRows");if(!box)return;try{await loadSupabase();const {data,error}=await db.from("user_attempts").select("*").order("created_at",{ascending:false}).limit(300);if(error)throw error;box.innerHTML=(data||[]).map(r=>`<tr><td>${esc(r.created_at?new Date(r.created_at).toLocaleString("vi-VN"):"—")}</td><td><b>${esc(r.student_name||"Không tên")}</b><small>${esc(r.student_code||String(r.device_id||"").slice(0,8))}</small></td><td>${esc(r.exam_title||"—")}</td><td><span class="badge">${Number(r.score||0)}% · ${Number(r.correct||0)}/${Number(r.total||0)}</span></td><td>${Array.isArray(r.wrong_indexes)?r.wrong_indexes.length:"—"}</td></tr>`).join("")||`<tr><td colspan="5">Chưa có lịch sử.</td></tr>`}catch(e){box.innerHTML=`<tr><td colspan="5" class="danger-text">${esc(e.message)}</td></tr>`}}
+
+async function renderTests(){const box=$("testList");if(!box)return;try{await loadSupabase();const {data,error}=await db.from("exams").select("*").order("created_at",{ascending:false});if(error)throw error;box.innerHTML=(data||[]).map(t=>`<div class="account-row"><div class="row-meta"><b>${esc(t.title||"Chưa đặt tên")}</b><small>${esc(t.subject||"—")} · ${Number(t.question_count||0)} câu · ${Number(t.duration||0)} phút</small></div><span class="badge">${esc(t.status||"active")}</span></div>`).join("")||`<p class="muted">Chưa có bài kiểm tra.</p>`}catch(e){box.innerHTML=`<p class="danger-text">${esc(e.message)}</p>`}}
+
+async function extractDoc(file){const n=(file.name||"").toLowerCase();if(n.endsWith(".txt")||n.endsWith(".md")||n.endsWith(".csv")||n.endsWith(".rtf"))return file.text();if(n.endsWith(".pdf")){await loadExternal("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";const pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;let out="";for(let i=1;i<=pdf.numPages;i++){const p=await pdf.getPage(i);const t=await p.getTextContent();out+=`\n--- Trang ${i} ---\n`+t.items.map(x=>x.str||"").join(" ")}return out.trim()}if(n.endsWith(".docx")){await loadExternal("https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js");return (await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()})).value||""}return ""}
+function loadExternal(src){return new Promise((resolve,reject)=>{const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=()=>reject(new Error("Không tải được thư viện"));document.head.appendChild(s)})}
+async function createExam(){const file=$("file")?.files[0],msg=$("msg");const title=$("title").value.trim(),subject=$("subject").value,difficulty=$("level").value,duration=Number($("minutes").value||45),questionCount=Number($("questions").value||20),types=[...document.querySelectorAll('input[name="questionType"]:checked')].map(x=>x.value);if(!file)return msg.textContent="⚠️ Hãy chọn tài liệu.";if(!title)return msg.textContent="⚠️ Hãy đặt tên bài.";if(!types.length)return msg.textContent="⚠️ Chọn ít nhất một dạng câu.";try{msg.textContent="⏳ Đang đọc tài liệu...";let documentText=await extractDoc(file).catch(()=>"");if(documentText.length>180000)documentText=documentText.slice(0,180000)+"\n[Đã giới hạn văn bản để giữ request nhẹ]";if(!documentText)throw new Error("Không trích xuất được chữ từ tài liệu. Hãy dùng PDF có text hoặc DOCX.");msg.textContent="⏳ Gemini đang tạo và tự kiểm tra đề...";const r=await fetch("/api/generate-exam",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:file.name,mimeType:file.type,documentText,fileData:"",subject,difficulty,questionCount,types})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Không tạo được đề");await loadSupabase();const {error}=await db.from("exams").insert({title,subject,difficulty,duration,question_count:questionCount,questions:data.questions,status:"active"});if(error)throw error;msg.textContent=`✅ Đã tạo ${data.questions.length} câu và lưu thành công.`;$("title").value="";$("file").value="";await renderTests();loadDashboard()}catch(e){msg.textContent="❌ "+e.message}}
+
+async function loadAccounts(){try{await loadSupabase();const {data,error}=await db.from("support_accounts").select("*").order("created_at",{ascending:true});if(error)throw error;admin.accounts=data||[];const list=$("accountList");if(list)list.innerHTML=admin.accounts.map(a=>`<div class="account-row"><div class="row-meta"><b>${esc(a.avatar||"💬")} ${esc(a.name)}</b><small>@${esc(a.handle||"—")} · ${esc(a.description||"")}</small></div><span class="badge">Bot ${a.bot_enabled?"ON":"OFF"}</span></div>`).join("")||`<p class="muted">Chưa có tài khoản hỗ trợ.</p>`;const sel=$("botAccount");if(sel)sel.innerHTML=admin.accounts.map(a=>`<option value="${a.id}">${esc(a.avatar||"💬")} ${esc(a.name)}</option>`).join("")}catch(e){toast("Chưa có bảng support_accounts. Chạy migration nâng cấp.")}}
+async function loadBotRules(){const box=$("botList");if(!box)return;try{await loadSupabase();const {data,error}=await db.from("support_bot_rules").select("*,support_accounts(name)").order("priority",{ascending:false});if(error)throw error;box.innerHTML=(data||[]).map(r=>`<div class="bot-row"><div class="row-meta"><b>${esc(r.reply)}</b><small>${esc(r.support_accounts?.name||"Kênh")} · ${esc((r.keywords||[]).join(", "))}</small></div><span class="badge">P${Number(r.priority||0)}</span></div>`).join("")||`<p class="muted">Chưa có quy tắc bot.</p>`}catch(e){box.innerHTML=`<p class="muted">Chạy migration Support 2.0 để bật bot.</p>`}}
+
+async function loadSupportThreads(){try{await loadSupabase();const {data,error}=await db.from("support_threads").select("*,support_accounts(name,avatar)").order("updated_at",{ascending:false});if(error)throw error;admin.threads=data||[];renderThreads();updateUnread()}catch(e){toast("Không tải được hội thoại: "+e.message)}}
+function updateUnread(){const unread=admin.threads.reduce((s,t)=>s+Number(t.unread_admin||0),0);$("statUnread").textContent=unread;$("unreadBadge").textContent=unread;$("unreadBadge").classList.toggle("show",unread>0)}
+function renderThreads(){const box=$("supportThreads"),q=($("threadSearch")?.value||"").toLowerCase();const rows=admin.threads.filter(t=>!q||String(t.student_name||"").toLowerCase().includes(q)||String(t.device_id||"").toLowerCase().includes(q));box.innerHTML=rows.map(t=>`<button class="thread ${String(admin.thread?.id)===String(t.id)?"active":""}" data-id="${t.id}"><span class="avatar">${esc(t.support_accounts?.avatar||"💬")}</span><span class="thread-main"><b>${esc(t.student_name||"Người dùng")}</b><small>${esc(t.last_message||"Chưa có tin nhắn")}</small></span><span>${Number(t.unread_admin||0)>0?'<span class="unread-dot"></span>':''}<small class="thread-time">${t.updated_at?esc(new Date(t.updated_at).toLocaleTimeString("vi-VN",{hour:"2-digit",minute:"2-digit"})):""}</small></span></button>`).join("")||`<div class="empty-chat"><span>💬</span><small>Chưa có cuộc trò chuyện.</small></div>`;box.querySelectorAll(".thread").forEach(b=>b.onclick=()=>openThread(b.dataset.id))}
+async function openThread(id){const t=admin.threads.find(x=>String(x.id)===String(id));if(!t)return;admin.thread=t;try{await loadSupabase();await db.from("support_threads").update({unread_admin:0}).eq("id",id);const {data,error}=await db.from("support_messages").select("*").eq("thread_id",id).order("created_at",{ascending:true});if(error)throw error;admin.messages=data||[];renderChat();renderThreads();}catch(e){toast("Không mở được chat: "+e.message)}}
+function renderChat(){const t=admin.thread;if(!t)return;$("chatHeader").innerHTML=`<div class="chat-person"><span class="avatar">${esc(t.support_accounts?.avatar||"💬")}</span><div><b>${esc(t.student_name||"Người dùng")}</b><small>${esc(t.support_accounts?.name||"Hỗ trợ chung")} · ${esc(String(t.device_id||"").slice(0,12))}</small></div></div>`;$("supportMessages").innerHTML=admin.messages.map(m=>`<div class="bubble-row ${m.sender||"user"}"><div class="bubble ${m.sender||"user"}"><b>${esc(m.sender_name||(m.sender==="admin"?"Bạn":m.sender==="bot"?"Bot":"Người dùng"))}</b><div>${esc(m.message)}</div><small>${m.created_at?esc(new Date(m.created_at).toLocaleString("vi-VN")):""}</small></div></div>`).join("")||`<div class="empty-chat"><span>💬</span><small>Chưa có tin nhắn.</small></div>`;$("replyForm").classList.remove("hidden");const box=$("supportMessages");box.scrollTop=box.scrollHeight}
+async function sendReply(){const input=$("replyInput"),text=input.value.trim();if(!text||!admin.thread)return;input.value="";try{await loadSupabase();const {error}=await db.from("support_messages").insert({thread_id:admin.thread.id,account_id:admin.thread.account_id||null,sender:"admin",sender_name:"Admin",message:text});if(error)throw error;toast("Đã gửi");await openThread(admin.thread.id);await loadSupportThreads()}catch(e){input.value=text;toast("Không gửi được: "+e.message)}}
+function startSupportLive(){loadSupportThreads();if(admin.channel&&db)db.removeChannel(admin.channel).catch(()=>{});loadSupabase().then(()=>{admin.channel=db.channel("admin-support-upgrade").on("postgres_changes",{event:"INSERT",schema:"public",table:"support_messages"},async p=>{if(admin.thread&&String(p.new.thread_id)===String(admin.thread.id)){admin.messages.push(p.new);renderChat()}await loadSupportThreads();}).on("postgres_changes",{event:"UPDATE",schema:"public",table:"support_threads"},async()=>{await loadSupportThreads()}).subscribe((s,e)=>{if(s==="SUBSCRIBED")$("liveState").innerHTML="<span></span> Live";if(e)console.warn(s,e)});clearInterval(admin.poll);admin.poll=setInterval(()=>{if(admin.tab==="support")loadSupportThreads()},2500)})}
+
+async function loadAssistant(){const box=$("assistantMessages");if(!box)return;try{await loadSupabase();const {data}=await db.from("admin_assistant_messages").select("*").order("created_at",{ascending:true}).limit(80);admin.assistant=data||[]}catch{admin.assistant=[]}renderAssistant()}
+function renderAssistant(){const box=$("assistantMessages");if(!box)return;box.innerHTML=admin.assistant.map(m=>`<div class="assistant-bubble ${m.role==='user'?'user':'assistant'}">${esc(m.message)}</div>`).join("")||`<div class="empty-chat"><span>✨</span><b>Admin Copilot sẵn sàng</b><small>Hỏi về lỗi, UX, realtime, database, bảo trì...</small></div>`;box.scrollTop=box.scrollHeight}
+async function sendAssistant(){const input=$("assistantInput"),message=input.value.trim();if(!message)return;input.value="";admin.assistant.push({role:"user",message});renderAssistant();const placeholder={role:"assistant",message:"Đang phân tích..."};admin.assistant.push(placeholder);renderAssistant();try{const r=await fetch("/api/admin-assistant",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token()}`},body:JSON.stringify({message,history:admin.assistant.slice(-12)})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Copilot lỗi");placeholder.message=data.answer||"Không có câu trả lời."}catch(e){placeholder.message="❌ "+e.message}renderAssistant()}
+
+function bind(){
+  $("loginForm").onsubmit=async e=>{e.preventDefault();$("loginMsg").textContent="";try{await login($("adminPassword").value)}catch(err){$("loginMsg").textContent=err.message}};
+  $("logoutBtn").onclick=logout;$("themeToggle").onclick=toggleTheme;$("mobileTheme").onclick=toggleTheme;$("refreshAll").onclick=()=>{loadDashboard();if(admin.tab==="support")loadSupportThreads();if(admin.tab==="participants")loadParticipants();if(admin.tab==="history")loadHistory();toast("Đã làm mới")};
+  document.querySelectorAll(".nav-item[data-tab]").forEach(b=>b.onclick=()=>openTab(b.dataset.tab));document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>openTab(b.dataset.go));
+  $("replyForm").onsubmit=e=>{e.preventDefault();sendReply()};$("threadSearch").oninput=renderThreads;$("newSupportRefresh").onclick=loadSupportThreads;
+  $("createBtn").onclick=createExam;$("reloadTests").onclick=renderTests;
+  $("accountForm").onsubmit=async e=>{e.preventDefault();try{await loadSupabase();const {error}=await db.from("support_accounts").insert({name:$("accountName").value.trim(),handle:$("accountHandle").value.trim(),avatar:$("accountAvatar").value.trim()||"💬",description:$("accountDescription").value.trim(),bot_enabled:$("accountBot").checked});if(error)throw error;e.target.reset();toast("Đã tạo tài khoản hỗ trợ");loadAccounts()}catch(err){toast(err.message)}};
+  $("botForm").onsubmit=async e=>{e.preventDefault();try{await loadSupabase();const keywords=$("botKeywords").value.split(",").map(x=>x.trim()).filter(Boolean);const {error}=await db.from("support_bot_rules").insert({account_id:$("botAccount").value,keywords,reply:$("botReply").value.trim(),priority:Number($("botPriority").value||10),enabled:true});if(error)throw error;e.target.reset();$("botPriority").value=10;toast("Đã lưu quy tắc bot");loadBotRules()}catch(err){toast(err.message)}};
+  $("assistantForm").onsubmit=e=>{e.preventDefault();sendAssistant()};
+  document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.classList.contains("nav-item"))return;const r=document.createElement("span");r.className="ripple";const s=Math.max(b.offsetWidth,b.offsetHeight)*1.8;r.style.width=r.style.height=s+"px";const rect=b.getBoundingClientRect();r.style.left=rect.left+rect.width/2-s/2+"px";r.style.top=rect.top+rect.height/2-s/2+"px";document.body.appendChild(r);setTimeout(()=>r.remove(),600)});
 }
-function pick(o,n){for(const k of n)if(o?.[k]!==undefined&&o?.[k]!==null&&o?.[k]!=="")return o[k];return ""}
-function renderStudents(){
-  const box=document.getElementById("studentList");if(!box)return;const ps=window.onlineParticipants||[],as=window.onlineAttempts||[];
-  if(!ps.length&&!as.length){box.innerHTML="Chưa có dữ liệu người tham gia/lượt làm bài trên Supabase.";return;}
-  box.innerHTML=`<div style="overflow:auto"><table style="width:100%;border-collapse:collapse"><tr><th>Người tham gia</th><th>Lượt làm</th><th>Mã / Email</th></tr>${ps.map(p=>{const id=pick(p,["id","participant_id"]);const count=as.filter(a=>String(pick(a,["participant_id","participantId","user_id","userId"]))===String(id)).length;return `<tr><td>${esc(pick(p,["name","full_name","student_name","username"])||"Không tên")}</td><td>${count||pick(p,["attempts_count"])||0}</td><td>${esc(String(pick(p,["code","student_code","email"])||"—"))}</td></tr>`}).join("")}</table></div>`;
-  const rb=document.getElementById("attemptList");if(rb)rb.innerHTML=as.slice(0,100).map(a=>`<div class="test"><div><b>${esc(String(pick(a,["student_name","name","candidate","participant_name"])||"Không tên"))}</b><p>${esc(String(pick(a,["exam_title","exam_name","title","exam"])||"—"))} · Điểm: ${esc(String(pick(a,["score","points","result"])||"—"))}</p></div><span class="badge">${a.created_at?esc(new Date(a.created_at).toLocaleString("vi-VN")):"—"}</span></div>`).join("");
-}
-(async()=>{await updateStats();await renderTests();await loadOnline()})();
+async function bootAdmin(){bind();await loadDashboard();await loadAccounts();if(admin.tab==="support")startSupportLive()}
+if(token())showApp();else $("adminLogin").classList.remove("hidden");

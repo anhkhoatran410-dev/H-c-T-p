@@ -1,12 +1,77 @@
 <!doctype html>
 <html lang="vi">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>STUDY — Admin</title><link rel="stylesheet" href="style.css?v=20260809-5"></head>
-<body><div class="app"><aside><div class="logo">🎓 STUDY</div><div class="admin">⚙️ Khu vực quản trị</div><nav>
-<button class="nav active" data-tab="dashboard">📊 Tổng quan</button><button class="nav" data-tab="create">📤 Tạo bài kiểm tra</button><button class="nav" data-tab="tests">📚 Bài kiểm tra</button><button class="nav" data-tab="students">👥 Người tham gia</button><button class="nav" data-tab="history">🕘 Lịch sử chi tiết</button><button class="nav" data-tab="support">💬 Tin nhắn hỗ trợ</button></nav></aside><main>
-<section id="dashboard" class="tab active"><h1>Tổng quan</h1><p class="muted">Quản lý bài kiểm tra của STUDY</p><div class="stats"><div><b id="statTests">0</b><span>Bài kiểm tra</span></div><div><b id="statStudents">0</b><span>Người tham gia</span></div><div><b id="statAttempts">0</b><span>Lượt làm bài</span></div></div><div class="panel"><h2>🚀 Bắt đầu nhanh</h2><p>Upload tài liệu, chọn số câu và dạng câu. AI sẽ đọc tài liệu rồi tự tạo đề.</p><button class="primary" onclick="openTab('create')">+ Tạo bài kiểm tra</button></div></section>
-<section id="create" class="tab"><h1>Tạo bài kiểm tra</h1><p class="muted">AI tự đọc tài liệu và tạo câu hỏi bám theo nội dung file.</p><div class="panel form"><label>Tài liệu</label><input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.rtf,image/*"><small id="fileName">Chưa chọn file</small><label>Môn học</label><select id="subject"><option>Toán</option><option>Tiếng Anh</option><option>Ngữ Văn</option></select><label>Tên bài kiểm tra</label><input id="title" placeholder="Ví dụ: Hàm số - ôn tập chương 1"><div class="grid"><div><label>Độ khó</label><select id="level"><option>Dễ</option><option selected>Trung bình</option><option>Khó</option></select></div><div><label>Thời gian (phút)</label><input id="minutes" type="number" min="1" value="45"></div></div><label>Số câu</label><input id="questions" type="number" min="1" max="100" value="20"><label>Dạng câu hỏi</label><div id="questionTypes" style="display:grid;gap:10px;margin:8px 0 16px"><label><input type="checkbox" name="questionType" value="mcq" checked> Trắc nghiệm 4 lựa chọn</label><label><input type="checkbox" name="questionType" value="true_false" checked> Đúng / Sai</label><label><input type="checkbox" name="questionType" value="short" checked> Trả lời ngắn (4 ô)</label></div><button class="primary" id="createBtn">🤖 AI đọc file & tạo bài</button><p id="msg" class="message"></p></div></section>
-<section id="tests" class="tab"><h1>Bài kiểm tra</h1><p class="muted">Các bài đã lưu trên Supabase.</p><div id="testList"></div></section>
-<section id="students" class="tab"><h1>Người tham gia</h1><p id="onlineStatus" class="muted">Đang kết nối Supabase...</p><div id="studentList" class="panel"><p class="muted">Đang tải dữ liệu...</p></div><h2 style="margin-top:24px">📈 Lượt làm bài</h2><div id="attemptList"></div></section>
-<section id="history" class="tab"><h1>🕘 Lịch sử chi tiết</h1><p class="muted">Toàn bộ lượt làm đã lưu, gồm câu sai và thiết bị.</p><div id="historyList" class="panel">Đang tải...</div></section>
-<section id="support" class="tab"><h1>💬 Tin nhắn hỗ trợ</h1><p class="muted">Người dùng có thể nhắn lỗi và Admin trả lời trực tiếp.</p><div id="supportThreads" class="panel">Đang tải...</div><div id="supportChat" class="panel" style="margin-top:16px">Chọn một cuộc trò chuyện.</div></section>
-</main></div><script src="app.js?v=20260810-4"></script><script src="support.js?v=20260810-3"></script></body></html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>STUDY — Admin Center</title>
+  <link rel="stylesheet" href="style.css?v=20260810-1">
+</head>
+<body>
+  <div id="adminLogin" class="login-screen">
+    <div class="login-card glow-card">
+      <div class="brand-mark">🎓</div>
+      <h1>STUDY Admin</h1>
+      <p>Không gian quản trị riêng của bạn.</p>
+      <form id="loginForm">
+        <label>Mật khẩu Admin</label>
+        <input id="adminPassword" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Nhập mật khẩu">
+        <button class="primary wide" type="submit">🔐 Đăng nhập</button>
+        <div id="loginMsg" class="danger-text"></div>
+      </form>
+    </div>
+  </div>
+
+  <div id="adminApp" class="admin-shell hidden">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <div class="brand-row"><span class="brand-orb">🎓</span><div><b>STUDY</b><small>Admin Center</small></div></div>
+        <button class="icon-btn" id="themeToggle" title="Đổi giao diện">◐</button>
+      </div>
+      <div class="admin-profile"><span class="online-dot"></span><div><b>Chủ hệ thống</b><small>Admin duy nhất</small></div></div>
+      <nav id="adminNav">
+        <button class="nav-item active" data-tab="dashboard">⌂ <span>Tổng quan</span></button>
+        <button class="nav-item" data-tab="support">💬 <span>Hỗ trợ</span><i id="unreadBadge">0</i></button>
+        <button class="nav-item" data-tab="participants">👥 <span>Người tham gia</span></button>
+        <button class="nav-item" data-tab="history">🕘 <span>Lịch sử làm bài</span></button>
+        <button class="nav-item" data-tab="tests">📚 <span>Bài kiểm tra</span></button>
+        <button class="nav-item" data-tab="accounts">🧩 <span>Tài khoản hỗ trợ</span></button>
+        <button class="nav-item" data-tab="bot">🤖 <span>Bot tự động</span></button>
+        <button class="nav-item" data-tab="assistant">✨ <span>Admin Copilot</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button class="nav-item" id="refreshAll">↻ <span>Làm mới dữ liệu</span></button>
+        <button class="nav-item danger-nav" id="logoutBtn">⇥ <span>Đăng xuất</span></button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar"><div><span class="eyebrow">STUDY TEST AI</span><h1 id="pageTitle">Tổng quan</h1></div><div class="top-actions"><span id="liveState" class="live-pill"><span></span> Live</span><button class="icon-btn" id="mobileTheme">◐</button></div></header>
+
+      <section id="dashboard" class="tab active">
+        <div class="hero glow-card"><div><span class="eyebrow">CONTROL ROOM</span><h2>Quản lý mọi thứ trong một chỗ.</h2><p>Chat hỗ trợ, người tham gia, lịch sử làm bài, bot và công cụ nâng cấp hệ thống.</p></div><div class="hero-orb">✦</div></div>
+        <div class="stats-grid"><div class="stat-card"><span>📚</span><b id="statTests">0</b><small>Bài kiểm tra</small></div><div class="stat-card"><span>👥</span><b id="statStudents">0</b><small>Người tham gia</small></div><div class="stat-card"><span>📝</span><b id="statAttempts">0</b><small>Lượt làm bài</small></div><div class="stat-card accent"><span>💬</span><b id="statUnread">0</b><small>Tin chưa đọc</small></div></div>
+        <div class="two-col"><div class="panel"><div class="panel-head"><div><h3>Hoạt động gần đây</h3><small>Realtime từ Supabase</small></div></div><div id="recentActivity"></div></div><div class="panel"><div class="panel-head"><div><h3>Truy cập nhanh</h3><small>Một chạm để xử lý</small></div></div><div class="quick-grid"><button class="quick" data-go="support">💬 <b>Mở hỗ trợ</b><small>Trả lời người học</small></button><button class="quick" data-go="participants">👥 <b>Người tham gia</b><small>Xem tiến độ</small></button><button class="quick" data-go="history">🕘 <b>Lịch sử</b><small>Kiểm tra lượt làm</small></button><button class="quick" data-go="assistant">✨ <b>Copilot</b><small>Hỏi về bảo trì</small></button></div></div></div>
+      </section>
+
+      <section id="support" class="tab">
+        <div class="section-head"><div><span class="eyebrow">MESSENGER MODE</span><h2>Hỗ trợ trực tiếp</h2><p>Cuộc trò chuyện cập nhật tức thời, không cần F5.</p></div><button class="soft-btn" id="newSupportRefresh">↻</button></div>
+        <div class="messenger"><aside class="conversation-list"><div class="chat-search"><span>⌕</span><input id="threadSearch" placeholder="Tìm người tham gia..."></div><div id="supportThreads" class="thread-list"></div></aside><section class="conversation"><div id="chatHeader" class="chat-header"><div class="empty-chat"><span>💬</span><b>Chọn một cuộc trò chuyện</b><small>Tin nhắn sẽ xuất hiện ở đây.</small></div></div><div id="supportMessages" class="message-list"><div class="empty-chat"><span>✨</span><b>Chưa chọn cuộc trò chuyện</b><small>Chọn người ở bên trái để bắt đầu.</small></div></div><form id="replyForm" class="composer hidden"><button type="button" class="icon-btn">＋</button><textarea id="replyInput" rows="1" placeholder="Nhập tin nhắn..."></textarea><button class="send-btn" type="submit">➤</button></form></section></div>
+      </section>
+
+      <section id="participants" class="tab"><div class="section-head"><div><span class="eyebrow">PEOPLE</span><h2>Người tham gia</h2><p>Danh sách người học và hoạt động làm bài.</p></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>Người tham gia</th><th>Mã</th><th>Lượt làm</th><th>Điểm gần nhất</th><th>Hoạt động</th></tr></thead><tbody id="participantRows"></tbody></table></div></div></section>
+
+      <section id="history" class="tab"><div class="section-head"><div><span class="eyebrow">AUDIT TRAIL</span><h2>Lịch sử làm bài</h2><p>Dữ liệu được lưu lâu dài trên Supabase.</p></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>Thời gian</th><th>Người học</th><th>Bài kiểm tra</th><th>Kết quả</th><th>Câu sai</th></tr></thead><tbody id="historyRows"></tbody></table></div></div></section>
+
+      <section id="tests" class="tab"><div class="section-head"><div><span class="eyebrow">EXAMS</span><h2>Bài kiểm tra</h2><p>Tạo đề và quản lý đề đã lưu.</p></div></div><div class="two-col"><div class="panel"><h3>🤖 Tạo bài kiểm tra bằng AI</h3><div class="form-grid"><label>Tài liệu<input id="file" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,.rtf,image/*"></label><label>Tên bài<input id="title" placeholder="Ví dụ: Ôn tập chương 1"></label><label>Môn<select id="subject"><option>Toán</option><option>Tiếng Anh</option><option>Ngữ Văn</option></select></label><label>Độ khó<select id="level"><option>Dễ</option><option selected>Trung bình</option><option>Khó</option></select></label><label>Thời gian (phút)<input id="minutes" type="number" min="1" value="45"></label><label>Số câu<input id="questions" type="number" min="1" max="100" value="20"></label></div><div class="type-picks"><label><input type="checkbox" name="questionType" value="mcq" checked> Trắc nghiệm</label><label><input type="checkbox" name="questionType" value="true_false" checked> Đúng / Sai</label><label><input type="checkbox" name="questionType" value="short" checked> Trả lời ngắn</label></div><button class="primary" id="createBtn">🤖 AI đọc file & tạo bài</button><p id="msg" class="message"></p></div><div class="panel"><div class="panel-head"><h3>Đề đã lưu</h3><button class="soft-btn" id="reloadTests">↻</button></div><div id="testList"></div></div></div></section>
+
+      <section id="accounts" class="tab"><div class="section-head"><div><span class="eyebrow">SUPPORT ACCOUNTS</span><h2>Tài khoản hỗ trợ</h2><p>Tách kênh hỗ trợ theo kỹ thuật, học tập, tổng đài...</p></div></div><div class="two-col"><div class="panel"><h3>＋ Tạo tài khoản</h3><form id="accountForm" class="stack-form"><input id="accountName" placeholder="Tên tài khoản, ví dụ: Kỹ thuật"><input id="accountHandle" placeholder="handle, ví dụ: tech"><input id="accountAvatar" placeholder="Emoji đại diện, ví dụ: 🛠️"><textarea id="accountDescription" placeholder="Mô tả ngắn"></textarea><label class="switch-row"><input id="accountBot" type="checkbox" checked> Cho phép bot trả lời</label><button class="primary" type="submit">Tạo tài khoản</button></form></div><div class="panel"><h3>Danh sách tài khoản</h3><div id="accountList"></div></div></div></section>
+
+      <section id="bot" class="tab"><div class="section-head"><div><span class="eyebrow">AUTOMATION</span><h2>Bot tự động</h2><p>Bot trả lời trước; bạn có thể vào cuộc bất cứ lúc nào.</p></div></div><div class="two-col"><div class="panel"><h3>＋ Thêm quy tắc</h3><form id="botForm" class="stack-form"><select id="botAccount"></select><input id="botKeywords" placeholder="Từ khóa, ngăn cách bằng dấu phẩy"><textarea id="botReply" placeholder="Nội dung bot trả lời trước"></textarea><input id="botPriority" type="number" value="10" placeholder="Độ ưu tiên"><button class="primary" type="submit">Lưu quy tắc</button></form></div><div class="panel"><h3>Quy tắc hiện tại</h3><div id="botList"></div></div></div></section>
+
+      <section id="assistant" class="tab"><div class="section-head"><div><span class="eyebrow">PRIVATE COPILOT</span><h2>Admin Copilot</h2><p>Chat riêng để hỏi về sửa lỗi, nâng cấp và bảo trì.</p></div></div><div class="copilot panel"><div id="assistantMessages" class="assistant-messages"></div><form id="assistantForm" class="composer"><textarea id="assistantInput" rows="1" placeholder="Ví dụ: kiểm tra vì sao realtime hỗ trợ chậm..."></textarea><button class="send-btn" type="submit">➤</button></form></div></section>
+    </main>
+  </div>
+  <div id="toast" class="toast"></div>
+  <script src="app.js?v=20260810-1"></script>
+</body>
+</html>

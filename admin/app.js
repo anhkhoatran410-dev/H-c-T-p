@@ -28,6 +28,49 @@ document.getElementById("file")?.addEventListener("change",e=>{
   document.getElementById("fileName").textContent=e.target.files[0]?.name||"Chưa chọn file";
 });
 
+function loadScript(src){
+  return new Promise((resolve,reject)=>{
+    const existing=[...document.scripts].find(s=>s.src===src);
+    if(existing){existing.addEventListener("load",()=>resolve());if(window.pdfjsLib||window.mammoth)resolve();return;}
+    const s=document.createElement("script");s.src=src;s.onload=resolve;s.onerror=()=>reject(new Error(`Không tải được thư viện: ${src}`));document.head.appendChild(s);
+  });
+}
+
+async function extractPdfText(file){
+  await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  const data=await file.arrayBuffer();
+  const pdf=await window.pdfjsLib.getDocument({data}).promise;
+  const parts=[];
+  for(let i=1;i<=pdf.numPages;i++){
+    const page=await pdf.getPage(i);
+    const text=await page.getTextContent();
+    parts.push(`\n--- Trang ${i} ---\n`+text.items.map(x=>x.str||"").join(" "));
+  }
+  return parts.join("\n").trim();
+}
+
+async function extractDocumentText(file){
+  const name=(file.name||"").toLowerCase();
+  if(name.endsWith(".txt")||name.endsWith(".md")||name.endsWith(".csv")||name.endsWith(".rtf")) return await file.text();
+  if(name.endsWith(".pdf")||file.type==="application/pdf") return await extractPdfText(file);
+  if(name.endsWith(".docx")||file.type==="application/vnd.openxmlformats-officedocument.wordprocessingml.document"){
+    await loadScript("https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js");
+    const result=await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+    return result.value||"";
+  }
+  return "";
+}
+
+function fileToBase64(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=()=>resolve(String(reader.result||"").split(",")[1]||"");
+    reader.onerror=()=>reject(reader.error||new Error("Không đọc được file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function createExam(){
   const file=document.getElementById("file")?.files[0];
   const title=document.getElementById("title")?.value.trim();
@@ -42,15 +85,29 @@ async function createExam(){
   if(!questionCount) return msg.textContent="⚠️ Hãy nhập số câu.";
   if(!types.length) return msg.textContent="⚠️ Chọn ít nhất một dạng câu hỏi.";
   try{
-    msg.textContent="⏳ Đang đọc tài liệu và nhờ AI tạo câu hỏi...";
-    const buf=await file.arrayBuffer();
-    const bytes=new Uint8Array(buf);
-    let binary="";
-    const chunk=0x8000;
-    for(let i=0;i<bytes.length;i+=chunk) binary+=String.fromCharCode(...bytes.subarray(i,i+chunk));
-    const fileData=btoa(binary);
-    const aiRes=await fetch("/api/generate-exam",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:file.name,mimeType:file.type||"application/pdf",fileData,subject,difficulty,questionCount,types})});
-    const ai=await aiRes.json();
+    msg.textContent="⏳ Đang đọc toàn bộ tài liệu trên trình duyệt...";
+    let documentText="";
+    try{documentText=await extractDocumentText(file);}catch(ex){console.warn("Không trích xuất được văn bản:",ex)}
+
+    // Vercel Functions giới hạn request body 4.5 MB. Ưu tiên gửi text đã trích xuất
+    // để file PDF/DOCX lớn không bị lỗi "Request Entity Too Large".
+    if(documentText){
+      documentText=documentText.trim();
+      if(documentText.length>350000) documentText=documentText.slice(0,350000)+"\n[Đã cắt phần vượt quá giới hạn xử lý]";
+    }
+
+    let fileData="";
+    if(!documentText){
+      if(file.size>3000000) throw new Error("File quá lớn để gửi trực tiếp. PDF/DOCX cần có thể trích xuất được chữ; hãy thử file PDF có text hoặc file nhỏ hơn 3 MB.");
+      msg.textContent="⏳ Đang chuẩn bị file...";
+      fileData=await fileToBase64(file);
+    }
+
+    msg.textContent="⏳ Đang nhờ AI tạo câu hỏi...";
+    const aiRes=await fetch("/api/generate-exam",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({fileName:file.name,mimeType:file.type||"application/pdf",fileData,documentText,subject,difficulty,questionCount,types})});
+    const raw=await aiRes.text();
+    let ai={};
+    try{ai=raw?JSON.parse(raw):{}}catch{throw new Error(`Server trả về dữ liệu không hợp lệ (${aiRes.status}). ${raw.slice(0,250)}`)}
     if(!aiRes.ok) throw new Error(ai.error||"AI không tạo được đề");
     const questions=ai.questions||[];
     if(questions.length!==questionCount) throw new Error(`AI tạo ${questions.length}/${questionCount} câu.`);

@@ -71,10 +71,44 @@ document.getElementById("createBtn").onclick=()=>{
   renderTests(); updateStats();
 };
 
-function renderTests(){
-  const box=document.getElementById("testList"), tests=getTests();
-  if(!tests.length){box.innerHTML='<div class="panel">Chưa có bài kiểm tra.</div>';return}
-  box.innerHTML=tests.map(t=>`<div class="test"><div><h3>${escapeHtml(t.title)}</h3><p>${escapeHtml(t.subject)} · ${escapeHtml(t.level)} · ${t.questions} câu · ${t.minutes} phút · ${escapeHtml(t.sourceFile)}</p></div><span class="badge">${escapeHtml(t.status)}</span></div>`).join("");
+async function renderTests(){
+  const box=document.getElementById("testList");
+  if(!box) return;
+
+  try{
+    await loadSupabase();
+
+    const {data,error}=await db
+      .from("exams")
+      .select("*")
+      .order("created_at",{ascending:false});
+
+    if(error) throw error;
+
+    if(!data || !data.length){
+      box.innerHTML="Chưa có bài kiểm tra.";
+      return;
+    }
+
+    box.innerHTML=data.map(t=>`
+      <div class="test">
+        <div>
+          <h3>${escapeHtml(t.title||"Chưa đặt tên")}</h3>
+          <p>
+            ${escapeHtml(t.subject||"—")}
+            · ${escapeHtml(t.difficulty||"—")}
+            · ${t.question_count||0} câu
+            · ${t.duration||0} phút
+          </p>
+        </div>
+        <span class="badge">${escapeHtml(t.status||"active")}</span>
+      </div>
+    `).join("");
+
+  }catch(e){
+    console.error(e);
+    box.innerHTML="🔴 Không đọc được bài kiểm tra từ Supabase.";
+  }
 }
 
 function pick(obj,names){for(const n of names) if(obj && obj[n]!==undefined && obj[n]!==null && obj[n]!=="") return obj[n];return ""}

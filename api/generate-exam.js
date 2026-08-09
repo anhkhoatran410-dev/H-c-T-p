@@ -151,9 +151,6 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
     };
 
     async function callGemini(prompt, includeFile) {
-      // Gemini API key must be sent as an HTTP header. This avoids URL/header
-      // encoding problems and, importantly, prevents accidental Unicode in a
-      // pasted Vercel secret from reaching fetch as a ByteString.
       const rawKey = String(process.env.GEMINI_API_KEY || "");
       const key = rawKey
         .replace(/^['"`]+|['"`]+$/g, "")
@@ -176,8 +173,24 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
         });
       }
 
-      const configuredModel = String(process.env.GEMINI_MODEL || "gemini-2.5-flash").trim();
-      const models = [configuredModel, "gemini-2.5-flash-lite"].filter((m, i, a) => m && a.indexOf(m) === i);
+      // Do not keep retired Gemini 2.5 Flash-Lite as a fallback. Current stable
+      // models for this workload are Gemini 3.5 Flash-Lite and Gemini 3.6 Flash.
+      // Also ignore an old Vercel GEMINI_MODEL value if it points at a retired
+      // preview/flash-lite model, so redeploying does not resurrect the same 404.
+      const configuredModel = String(process.env.GEMINI_MODEL || "").trim();
+      const retiredModels = new Set([
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash-lite-preview-09-2025",
+        "gemini-2.5-flash-preview-09-2025",
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite"
+      ]);
+      const firstModel = configuredModel && !retiredModels.has(configuredModel)
+        ? configuredModel
+        : "gemini-3.5-flash-lite";
+      const models = [firstModel, "gemini-3.5-flash-lite", "gemini-3.6-flash"]
+        .filter((m, i, a) => m && a.indexOf(m) === i);
+
       let lastError = null;
 
       for (const model of models) {
@@ -193,8 +206,7 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
               body: JSON.stringify({
                 contents: [{ role: "user", parts }],
                 generationConfig: {
-                  responseMimeType: "application/json",
-                  temperature: 0.25
+                  responseMimeType: "application/json"
                 }
               })
             });
@@ -225,8 +237,7 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
           }
         }
 
-        // If the configured model is unavailable, try the lightweight fallback.
-        if (Number(lastError?.status || 0) === 400 || Number(lastError?.status || 0) === 404) continue;
+        if ([400, 404].includes(Number(lastError?.status || 0))) continue;
         break;
       }
 
@@ -244,7 +255,7 @@ MÔN: ${subject || "Tự xác định từ tài liệu"}
       questions = cleanQuestions(repaired.questions);
     }
 
-    console.log("Exam generated and validated by Gemini (v6-auth-retry)");
+    console.log("Exam generated and validated by Gemini (v7-current-models)");
     return res.status(200).json({ questions, provider: "gemini", validated: true });
   } catch (e) {
     console.error("generate-exam:", e);

@@ -1,0 +1,43 @@
+/* STUDY TH — final public chat + exam layout repair. */
+.support-composer{display:flex!important;align-items:center!important;gap:8px!important;flex-wrap:nowrap!important;min-width:0!important;padding:10px!important}
+.support-composer .support-tools{display:flex!important;align-items:center!important;gap:6px!important;flex:0 0 auto!important}
+.support-composer .support-tool{width:40px!important;height:40px!important;border:1px solid rgba(130,140,180,.28)!important;border-radius:12px!important;background:rgba(120,130,180,.08)!important;color:inherit!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;font-size:20px!important;padding:0!important}
+.support-composer .support-tool:hover{transform:translateY(-1px);background:rgba(120,130,180,.16)!important}
+.support-composer #supportInput{flex:1 1 auto!important;min-width:0!important;width:auto!important;resize:none!important;overflow:auto!important}
+.support-composer .send-btn,.support-composer .composer-send{flex:0 0 auto!important;width:52px!important;height:52px!important;min-width:52px!important}
+.support-media-menu{position:absolute;z-index:10050;bottom:74px;left:12px;display:flex;gap:7px;flex-wrap:wrap;max-width:min(92vw,420px);padding:10px;border:1px solid rgba(130,140,180,.25);border-radius:16px;background:var(--card,#111a33);box-shadow:0 18px 50px rgba(0,0,0,.25)}
+.support-media-menu.hidden{display:none!important}
+.support-media-menu button{border:0;border-radius:10px;padding:8px 10px;background:rgba(120,130,180,.12);color:inherit;cursor:pointer;font-size:14px}
+.support-media-menu button:hover{background:rgba(120,130,180,.22)}
+.support-composer{position:relative}
+.support-upload-status{font-size:12px;opacity:.75;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+
+/* Exam: keep question text and answer controls in one coherent responsive grid. */
+.q,.question,.attempt-question,.attempt-detail{box-sizing:border-box;max-width:100%;overflow:visible}
+.q> b,.q>strong,.question-title,.attempt-question{overflow-wrap:anywhere;word-break:normal;white-space:normal;line-height:1.55}
+.q .option{box-sizing:border-box;max-width:100%;min-width:0;overflow:visible}
+.q .option>span:first-child{min-width:0;overflow-wrap:anywhere;word-break:normal;line-height:1.5}
+.q .option>label{flex:0 0 auto;white-space:nowrap;display:inline-flex!important;align-items:center;gap:6px;min-width:max-content}
+.q .option:has(>span + label){display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;column-gap:14px!important}
+.q .option input[type=radio]{flex:0 0 auto;width:20px;height:20px}
+.q input[type=text]{box-sizing:border-box;max-width:100%}
+.q .katex,.question .katex,.attempt-question .katex,.attempt-detail .katex{color:inherit!important;opacity:1!important;visibility:visible!important}
+.q .katex-html,.question .katex-html,.attempt-question .katex-html{color:inherit!important}
+.katex-display{max-width:100%;overflow-x:auto;overflow-y:hidden}
+.study-math-rendered{max-width:100%;vertical-align:middle}
+
+@media(max-width:760px){
+  .support-composer{gap:5px!important;padding:7px!important}
+  .support-composer .support-tool{width:34px!important;height:34px!important;border-radius:10px!important;font-size:17px!important}
+  .support-composer .send-btn,.support-composer .composer-send{width:46px!important;height:46px!important;min-width:46px!important}
+  .support-upload-status{display:none}
+  .q .option:has(>span + label){grid-template-columns:minmax(0,1fr) auto!important;column-gap:8px!important}
+  .q .option>label{font-size:14px!important}
+  .q .option input[type=radio]{width:18px;height:18px}
+}
+@media(max-width:430px){
+  .support-composer .support-tools{gap:3px!important}
+  .support-composer .support-tool{width:31px!important;height:31px!important;font-size:15px!important}
+  .support-composer .send-btn,.support-composer .composer-send{width:43px!important;height:43px!important;min-width:43px!important}
+  .q .option:has(>span + label){grid-template-columns:minmax(0,1fr) 88px!important}
+}

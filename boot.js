@@ -4,6 +4,13 @@
   const SUPABASE_KEY = "sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi";
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+  function fixPublicTitle() {
+    document.title = "Study";
+    document.querySelectorAll('.brand').forEach((el) => {
+      if (el.textContent.includes('STUDY')) el.textContent = '🎓 Study';
+    });
+  }
+
   async function fallbackLoadExams() {
     try {
       const controller = new AbortController();
@@ -33,24 +40,26 @@
     const app = document.getElementById("app");
     if (!app) return;
 
-    // app.js may still be waiting for an external library. Render the public shell now.
+    fixPublicTitle();
     if (typeof render === "function") {
       try { await render(); } catch (_) {}
     }
+    fixPublicTitle();
 
-    // Load exams independently so the page can become usable even when Supabase JS CDN is slow.
     if (typeof exams !== "undefined" && exams.length === 0) {
       const loaded = await fallbackLoadExams();
       if (loaded && typeof render === "function") {
         try { await render(); } catch (_) {}
+        fixPublicTitle();
       }
     }
 
-    // If app.js failed before defining render(), show a useful error instead of a blank/forever-loading page.
     if (typeof render !== "function") {
-      app.innerHTML = '<main class="container"><div class="card"><h1>🎓 STUDY TEST AI</h1><p class="danger-text">Không tải được phần giao diện. Hãy tải lại trang.</p><button class="btn" onclick="location.reload()">↻ Tải lại</button></div></main>';
+      app.innerHTML = '<main class="container"><div class="card"><h1>🎓 Study</h1><p class="danger-text">Không tải được phần giao diện. Hãy tải lại trang.</p><button class="btn" onclick="location.reload()">↻ Tải lại</button></div></main>';
     }
+    fixPublicTitle();
   }
 
+  new MutationObserver(fixPublicTitle).observe(document.documentElement, { childList: true, subtree: true });
   recover();
 })();

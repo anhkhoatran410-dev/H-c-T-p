@@ -60,13 +60,13 @@
     var target=document.getElementById('support');
     if(target){var observer=new MutationObserver(schedule);observer.observe(target,{childList:true,subtree:true})}
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,100)});else setTimeout(boot,100);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,100)});else setTimeout(boot,100)
 })();
 
 /* Load runtime guards from root assets. Root paths bypass /admin/* rewrite rules. */
 (function(){
-  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-v11';s.async=false;document.body.appendChild(s)}
-  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-v11';document.head.appendChild(l)}
+  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-v12';s.async=false;document.body.appendChild(s)}
+  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-v12';document.head.appendChild(l)}
   function boot(){
     if(window.__studyFinalGuardsLoader)return;window.__studyFinalGuardsLoader=true;
     loadStyle('/admin-chat-final.css');

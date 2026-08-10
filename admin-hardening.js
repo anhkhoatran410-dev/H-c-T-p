@@ -27,8 +27,8 @@
 
 /* Load runtime guards from root assets. Root paths bypass /admin/* rewrite rules. */
 (function(){
-  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-v7';s.async=false;document.body.appendChild(s)}
-  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-v7';document.head.appendChild(l)}
+  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-v8';s.async=false;document.body.appendChild(s)}
+  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-v8';document.head.appendChild(l)}
   function boot(){
     if(window.__studyFinalGuardsLoader)return;window.__studyFinalGuardsLoader=true;
     loadStyle('/admin-chat-final.css');
@@ -36,5 +36,5 @@
     loadScript('/admin/admin-copilot-final.js');
     loadScript('/admin-support-force-v7.js');
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,50)});else setTimeout(boot,50);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,50)});else setTimeout(boot,50)
 })();

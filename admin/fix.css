@@ -1,7 +1,8 @@
 /* Admin layout fix: only the chat panel scrolls while Support is open. */
 .admin-chat-open{overflow:hidden!important}
-.admin-chat-open .workspace{height:100vh;overflow:hidden}
-.admin-chat-open #support.active{height:100%;display:flex;flex-direction:column;min-height:0}
+.admin-chat-open .workspace{height:100vh;overflow:hidden;display:flex;flex-direction:column}
+.admin-chat-open .workspace .topbar{flex:0 0 auto}
+.admin-chat-open #support.active{height:auto;flex:1;display:flex;flex-direction:column;min-height:0}
 .admin-chat-open #support.active .section-head{flex:0 0 auto}
 .admin-chat-open #support.active .messenger{flex:1;height:auto;min-height:0}
 .admin-chat-open #support.active .conversation{min-height:0;height:100%}

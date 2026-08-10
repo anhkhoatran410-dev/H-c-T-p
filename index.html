@@ -15,7 +15,7 @@
 <body>
   <div id="app"><main class="container"><div class="card"><h1>🎓 STUDY TH</h1><p class="muted" id="boot-status">Đang tải hệ thống...</p></div></main></div>
   <script>
-    /* Disable the older competing math/AI formatters. One renderer below owns the DOM. */
+    /* Runtime flags: the final renderer owns math formatting; flags are descriptive, not blockers. */
     window.__studyMathRenderFinal=true;
     window.__mathFixInstalled=true;
     window.__studyAiFormatFinalV2=true;
@@ -29,7 +29,7 @@
   <script src="/ui-fix.js?v=20260810-5" defer></script>
   <script src="/public-enhancements.js?v=20260810-4" defer></script>
   <script src="/math-fix.js?v=20260810-4" defer></script>
-  <script src="/math-render-final.js?v=20260810-2" defer></script>
+  <script src="/math-render-final.js?v=20260810-3" defer></script>
   <script src="/public-final-fix.js?v=20260810-5" defer></script>
   <script src="/public-hardening.js?v=20260810-3" defer></script>
   <script src="/public-last-fix.js?v=20260810-4" defer></script>

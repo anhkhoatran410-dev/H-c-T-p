@@ -4,13 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>STUDY — Admin Center</title>
-  <link rel="stylesheet" href="style.css?v=20260810-8">
-  <link rel="stylesheet" href="media-fix.css?v=20260810-7">
-  <link rel="stylesheet" href="fix.css?v=20260810-5">
-  <link rel="stylesheet" href="enhancements.css?v=20260810-5">
-  <link rel="stylesheet" href="admin-final-fix.css?v=20260810-5">
-  <link rel="stylesheet" href="/admin-hardening.css?v=20260810-4">
-  <link rel="stylesheet" href="admin-chat-final.css?v=20260810-4">
+  <link rel="stylesheet" href="style.css?v=20260810-9">
+  <link rel="stylesheet" href="media-fix.css?v=20260810-8">
+  <link rel="stylesheet" href="fix.css?v=20260810-6">
+  <link rel="stylesheet" href="enhancements.css?v=20260810-6">
+  <link rel="stylesheet" href="admin-final-fix.css?v=20260810-6">
+  <link rel="stylesheet" href="/admin-hardening.css?v=20260810-8">
+  <link rel="stylesheet" href="admin-chat-final.css?v=20260810-8">
+  <style id="admin-support-composer-structural-fix">
+    /* Admin > Hỗ trợ: the reply box is part of the conversation layout, never optional. */
+    #support .messenger{display:grid!important;grid-template-columns:330px minmax(0,1fr)!important;height:min(690px,calc(100vh - 205px))!important;min-height:520px!important;overflow:hidden!important}
+    #support .conversation{display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;height:100%!important;min-height:0!important;overflow:hidden!important;position:relative!important}
+    #support #chatHeader{grid-row:1!important;min-height:70px!important}
+    #support #supportMessages{grid-row:2!important;min-height:0!important;height:auto!important;overflow-y:auto!important;overflow-x:hidden!important}
+    #support #replyForm{grid-row:3!important;display:flex!important;visibility:visible!important;opacity:1!important;position:relative!important;inset:auto!important;width:100%!important;min-height:68px!important;height:auto!important;z-index:100000!important;align-items:flex-end!important;gap:8px!important;padding:10px 12px!important;margin:0!important;background:var(--panel,#fff)!important;border-top:1px solid var(--line,#e5eaf2)!important;box-sizing:border-box!important}
+    #support #replyForm.hidden{display:flex!important}
+    #support #replyForm #replyInput{display:block!important;visibility:visible!important;opacity:1!important;flex:1 1 auto!important;width:auto!important;min-width:0!important;height:44px!important;min-height:44px!important;max-height:140px!important;box-sizing:border-box!important;resize:none!important}
+    #support #replyForm .send-btn{display:inline-flex!important;visibility:visible!important;opacity:1!important;flex:0 0 44px!important;width:44px!important;height:44px!important;align-items:center!important;justify-content:center!important}
+    #support #replyForm .composer-tool{display:inline-flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important}
+    @media(max-width:900px){#support .messenger{height:calc(100vh - 285px)!important;max-height:none!important;min-height:390px!important}}
+    @media(max-width:650px){#support .messenger{height:calc(100vh - 245px)!important;min-height:360px!important}#support #replyForm .composer-tool{display:none!important}}
+  </style>
 </head>
 <body>
   <div id="adminLogin" class="login-screen"><div class="login-card glow-card"><div class="brand-mark">🎓</div><h1>STUDY Admin</h1><p>Không gian quản trị riêng của bạn.</p><form id="loginForm"><label>Mật khẩu Admin</label><input id="adminPassword" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Nhập mật khẩu"><button class="primary wide" type="submit">🔐 Đăng nhập</button><div id="loginMsg" class="danger-text"></div></form></div></div>
@@ -26,6 +40,6 @@
       <section id="assistant" class="tab"><div class="section-head"><div><span class="eyebrow">PRIVATE COPILOT</span><h2>Admin Copilot</h2><p>Trợ lý kỹ thuật cho bảo trì, chẩn đoán lỗi, UX/UI và kế hoạch nâng cấp.</p></div></div><div class="copilot panel"><div id="assistantMessages" class="assistant-messages"></div><form id="assistantForm" class="composer"><textarea id="assistantInput" rows="1" placeholder="Ví dụ: kiểm tra người tham gia, tắt bot Kỹ thuật, hoặc lập checklist bảo trì..."></textarea><button class="send-btn" type="submit">➤</button></form></div></section>
     </main>
   </div><div id="toast" class="toast"></div>
-  <script src="auth.js?v=20260810-2"></script><script src="app.js?v=20260810-6"></script><script src="media-fix.js?v=20260810-4"></script><script src="login-fix.js?v=20260810-2"></script><script src="fix.js?v=20260810-2"></script><script src="enhancements.js?v=20260810-2"></script><script src="final-fix.js?v=20260810-2"></script><script src="exam-save-fix.js?v=20260810-2"></script><script src="/admin-media-fix.js?v=20260810-2"></script><script src="/admin-final-fix.js?v=20260810-2"></script><script src="/admin-hardening.js?v=20260810-3"></script><script src="/admin-last-fix.js?v=20260810-3"></script><script src="/admin/admin-ultimate-fix.js?v=20260810-2"></script><script src="/admin/admin-system-final.js?v=20260810-1"></script><script src="/admin/admin-chat-final.js?v=20260810-4"></script><script src="/admin/admin-support-hotfix.js?v=20260810-2"></script><script src="/admin/admin-support-final-v3.js?v=20260810-3"></script><script src="/admin/admin-support-force-v6.js?v=20260810-1"></script>
+  <script src="auth.js?v=20260810-3"></script><script src="app.js?v=20260810-7"></script><script src="media-fix.js?v=20260810-5"></script><script src="login-fix.js?v=20260810-3"></script><script src="fix.js?v=20260810-3"></script><script src="enhancements.js?v=20260810-3"></script><script src="final-fix.js?v=20260810-3"></script><script src="exam-save-fix.js?v=20260810-3"></script><script src="/admin-media-fix.js?v=20260810-3"></script><script src="/admin-final-fix.js?v=20260810-3"></script><script src="/admin-hardening.js?v=20260810-8"></script><script src="/admin-last-fix.js?v=20260810-4"></script><script src="/admin/admin-ultimate-fix.js?v=20260810-3"></script><script src="/admin/admin-system-final.js?v=20260810-2"></script><script src="/admin/admin-chat-final.js?v=20260810-5"></script><script src="/admin/admin-support-hotfix.js?v=20260810-3"></script><script src="/admin/admin-support-final-v3.js?v=20260810-4"></script><script src="/admin/admin-support-force-v6.js?v=20260810-2"></script><script src="/admin-support-force-v7.js?v=20260810-v8"></script>
 </body>
 </html>

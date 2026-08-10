@@ -1,0 +1,13 @@
+/* Admin layout fix: only the chat panel scrolls while Support is open. */
+.admin-chat-open{overflow:hidden!important}
+.admin-chat-open .workspace{height:100vh;overflow:hidden}
+.admin-chat-open #support.active{height:100%;display:flex;flex-direction:column;min-height:0}
+.admin-chat-open #support.active .section-head{flex:0 0 auto}
+.admin-chat-open #support.active .messenger{flex:1;height:auto;min-height:0}
+.admin-chat-open #support.active .conversation{min-height:0;height:100%}
+.admin-chat-open #support.active .message-list{min-height:0;height:auto;overflow-y:auto;overscroll-behavior:contain}
+.admin-chat-open #support.active .composer{flex:0 0 auto}
+.participant-empty{display:flex;flex-direction:column;gap:4px;padding:10px 0}.participant-empty small{color:var(--muted)}
+.multi-file-hint{display:block;color:var(--muted);font-weight:500;margin-top:5px;line-height:1.4}
+.assistant-bubble .ai-role{font-size:11px;font-weight:900;opacity:.7;margin-bottom:7px}.assistant-bubble .ai-heading{font-weight:900;margin:8px 0 5px}.assistant-bubble .ai-point{display:flex;gap:8px;margin:5px 0}.assistant-bubble .ai-point>span:first-child{font-weight:900}.assistant-bubble .ai-line{margin:4px 0}.assistant-bubble .ai-gap{height:3px}.ai-action{display:flex;align-items:center;gap:7px;margin-top:12px;padding:9px 10px;border-radius:12px;background:var(--soft);border:1px solid var(--line);font-size:12px}.ai-action-ok{margin-left:auto;color:#16845f;font-weight:900}
+@media(max-width:760px){.admin-chat-open .workspace{padding:18px 14px 14px}.admin-chat-open #support.active .messenger{height:auto}.admin-chat-open #support.active .conversation-list{min-height:0}.admin-chat-open #support.active .message-list{min-height:0}}

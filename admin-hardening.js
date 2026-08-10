@@ -25,13 +25,16 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,300)});else setTimeout(boot,300)
 })();
 
-/* Load the last two runtime guards after every older admin patch. */
+/* Load runtime guards from root assets. Root paths bypass /admin/* rewrite rules. */
 (function(){
-  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-final';s.async=false;document.body.appendChild(s)}
-  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-final';document.head.appendChild(l)}
+  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-v7';s.async=false;document.body.appendChild(s)}
+  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-v7';document.head.appendChild(l)}
   function boot(){
     if(window.__studyFinalGuardsLoader)return;window.__studyFinalGuardsLoader=true;
-    loadStyle('/admin-chat-final.css');loadScript('/admin/admin-chat-final.js');loadScript('/admin/admin-copilot-final.js');
+    loadStyle('/admin-chat-final.css');
+    loadScript('/admin/admin-chat-final.js');
+    loadScript('/admin/admin-copilot-final.js');
+    loadScript('/admin-support-force-v7.js');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,50)});else setTimeout(boot,50);
 })();

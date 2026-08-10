@@ -1,1 +1,65 @@
-<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Study</title><link rel="stylesheet" href="style.css?v=20260810-4"><link rel="stylesheet" href="support-fix.css?v=20260810-3"></head><body><div id="app"><main class="container"><div class="card"><h1>🎓 Study</h1><p class="muted" id="boot-status">Đang tải hệ thống...</p></div></main></div><script src="/app.js?v=20260810-11"></script><script src="/support-fix.js?v=20260810-3"></script><script src="/boot.js?v=20260810-10"></script><script src="/review.js?v=20260810-3"></script><script>document.title='Study';window.addEventListener('error',function(e){if(e&&e.error)console.error('Study boot error:',e.error);});setTimeout(function(){var a=document.getElementById('app');var s=document.getElementById('boot-status');if(a&&s&&s.textContent.includes('Đang tải')){s.textContent='Hệ thống chưa khởi động được. Hãy mở F12 → Console để xem lỗi.';s.className='danger-text';}},6000);</script></body></html>
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Study</title>
+  <link rel="stylesheet" href="/style.css?v=20260810-5">
+  <link rel="stylesheet" href="/support-fix.css?v=20260810-4">
+</head>
+<body>
+  <div id="app">
+    <main class="container">
+      <div class="card">
+        <h1>🎓 Study</h1>
+        <p class="muted" id="boot-status">Đang tải hệ thống...</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- Boot runs FIRST so a broken app.js can never leave the page spinning forever. -->
+  <script src="/boot.js?v=20260810-11" defer></script>
+  <script src="/app.js?v=20260810-12" defer></script>
+  <script src="/support-fix.js?v=20260810-4" defer></script>
+  <script src="/review.js?v=20260810-4" defer></script>
+
+  <script>
+    (function () {
+      document.title = 'Study';
+      function status(text, danger) {
+        var el = document.getElementById('boot-status');
+        if (!el) return;
+        el.textContent = text;
+        if (danger) el.className = 'danger-text';
+      }
+      window.addEventListener('error', function (e) {
+        var target = e && e.target;
+        if (target && target.tagName === 'SCRIPT') {
+          status('Không tải được ' + (target.src || 'tệp JavaScript') + '.', true);
+          console.error('Study script failed:', target.src);
+        } else if (e && e.error) {
+          console.error('Study runtime error:', e.error);
+        }
+      }, true);
+      window.addEventListener('unhandledrejection', function (e) {
+        console.error('Study unhandled rejection:', e.reason);
+      });
+      setTimeout(function () {
+        var app = document.getElementById('app');
+        var text = document.getElementById('boot-status');
+        if (app && text && text.textContent.indexOf('Đang tải hệ thống') !== -1) {
+          status('Không khởi động được ứng dụng. Một tệp JavaScript không chạy.', true);
+          var card = text.closest('.card');
+          if (card && !card.querySelector('.boot-retry')) {
+            var b = document.createElement('button');
+            b.className = 'btn boot-retry';
+            b.textContent = '↻ Tải lại';
+            b.onclick = function () { location.reload(); };
+            card.appendChild(b);
+          }
+        }
+      }, 5000);
+    })();
+  </script>
+</body>
+</html>

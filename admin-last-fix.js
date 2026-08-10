@@ -1,17 +1,23 @@
 /* STUDY TH — safe Admin participant guard.
    IMPORTANT: this file must not own the support chat runtime.
-   The previous version installed a MutationObserver + interval and rebuilt the chat DOM;
-   that was unnecessary main-thread work and could make Admin unresponsive.
+   The participant view uses the same Supabase client as admin/app.js.
 */
 (function(){
   'use strict';
-  if(window.__studyAdminParticipantGuardV2)return;
-  window.__studyAdminParticipantGuardV2=true;
+  if(window.__studyAdminParticipantGuardV3)return;
+  window.__studyAdminParticipantGuardV3=true;
 
   function safeEsc(v){
     return typeof window.esc==='function' ? window.esc(v) : String(v==null?'':v).replace(/[&<>"']/g,function(c){
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c];
     });
+  }
+
+  async function getDb(){
+    if(typeof window.loadSupabase!=='function')throw new Error('Supabase chưa sẵn sàng.');
+    var client=await window.loadSupabase();
+    if(!client || typeof client.from!=='function')throw new Error('Không khởi tạo được kết nối dữ liệu.');
+    return client;
   }
 
   function modal(title,html){
@@ -34,12 +40,12 @@
 
   window.loadParticipants=async function(){
     var box=document.getElementById('participantRows');
-    if(!box || typeof window.loadSupabase!=='function')return;
+    if(!box)return;
     try{
-      await window.loadSupabase();
+      var client=await getDb();
       var results=await Promise.all([
-        window.db.from('participants').select('*').order('created_at',{ascending:false}),
-        window.db.from('user_attempts').select('*').order('created_at',{ascending:false})
+        client.from('participants').select('*').order('created_at',{ascending:false}),
+        client.from('user_attempts').select('*').order('created_at',{ascending:false})
       ]);
       var peopleRes=results[0], attemptsRes=results[1];
       if(peopleRes.error)throw peopleRes.error;
@@ -56,6 +62,7 @@
       attempts.forEach(function(a){
         var code=String(a.student_code||a.device_id||a.student_name||'unknown');
         if(!byCode[code])byCode[code]={name:a.student_name||'Không tên',code:code,attempts:[]};
+        if(!byCode[code].name || byCode[code].name==='Không tên')byCode[code].name=a.student_name||byCode[code].name;
         byCode[code].attempts.push(a);
       });
 
@@ -83,8 +90,8 @@
 
   window.showPersonLast=async function(code){
     try{
-      await window.loadSupabase();
-      var r=await window.db.from('user_attempts').select('*').order('created_at',{ascending:false});
+      var client=await getDb();
+      var r=await client.from('user_attempts').select('*').order('created_at',{ascending:false});
       if(r.error)throw r.error;
       var rows=(r.data||[]).filter(function(a){
         return String(a.student_code||a.device_id||a.student_name||'')===String(code);
@@ -117,14 +124,14 @@
   };
 
   function installTabHook(){
-    if(typeof window.openTab!=='function' || window.openTab.__studyParticipantGuardV2)return false;
+    if(typeof window.openTab!=='function' || window.openTab.__studyParticipantGuardV3)return false;
     var nativeOpenTab=window.openTab;
     var wrapped=function(id){
       var result=nativeOpenTab.apply(this,arguments);
       if(id==='participants')setTimeout(function(){window.loadParticipants();},0);
       return result;
     };
-    wrapped.__studyParticipantGuardV2=true;
+    wrapped.__studyParticipantGuardV3=true;
     window.openTab=wrapped;
     return true;
   }

@@ -61,9 +61,7 @@
     }
     function detailHtml(r,exam){
       var qs=exam?.questions||[];
-      return '<main class="container"><div class="card attempt-detail"><div class="attempt-detail-head"><div><span class="eyebrow">BÀI LÀM</span><h1>'+esc(r.exam_title||r.examTitle||exam?.title||'Bài kiểm tra')+'</h1><p class="muted">'+esc(r.student_name||r.candidate||state.candidate||'Người học')+' · '+Number(r.score||0)+'% · '+Number(r.correct||0)+'/'+Number(r.total||qs.length)+' câu</p></div><div class="score">'+Number(r.score||0)+'%</div></div>'+
-        qs.map(function(q,i){var a=r.answers?.[i],ok=answerIsCorrect(q,a);return '<article class="attempt-question '+(ok?'is-correct':'is-wrong')+'"><div class="attempt-q-title"><b>Câu '+(i+1)+'</b><span>'+(ok?'✓ Đúng':'✕ Sai')+'</span></div><h3>'+esc(q.q||'')+'</h3><div class="attempt-answer"><span>Bạn trả lời</span><b>'+esc(answerText(q,a))+'</b></div><div class="attempt-answer"><span>Đáp án đúng</span><b>'+esc(correctText(q))+'</b></div>'+(q.explanation?'<p class="muted">'+esc(q.explanation)+'</p>':'')+'</article>'}).join('')+
-        '<div class="attempt-detail-actions">'+((r.wrong_indexes||r.wrongIndexes||[]).length?'<button class="btn" onclick="openReview(\''+esc(r.id||'')+'\')">🧠 Ôn lại câu sai</button>':'<span class="success">🎉 Không có câu sai.</span>')+'<button class="btn secondary" onclick="go(\'history\')">← Quay lại lịch sử</button></div></div></main>';
+      return '<main class="container"><div class="card attempt-detail"><div class="attempt-detail-head"><div><span class="eyebrow">BÀI LÀM</span><h1>'+esc(r.exam_title||r.examTitle||exam?.title||'Bài kiểm tra')+'</h1><p class="muted">'+esc(r.student_name||r.candidate||state.candidate||'Người học')+' · '+Number(r.score||0)+'% · '+Number(r.correct||0)+'/'+Number(r.total||qs.length)+' câu</p></div><div class="score">'+Number(r.score||0)+'%</div></div>'+qs.filter(function(q){return q&&q.type!=='flashcard'}).map(function(q,i){var a=r.answers?.[i],ok=answerIsCorrect(q,a);return '<article class="attempt-question '+(ok?'is-correct':'is-wrong')+'"><div class="attempt-q-title"><b>Câu '+(i+1)+'</b><span>'+(ok?'✓ Đúng':'✕ Sai')+'</span></div><h3>'+esc(q.q||'')+'</h3><div class="attempt-answer"><span>Bạn trả lời</span><b>'+esc(answerText(q,a))+'</b></div><div class="attempt-answer"><span>Đáp án đúng</span><b>'+esc(correctText(q))+'</b></div>'+(q.explanation?'<p class="muted">'+esc(q.explanation)+'</p>':'')+'</article>'}).join('')+'<div class="attempt-detail-actions">'+((r.wrong_indexes||r.wrongIndexes||[]).length?'<button class="btn" onclick="openReview(\''+esc(r.id||'')+'\')">🧠 Ôn lại câu sai</button>':'<span class="success">🎉 Không có câu sai.</span>')+'<button class="btn secondary" onclick="go(\'history\')">← Quay lại lịch sử</button></div></div></main>';
     }
 
     var originalPage=window.page;
@@ -98,7 +96,7 @@
         if(r.exam_id||r.examId){var er=await db.from('exams').select('*').eq('id',r.exam_id||r.examId).maybeSingle();if(!er.error)exam=er.data}
         if(!exam)exam=(exams||[]).find(function(e){return String(e.id)===String(r.exam_id||r.examId)})||(exams||[]).find(function(e){return e.title===(r.exam_title||r.examTitle)});
         if(!exam)return alert('Không tìm thấy đề gốc để ôn lại.');
-        state.review={attempt:r,exam:exam,items:(r.wrong_indexes||r.wrongIndexes||[]).map(function(i){return {index:i,question:exam.questions?.[i],answer:r.answers?.[i]}}).filter(function(x){return !!x.question}),cursor:0};
+        state.review={attempt:r,exam:exam,items:(r.wrong_indexes||r.wrongIndexes||[]).map(function(i){return {index:i,question:exam.questions?.[i],answer:r.answers?.[i]}}).filter(function(x){return !!x.question&&x.question.type!=='flashcard'}),cursor:0};
         state.reviewChoice=null;state.reviewTF=[];state.page='review';render();
       }catch(e){alert('Không mở được phần ôn câu sai: '+(e?.message||e))}
     };
@@ -106,6 +104,11 @@
     /* Re-render after the app is fully booted so overrides are not lost. */
     var oldRender=window.render;
     window.render=async function(){var r=oldRender?.();if(r&&typeof r.then==='function')await r();document.querySelectorAll('.support-picker').forEach(function(x){x.classList.add('hidden')});};
+
+    /* Load the subject-specific study modes after the base app is bridged. */
+    if(!window.__studyModesLoaded){
+      var s=document.createElement('script');s.src='/public-study-modes.js?v=20260810-1';s.async=false;s.onload=function(){window.__studyModesLoaded=true};document.head.appendChild(s);
+    }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready);else ready();
   window.addEventListener('study-app-loaded',function(){setTimeout(ready,0)});

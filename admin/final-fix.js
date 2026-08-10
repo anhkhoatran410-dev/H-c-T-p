@@ -1,6 +1,52 @@
 /* Small post-enhancement guardrails. */
 (function(){
   function reveal(){ $('saveExamEditor')?.classList.remove('hidden'); $('addQuestionBtn')?.classList.remove('hidden'); $('cancelExamEditor')?.classList.remove('hidden'); }
+
+  function dedupeAdminMessages(){
+    if(!window.admin||!Array.isArray(admin.messages))return;
+    var seen=new Set();
+    admin.messages=admin.messages.filter(function(m){var id=String(m&&m.id||'');if(!id)return true;if(seen.has(id))return false;seen.add(id);return true;});
+  }
+
+  function valueLabel(q,a){
+    if(q.type==='mcq'){
+      var n=Number(a);return Number.isInteger(n)&&n>=0&&n<4?String.fromCharCode(65+n):'Chưa chọn';
+    }
+    if(q.type==='short')return String((Array.isArray(a)?a.join(''):a)||'Chưa nhập');
+    if(q.type==='true_false')return Array.isArray(a)?a.map(function(v){return v?'Đúng':'Sai'}).join(' · '):'Chưa trả lời';
+    return String(a??'Chưa trả lời');
+  }
+  function correctLabel(q){
+    if(q.type==='mcq')return Number.isInteger(Number(q.a))?String.fromCharCode(65+Number(q.a)):'—';
+    if(q.type==='short')return String(q.answer??'—');
+    if(q.type==='true_false')return (q.answers||[]).map(function(v){return v?'Đúng':'Sai'}).join(' · ');
+    return String(q.a??q.answer??'—');
+  }
+
+  async function showAttemptResult(id){
+    try{
+      await loadSupabase();
+      var ar=await db.from('user_attempts').select('*').eq('id',id).maybeSingle();
+      if(ar.error)throw ar.error;
+      var attempt=ar.data;if(!attempt)return;
+      var er=await db.from('exams').select('*').eq('id',attempt.exam_id).maybeSingle();
+      var exam=er.data;
+      var m=$('examEditorModal');if(!m)return;
+      $('examEditorTitle').textContent='Kết quả lượt làm';
+      $('saveExamEditor').classList.add('hidden');$('addQuestionBtn').classList.add('hidden');$('cancelExamEditor').classList.remove('hidden');$('cancelExamEditor').textContent='Đóng';
+      var wrong=Array.isArray(attempt.wrong_indexes)?attempt.wrong_indexes:[];
+      var answers=attempt.answers||{};
+      var html='<div class="person-summary"><h3>'+esc(attempt.student_name||'Người tham gia')+'</h3><p class="muted">'+esc(attempt.exam_title||'Bài kiểm tra')+' · '+Number(attempt.score||0)+'% · '+Number(attempt.correct||0)+'/'+Number(attempt.total||0)+' câu</p></div>';
+      if(!wrong.length){html+='<div style="margin-top:14px;padding:14px;border-radius:12px;background:#ecfdf5;color:#166534"><b>🎉 Người học làm đúng tất cả câu.</b></div>'}
+      else if(!exam){html+='<p class="danger-text">Không tìm thấy đề gốc để hiển thị câu sai.</p>'}
+      else{
+        html+='<h4 style="margin:20px 0 10px">Câu làm sai ('+wrong.length+')</h4>';
+        wrong.forEach(function(i){var q=(exam.questions||[])[i];if(!q)return;var a=answers[i];html+='<article style="margin:10px 0;padding:14px;border:1px solid #e5e7eb;border-radius:12px"><b>Câu '+(i+1)+'. '+esc(q.q||q.question||'')+'</b><div style="margin-top:7px">Bạn chọn: <b>'+esc(valueLabel(q,a))+'</b></div><div>Đáp án đúng: <b>'+esc(correctLabel(q))+'</b></div>'+(q.explanation?'<div class="muted" style="margin-top:7px">💡 '+esc(q.explanation)+'</div>':'')+'</article>'});
+      }
+      $('examEditorBody').innerHTML=html;m.classList.remove('hidden');
+    }catch(e){toast('Không mở được kết quả: '+e.message)}
+  }
+
   function ready(){
     document.addEventListener('click',function(e){
       var view=e.target.closest('[data-exam-view]');
@@ -8,6 +54,22 @@
       var testNav=e.target.closest('[data-tab="tests"]');
       if(view||create||testNav)setTimeout(reveal,120);
     });
+
+    /* The old enhancement rendered an alert(JSON.stringify(...)) for attempts.
+       Capture the click and open a real result view instead. */
+    document.addEventListener('click',function(e){
+      var b=e.target.closest('[data-attempt]');
+      if(!b)return;
+      e.preventDefault();e.stopImmediatePropagation();
+      showAttemptResult(b.dataset.attempt);
+    },true);
+
+    /* Realtime INSERT and the post-send reload can both render the same row.
+       Keep one copy by message id before the chat is painted. */
+    var originalRenderChat=window.renderChat;
+    if(typeof originalRenderChat==='function'){
+      window.renderChat=function(){dedupeAdminMessages();return originalRenderChat.apply(this,arguments)};
+    }
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready);else ready();
 })();

@@ -9,7 +9,13 @@ export default async function handler(req,res){
   if(badIndex>=0)return res.status(500).json({error:`GEMINI_API_KEY trên Vercel chứa ký tự không hợp lệ tại vị trí ${badIndex}.`});
   const subject=String(req.body?.subject||'').trim();
   const history=Array.isArray(req.body?.history)?req.body.history.slice(-8):[];
-  const system=`Bạn là AI hỗ trợ học tập của STUDY TH. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn nhưng đủ bước. Bạn có thể giải thích kiến thức, hướng dẫn cách làm bài, sửa lỗi tư duy và hướng dẫn sử dụng website. Nếu câu hỏi là toán học, dùng ký hiệu Unicode/LaTeX rõ ràng như ∞, √, x², ≤, ≥ khi phù hợp. Không bịa dữ liệu của website. Nếu câu hỏi cần dữ liệu nội bộ mà bạn không được cung cấp, nói rõ rằng cần Admin kiểm tra. Không tự nhận là Admin.`;
+  const system=`Bạn là AI hỗ trợ học tập của STUDY TH. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn nhưng đủ bước. Bạn có thể giải thích kiến thức, hướng dẫn cách làm bài, sửa lỗi tư duy và hướng dẫn sử dụng website. Không bịa dữ liệu của website. Nếu câu hỏi cần dữ liệu nội bộ mà bạn không được cung cấp, nói rõ rằng cần Admin kiểm tra. Không tự nhận là Admin.
+
+QUY TẮC ĐỊNH DẠNG TOÁN BẮT BUỘC:
+- Mọi công thức toán phải dùng LaTeX có delimiter. Công thức inline bắt buộc viết dạng \\( ... \\). Công thức đứng riêng/bảng công thức bắt buộc viết dạng \\[ ... \\].
+- Không được trả về LaTeX trần như \\frac{a}{b}, \\sqrt{x}, x^2 hoặc \\infty bên ngoài delimiter.
+- Có thể dùng Unicode đơn giản như ∞, √, ≤, ≥, × khi không cần công thức LaTeX.
+- Khi có phân số, căn, đạo hàm, tích phân, giới hạn, ma trận hoặc công thức nhiều bước, ưu tiên LaTeX có delimiter để giao diện KaTeX render chính xác.`;
   const prompt=`${system}\nMôn hiện tại: ${subject||'chưa chọn'}\nLịch sử chat:\n${history.map(x=>`${x.role||'user'}: ${String(x.message||'')}`).join('\n')}\nCâu hỏi mới: ${message}`;
   let last='';
   try{

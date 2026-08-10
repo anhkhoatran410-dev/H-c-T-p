@@ -25,18 +25,17 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,300)});else setTimeout(boot,300)
 })();
 
-/* Admin support messenger viewport fix.
-   The old 690px hard limit starts below the fold on a normal desktop viewport.
-   Measure the messenger's actual top edge and reserve the remaining viewport for it,
-   so the composer is ALWAYS inside the visible Admin screen. */
+/* Admin support messenger viewport fix. Measure the actual messenger top edge and
+   reserve the remaining viewport for it, so the composer stays visible. */
 (function(){
+  var scheduled=false;
   function fitSupportMessenger(){
+    scheduled=false;
     var support=document.getElementById('support');
     var messenger=support&&support.querySelector('.messenger');
     if(!messenger)return;
     var rect=messenger.getBoundingClientRect();
-    var bottomGap=12;
-    var available=Math.floor(window.innerHeight-rect.top-bottomGap);
+    var available=Math.floor(window.innerHeight-rect.top-12);
     var min=window.innerWidth<=650?360:(window.innerWidth<=900?390:0);
     if(available<min)available=min;
     messenger.style.setProperty('height',Math.max(available,0)+'px','important');
@@ -48,9 +47,9 @@
     var messages=document.getElementById('supportMessages');
     if(messages){messages.style.setProperty('min-height','0','important');messages.style.setProperty('overflow-y','auto','important');messages.style.setProperty('overflow-x','hidden','important')}
     var composer=document.getElementById('replyForm');
-    if(composer){composer.style.setProperty('display','flex','important');composer.style.setProperty('visibility','visible','important');composer.style.setProperty('opacity','1','important');composer.style.setProperty('position','relative','important');composer.style.setProperty('bottom','auto','important');composer.style.setProperty('z-index','100000','important');}
+    if(composer){composer.style.setProperty('display','flex','important');composer.style.setProperty('visibility','visible','important');composer.style.setProperty('opacity','1','important');composer.style.setProperty('position','relative','important');composer.style.setProperty('bottom','auto','important');composer.style.setProperty('z-index','100000','important')}
   }
-  function schedule(){requestAnimationFrame(function(){requestAnimationFrame(fitSupportMessenger)})}
+  function schedule(){if(scheduled)return;scheduled=true;requestAnimationFrame(function(){requestAnimationFrame(fitSupportMessenger)})}
   function boot(){
     schedule();
     window.addEventListener('resize',schedule,{passive:true});
@@ -59,17 +58,16 @@
     if(nav)nav.addEventListener('click',function(){setTimeout(schedule,30);setTimeout(schedule,250)});
     var refresh=document.getElementById('newSupportRefresh');
     if(refresh)refresh.addEventListener('click',function(){setTimeout(schedule,100)});
-    var observer=new MutationObserver(schedule);
     var target=document.getElementById('support');
-    if(target)observer.observe(target,{attributes:true,childList:true,subtree:true});
+    if(target){var observer=new MutationObserver(schedule);observer.observe(target,{childList:true,subtree:true})}
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,100)});else setTimeout(boot,100);
 })();
 
 /* Load runtime guards from root assets. Root paths bypass /admin/* rewrite rules. */
 (function(){
-  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-v9';s.async=false;document.body.appendChild(s)}
-  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-v9';document.head.appendChild(l)}
+  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-v10';s.async=false;document.body.appendChild(s)}
+  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-v10';document.head.appendChild(l)}
   function boot(){
     if(window.__studyFinalGuardsLoader)return;window.__studyFinalGuardsLoader=true;
     loadStyle('/admin-chat-final.css');

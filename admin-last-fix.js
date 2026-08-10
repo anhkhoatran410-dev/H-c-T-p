@@ -129,7 +129,121 @@
       }
     },true);
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else boot();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else setTimeout(boot,0);
   window.addEventListener('load',function(){setTimeout(boot,0)});
   var tries=0,timer=setInterval(function(){boot();if(++tries>40)clearInterval(timer)},250);
+})();
+
+/* ADMIN SUPPORT UI REBUILD V8 — authoritative in-place composer and full-width chat. */
+(function(){
+  'use strict';
+  if(window.__ADMIN_SUPPORT_UI_V8__)return;
+  window.__ADMIN_SUPPORT_UI_V8__=true;
+  var selected=null,sending=false;
+
+  function ready(){return typeof window.loadSupabase==='function'&&typeof window.db!=='undefined'&&window.db;}
+  function getAdmin(){return typeof window.admin!=='undefined'?window.admin:null;}
+  function threadId(){var a=getAdmin();return selected||(a&&a.thread&&a.thread.id)||null;}
+
+  function css(){
+    if(document.getElementById('admin-support-ui-v8-css'))return;
+    var s=document.createElement('style');s.id='admin-support-ui-v8-css';
+    s.textContent=`
+      #support .messenger{display:grid!important;grid-template-columns:330px minmax(0,1fr)!important;width:100%!important;min-width:0!important;overflow:hidden!important}
+      #support .conversation{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:70px minmax(0,1fr) 70px!important;width:100%!important;min-width:0!important;height:100%!important;min-height:0!important;overflow:hidden!important;position:relative!important}
+      #support .conversation>*{grid-column:1!important;min-width:0!important;max-width:none!important}
+      #support #chatHeader{grid-row:1!important;width:100%!important;min-width:0!important}
+      #support #supportMessages{grid-row:2!important;width:100%!important;max-width:none!important;min-width:0!important;min-height:0!important;height:auto!important;overflow:auto!important;display:block!important;padding-bottom:16px!important}
+      #support #admin-support-ui-v8-composer{grid-row:3!important;display:flex!important;visibility:visible!important;opacity:1!important;width:100%!important;max-width:none!important;min-width:0!important;height:70px!important;min-height:70px!important;box-sizing:border-box!important;position:relative!important;z-index:2147483647!important;align-items:center!important;gap:8px!important;padding:10px 12px!important;margin:0!important;background:var(--panel,#fff)!important;border-top:1px solid var(--line,#e5eaf2)!important}
+      #support #admin-support-ui-v8-composer textarea{display:block!important;visibility:visible!important;opacity:1!important;flex:1 1 auto!important;width:auto!important;min-width:0!important;height:46px!important;min-height:46px!important;max-height:46px!important;box-sizing:border-box!important;resize:none!important;border:1px solid var(--line,#dce3ef)!important;border-radius:15px!important;padding:11px 14px!important;font:inherit!important;color:var(--text,#152033)!important;background:var(--soft,#edf3ff)!important;outline:none!important}
+      #support #admin-support-ui-v8-composer textarea:focus{background:#fff!important;border-color:#5d63ff!important;box-shadow:0 0 0 3px rgba(93,99,255,.12)!important}
+      #support #admin-support-ui-v8-composer button{display:inline-flex!important;visibility:visible!important;opacity:1!important;align-items:center!important;justify-content:center!important;flex:0 0 44px!important;width:44px!important;height:44px!important;border:0!important;border-radius:14px!important;cursor:pointer!important;font:inherit!important}
+      #support #admin-support-ui-v8-composer .v8-tool{background:#eef2fb!important;color:#26304b!important}
+      #support #admin-support-ui-v8-composer .v8-send{background:linear-gradient(135deg,#5d7cff,#805cff)!important;color:#fff!important;font-size:21px!important}
+      #support #admin-support-ui-v8-composer button:disabled,#support #admin-support-ui-v8-composer textarea:disabled{opacity:.55!important;cursor:not-allowed!important}
+      @media(max-width:700px){#support .messenger{grid-template-columns:1fr!important}#support .conversation-list{max-height:220px;border-right:0;border-bottom:1px solid var(--line)}#support .conversation{grid-template-rows:70px minmax(0,1fr) 70px!important}#support #admin-support-ui-v8-composer .v8-tool{display:none!important}}
+    `;
+    document.head.appendChild(s);
+  }
+
+  function build(){
+    css();
+    var support=document.getElementById('support'),conv=support&&support.querySelector('.conversation');
+    if(!support||!conv)return null;
+    var old=document.getElementById('replyForm');
+    if(old)old.remove();
+    var form=document.getElementById('admin-support-ui-v8-composer');
+    if(!form){
+      form=document.createElement('form');form.id='admin-support-ui-v8-composer';form.autocomplete='off';
+      form.innerHTML='<button type="button" class="v8-tool" title="Thêm">＋</button><button type="button" class="v8-tool" title="Emoji">😊</button><button type="button" class="v8-tool" title="Sticker">✨</button><textarea id="admin-support-ui-v8-input" rows="1" placeholder="Nhập tin nhắn..."></textarea><button type="submit" class="v8-send" title="Gửi">➤</button>';
+      conv.appendChild(form);
+    }else if(form.parentElement!==conv)conv.appendChild(form);
+    var id=threadId(),input=form.querySelector('textarea'),btn=form.querySelector('.v8-send');
+    if(input){input.disabled=!id;input.placeholder=id?'Nhập tin nhắn...':'Chọn một cuộc trò chuyện bên trái...';}
+    if(btn)btn.disabled=!id||sending;
+    return form;
+  }
+
+  async function loadMessages(id){
+    if(!id||!ready())return;
+    try{
+      await window.loadSupabase();
+      var r=await window.db.from('support_messages').select('*').eq('thread_id',id).order('created_at',{ascending:true});
+      if(r.error)throw r.error;
+      var a=getAdmin();if(a&&a.thread&&String(a.thread.id)===String(id)){a.messages=r.data||[];if(typeof window.renderChat==='function')window.renderChat();}
+    }catch(e){console.warn('[ADMIN SUPPORT V8] load',e)}
+  }
+
+  async function send(){
+    if(sending)return;
+    var id=threadId(),input=document.getElementById('admin-support-ui-v8-input'),text=input&&input.value.trim();
+    if(!id||!text)return;
+    sending=true;build();
+    try{
+      await window.loadSupabase();
+      var a=getAdmin(),t=a&&Array.isArray(a.threads)?a.threads.find(function(x){return String(x.id)===String(id)}):null;
+      var accountId=(t&&t.account_id)||(a&&a.thread&&a.thread.account_id)||null;
+      var r=await window.db.from('support_messages').insert({thread_id:id,account_id:accountId,sender:'admin',sender_name:'Admin',message:text}).select('*').single();
+      if(r.error)throw r.error;
+      if(input)input.value='';
+      await loadMessages(id);
+      var box=document.getElementById('supportMessages');if(box)box.scrollTop=box.scrollHeight;
+      if(typeof window.loadSupportThreads==='function')await window.loadSupportThreads();
+    }catch(e){console.error('[ADMIN SUPPORT V8] send',e);if(typeof window.toast==='function')window.toast('Không gửi được: '+(e&&e.message||e));}
+    finally{sending=false;build();}
+  }
+
+  function bind(){
+    var form=build();if(!form||form.__v8Bound)return;
+    form.__v8Bound=true;
+    form.addEventListener('submit',function(e){e.preventDefault();e.stopImmediatePropagation();send();},true);
+    var input=form.querySelector('textarea');
+    input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();send();}},true);
+  }
+
+  function hook(){
+    if(typeof window.openThread==='function'&&!window.openThread.__v8Wrapped){
+      var original=window.openThread;
+      var wrapped=async function(id){selected=String(id);var r=await original.apply(this,arguments);setTimeout(function(){bind();loadMessages(selected)},0);setTimeout(bind,250);return r};
+      wrapped.__v8Wrapped=true;window.openThread=wrapped;
+    }
+  }
+
+  function tick(){
+    var support=document.getElementById('support');if(!support||!support.classList.contains('active'))return;
+    var a=getAdmin();if(a&&a.thread&&a.thread.id)selected=String(a.thread.id);
+    hook();bind();
+  }
+
+  function boot(){
+    css();tick();
+    document.addEventListener('click',function(e){
+      var th=e.target.closest&&e.target.closest('#support .thread');
+      if(th){selected=th.getAttribute('data-id')||selected;setTimeout(function(){tick();if(selected)loadMessages(selected)},30);setTimeout(tick,250);setTimeout(tick,700);}
+      if(e.target.closest&&e.target.closest('[data-tab="support"]')){setTimeout(tick,100);setTimeout(tick,600);}
+    },true);
+    new MutationObserver(function(){tick()}).observe(document.body,{childList:true,subtree:true});
+    setInterval(tick,500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

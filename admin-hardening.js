@@ -34,20 +34,44 @@
       try{
         var raw=await readAsDataUrl(file),img=new Image();
         img.onload=function(){
-          var max=2200,scale=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height)),w=Math.max(1,Math.round((img.naturalWidth||img.width)*scale)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+          var max=1800,scale=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height)),w=Math.max(1,Math.round((img.naturalWidth||img.width)*scale)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
           var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;var ctx=canvas.getContext('2d',{alpha:false});
           if(!ctx){resolve({data:raw,mime:file.type||'image/jpeg'});return}
-          ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);resolve({data:canvas.toDataURL('image/jpeg',.86),mime:'image/jpeg'});
+          ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);resolve({data:canvas.toDataURL('image/jpeg',.74),mime:'image/jpeg'});
         };
         img.onerror=function(){resolve({data:raw,mime:file.type||'image/jpeg'})};img.src=raw;
       }catch(e){reject(e)}
     });
   }
+  async function renderPdfPages(file){
+    await loadExternal('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    var pdf=await window.pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    var pages=[];
+    for(var i=1;i<=pdf.numPages;i++){
+      var page=await pdf.getPage(i),base=page.getViewport({scale:1}),max=1800,scale=Math.min(1.55,max/base.width),vp=page.getViewport({scale:scale});
+      var canvas=document.createElement('canvas');canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);var ctx=canvas.getContext('2d',{alpha:false});
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+      await page.render({canvasContext:ctx,viewport:vp}).promise;
+      pages.push({data:canvas.toDataURL('image/jpeg',.74),mime:'image/jpeg',page:i});
+    }
+    return pages;
+  }
   async function getInputPayload(files,msg){
-    var file=files&&files[0];if(!file)throw new Error('Hãy chọn ít nhất một tài liệu hoặc ảnh.');
-    var isImage=/^image\//i.test(file.type)||/\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(file.name);
-    if(isImage){if(msg)msg.textContent='⏳ AI Vision đang đọc ảnh, nhận diện bảng và tách từ → nghĩa...';var prepared=await prepareImage(file);return {file:file,documentText:'',fileData:prepared.data,mimeType:prepared.mime};}
-    if(msg)msg.textContent='⏳ Đang đọc tài liệu...';var text=await extractDoc(file);return {file:file,documentText:String(text||''),fileData:'',mimeType:file.type||''};
+    var list=Array.from(files||[]);if(!list.length)throw new Error('Hãy chọn ít nhất một tài liệu hoặc ảnh.');
+    var texts=[],images=[];
+    for(var fi=0;fi<list.length;fi++){
+      var file=list[fi],name=(file.name||'').toLowerCase(),isImage=/^image\//i.test(file.type)||/\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(name),isPdf=/\.pdf$/i.test(name);
+      if(isImage){if(msg)msg.textContent='⏳ AI Vision đang đọc ảnh '+(fi+1)+'/'+list.length+'...';images.push(await prepareImage(file));continue}
+      if(isPdf){
+        if(msg)msg.textContent='⏳ Đang quét PDF '+(fi+1)+'/'+list.length+' thành ảnh để AI Vision đọc bảng...';
+        var pages=await renderPdfPages(file);pages.forEach(function(p){images.push(p)});continue;
+      }
+      if(msg)msg.textContent='⏳ Đang đọc tài liệu '+(fi+1)+'/'+list.length+'...';
+      var text='';try{text=await extractDoc(file)}catch(e){text=''}
+      if(text)texts.push('--- '+file.name+' ---\n'+String(text));
+    }
+    return {files:list,documentText:texts.join('\n\n').slice(0,220000),fileData:images.map(function(x){return x.data}),fileMimeTypes:images.map(function(x){return x.mime})};
   }
   async function createByAI(){
     var input=document.getElementById('file'),msg=document.getElementById('msg'),files=input&&input.files,title=String(val('title','')).trim(),subject=val('subject','Toán'),difficulty=val('level','Trung bình'),duration=Number(val('minutes',45)||45),count=Number(val('questions',20)||20),types=checkedTypes();
@@ -57,15 +81,15 @@
     if(!Number.isInteger(count)||count<1||count>100){msg.textContent='⚠️ Số lượng phải từ 1 đến 100.';return}
     var flashOnly=types.length===1&&types[0]==='flashcard';
     try{
-      var selected=await getInputPayload(files,msg);if(!selected.documentText&&!selected.fileData)throw new Error('Không đọc được nội dung. Hãy dùng tài liệu có chữ hoặc ảnh rõ nét.');
+      var selected=await getInputPayload(files,msg);if(!selected.documentText&&!selected.fileData.length)throw new Error('Không đọc được nội dung. Hãy dùng tài liệu có chữ hoặc ảnh rõ nét.');
       var questions=[];
       if(flashOnly){
-        msg.textContent=selected.fileData?'⏳ AI Vision đang phân tích ảnh và tạo từng flashcard...':'⏳ AI đang quét tài liệu và tách từng từ/cụm từ thành flashcard...';
-        var fr=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:selected.file.name,mimeType:selected.mimeType,documentText:selected.documentText,fileData:selected.fileData,subject:subject})});
+        msg.textContent=selected.fileData.length?'⏳ AI Vision đang phân tích '+selected.fileData.length+' trang/ảnh và tách từng từ → nghĩa...':'⏳ AI đang quét tài liệu và tách từng từ/cụm từ thành flashcard...';
+        var fr=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:Array.from(files).map(function(f){return f.name}).join(', '),mimeType:'image/jpeg',mimeTypes:selected.fileMimeTypes,documentText:selected.documentText,fileData:selected.fileData,subject:subject})});
         var fd=await fr.json().catch(function(){return{}});if(!fr.ok)throw new Error(fd.error||'Không tạo được flashcard');questions=normalizeQuestions(fd.flashcards||fd.questions);validate(questions,count,types);
       }else{
-        msg.textContent=selected.fileData?'⏳ AI Vision đang đọc ảnh và tạo nội dung...':'⏳ Gemini đang tạo đúng '+count+' nội dung và tự kiểm tra...';
-        var response=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:selected.file.name,mimeType:selected.mimeType,documentText:selected.documentText,fileData:selected.fileData,subject:subject,difficulty:difficulty,questionCount:count,types:types})});
+        msg.textContent=selected.fileData.length?'⏳ AI Vision đang đọc '+selected.fileData.length+' trang/ảnh và tạo nội dung...':'⏳ Gemini đang tạo đúng '+count+' nội dung và tự kiểm tra...';
+        var response=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:Array.from(files).map(function(f){return f.name}).join(', '),mimeType:'image/jpeg',mimeTypes:selected.fileMimeTypes,documentText:selected.documentText,fileData:selected.fileData,subject:subject,difficulty:difficulty,questionCount:count,types:types})});
         var data=await response.json().catch(function(){return{}});if(!response.ok)throw new Error(data.error||'Không tạo được đề');questions=normalizeQuestions(data.questions);validate(questions,count,types);
       }
       await loadSupabase();

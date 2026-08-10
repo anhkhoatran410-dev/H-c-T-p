@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="admin-final-fix.css?v=20260810-6">
   <link rel="stylesheet" href="/admin-hardening.css?v=20260810-9">
   <link rel="stylesheet" href="admin-chat-final.css?v=20260810-9">
+  <link rel="stylesheet" href="responsive-fix.css?v=20260810-1">
   <style id="admin-support-composer-structural-fix">
     #support .messenger{display:grid!important;grid-template-columns:330px minmax(0,1fr)!important;height:min(690px,calc(100vh - 205px))!important;min-height:520px!important;overflow:hidden!important}
     #support .conversation{display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;height:100%!important;min-height:0!important;overflow:hidden!important;position:relative!important}
@@ -21,8 +22,22 @@
     #support #replyForm #replyInput{display:block!important;visibility:visible!important;opacity:1!important;flex:1 1 auto!important;width:auto!important;min-width:0!important;height:44px!important;min-height:44px!important;max-height:140px!important;box-sizing:border-box!important;resize:none!important}
     #support #replyForm .send-btn{display:inline-flex!important;visibility:visible!important;opacity:1!important;flex:0 0 44px!important;width:44px!important;height:44px!important;align-items:center!important;justify-content:center!important}
     #support #replyForm .composer-tool{display:inline-flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important}
-    @media(max-width:900px){#support .messenger{height:calc(100vh - 285px)!important;max-height:none!important;min-height:390px!important}}
-    @media(max-width:650px){#support .messenger{height:calc(100vh - 245px)!important;min-height:360px!important}#support #replyForm .composer-tool{display:none!important}}
+    @media(max-width:900px){#support .messenger{height:calc(100dvh - 220px)!important;max-height:none!important;min-height:430px!important}}
+    @media(max-width:650px){
+      #support .messenger{grid-template-columns:1fr!important;grid-template-rows:112px minmax(0,1fr)!important;height:calc(100dvh - 245px)!important;min-height:430px!important;max-height:none!important}
+      #support .conversation-list{display:block!important;height:112px!important;max-height:112px!important;border-right:0!important;border-bottom:1px solid var(--line)!important}
+      #support .chat-search{padding:8px!important}
+      #support .thread-list{display:flex!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;padding:6px!important;height:68px!important}
+      #support .thread{flex:0 0 170px!important;min-width:170px!important;padding:8px!important}
+      #support .conversation{grid-row:2!important;height:auto!important;min-height:0!important}
+      #support #chatHeader{min-height:58px!important;padding:9px 12px!important}
+      #support #supportMessages{padding:12px!important}
+      #support #replyForm{min-height:72px!important;height:auto!important;padding:8px!important;gap:6px!important}
+      #support #replyForm #replyInput{height:50px!important;min-height:50px!important;max-height:120px!important;padding:12px 13px!important;font-size:16px!important;line-height:1.35!important}
+      #support #replyForm .send-btn{width:48px!important;height:48px!important;flex-basis:48px!important}
+      #support #replyForm .composer-tool{display:none!important}
+    }
+    @supports not (height:100dvh){@media(max-width:900px){#support .messenger{height:calc(100vh - 220px)!important}}}
   </style>
 </head>
 <body>
@@ -39,6 +54,6 @@
       <section id="assistant" class="tab"><div class="section-head"><div><span class="eyebrow">PRIVATE COPILOT</span><h2>Admin Copilot</h2><p>Trợ lý kỹ thuật cho bảo trì, chẩn đoán lỗi, UX/UI và kế hoạch nâng cấp.</p></div></div><div class="copilot panel"><div id="assistantMessages" class="assistant-messages"></div><form id="assistantForm" class="composer"><textarea id="assistantInput" rows="1" placeholder="Ví dụ: kiểm tra người tham gia, tắt bot Kỹ thuật, hoặc lập checklist bảo trì..."></textarea><button class="send-btn" type="submit">➤</button></form></div></section>
     </main>
   </div><div id="toast" class="toast"></div>
-  <script src="auth.js?v=20260810-3"></script><script src="app.js?v=20260810-7"></script><script src="media-fix.js?v=20260810-5"></script><script src="login-fix.js?v=20260810-3"></script><script src="fix.js?v=20260810-3"></script><script src="enhancements.js?v=20260810-3"></script><script src="final-fix.js?v=20260810-3"></script><script src="exam-save-fix.js?v=20260810-3"></script><script src="/admin-media-fix.js?v=20260810-3"></script><script src="/admin-final-fix.js?v=20260810-3"></script><script src="/admin-hardening.js?v=20260810-12"></script><script src="/admin-last-fix.js?v=20260810-4"></script><script src="/admin/admin-ultimate-fix.js?v=20260810-3"></script>
+  <script src="auth.js?v=20260810-3"></script><script src="app.js?v=20260810-7"></script><script src="media-fix.js?v=20260810-5"></script><script src="login-fix.js?v=20260810-3"></script><script src="fix.js?v=20260810-3"></script><script src="enhancements.js?v=20260810-3"></script><script src="final-fix.js?v=20260810-3"></script><script src="exam-save-fix.js?v=20260810-3"></script><script src="/admin-media-fix.js?v=20260810-3"></script><script src="/admin-final-fix.js?v=20260810-3"></script><script src="/admin-hardening.js?v=20260810-12"></script><script src="/admin-last-fix.js?v=20260810-5"></script><script src="/admin/admin-ultimate-fix.js?v=20260810-3"></script>
 </body>
 </html>

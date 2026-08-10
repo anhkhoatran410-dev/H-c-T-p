@@ -1,12 +1,16 @@
-/* STUDY TH — ADMIN SUPPORT HOTFIX v1
+/* STUDY TH — ADMIN SUPPORT HOTFIX v2
    Scope: Admin > Hỗ trợ ONLY.
    Guarantees a visible composer, selectable conversations, send-to-Supabase,
    realtime/poll refresh, and no accidental changes to the student support UI.
 */
 (function () {
   'use strict';
-  if (window.__studyAdminSupportHotfixV1) return;
-  window.__studyAdminSupportHotfixV1 = true;
+  if (window.__studyAdminSupportHotfixV2) return;
+  window.__studyAdminSupportHotfixV2 = true;
+
+  function hasAdmin() {
+    return typeof admin !== 'undefined' && admin;
+  }
 
   function installStyle() {
     if (document.getElementById('study-admin-support-hotfix-style')) return;
@@ -66,7 +70,7 @@
     e.form.style.setProperty('visibility', 'visible', 'important');
     e.form.style.setProperty('opacity', '1', 'important');
 
-    var ready = !!(window.admin && admin.thread && admin.thread.id);
+    var ready = !!(hasAdmin() && admin.thread && admin.thread.id);
     if (e.input) {
       e.input.disabled = !ready;
       e.input.placeholder = ready ? 'Nhập tin nhắn cho người học...' : 'Chọn một cuộc trò chuyện bên trái...';
@@ -89,39 +93,18 @@
     if (box) requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; });
   }
 
-  async function reloadMessages() {
-    if (!window.admin || !admin.thread || !admin.thread.id || typeof loadSupabase !== 'function') return;
-    try {
-      await loadSupabase();
-      var r = await db.from('support_messages')
-        .select('*')
-        .eq('thread_id', admin.thread.id)
-        .order('created_at', { ascending: true });
-      if (r.error) throw r.error;
-      if (!admin.thread || String(admin.thread.id) !== String(r.data?.[0]?.thread_id || admin.thread.id)) return;
-      admin.messages = r.data || [];
-      if (typeof renderChat === 'function') renderChat();
-      ensureForm();
-      scrollBottom();
-    } catch (err) {
-      console.error('[ADMIN SUPPORT HOTFIX] reload failed', err);
-      ensureForm();
-    }
-  }
-
   async function send() {
     var e = els();
     var text = e.input ? e.input.value.trim() : '';
-    if (!text || !window.admin || !admin.thread || !admin.thread.id || window.__studyAdminSupportSending) return;
+    if (!text || !hasAdmin() || !admin.thread || !admin.thread.id || window.__studyAdminSupportSending) return;
 
     window.__studyAdminSupportSending = true;
     ensureForm();
     try {
       await loadSupabase();
-      var accountId = admin.thread.account_id || null;
       var row = {
         thread_id: admin.thread.id,
-        account_id: accountId,
+        account_id: admin.thread.account_id || null,
         sender: 'admin',
         sender_name: 'Admin',
         message: text
@@ -151,7 +134,7 @@
     form.__supportHotfixBound = true;
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
-      ev.stopPropagation();
+      ev.stopImmediatePropagation();
       send();
     }, true);
     var input = document.getElementById('replyInput');
@@ -159,7 +142,7 @@
       input.addEventListener('keydown', function (ev) {
         if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) {
           ev.preventDefault();
-          ev.stopPropagation();
+          ev.stopImmediatePropagation();
           send();
         }
       }, true);
@@ -194,7 +177,7 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
     setInterval(function () {
-      if (window.admin && admin.tab === 'support') {
+      if (hasAdmin() && admin.tab === 'support') {
         installStyle();
         bindForm();
         wrapOpenThread();

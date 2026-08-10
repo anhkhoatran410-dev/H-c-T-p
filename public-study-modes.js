@@ -3,7 +3,7 @@
    Flashcards are a separate learning stage; the quiz is shown only after the learner chooses it.
 */
 (function(){
-  function escSafe(v){return typeof esc==='function'?esc(v):String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+  function escSafe(v){return typeof esc==='function'?esc(v):String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]))}
   function questionsOf(exam){return Array.isArray(exam?.questions)?exam.questions:[]}
   function isFlash(q){return q&&q.type==='flashcard'}
   function isScored(q){return q&&!isFlash(q)}
@@ -16,8 +16,11 @@
   function shortQuestion(q,i){const a=state.answers?.[i];return `<div class="q"><b>Câu ${i+1}. ${escSafe(q.q||'')}</b><div class="study-short-row">${[0,1,2,3].map(j=>`<input maxlength="1" inputmode="text" value="${escSafe(a?.[j]||'')}" oninput="setShort(${i},${j},this.value)">`).join('')}</div></div>`}
 
   function flashStage(qs){
-    const total=qs.length,index=Math.min(Math.max(Number(state.flashIndex||0),0),Math.max(total-1,0)),q=qs[index]||{},flipped=!!state.flashFlipped,done=index>=total;
-    if(done)return flashFinish(qs);
+    const total=qs.length;
+    const rawIndex=Number(state.flashIndex||0);
+    if(rawIndex>=total)return flashFinish(qs);
+    const index=Math.max(rawIndex,0);
+    const q=qs[index]||{},flipped=!!state.flashFlipped;
     return `<section class="study-flash-stage"><div class="study-flash-progress"><div><span class="eyebrow">VOCABULARY</span><h2>Flashcard từ vựng</h2><p class="muted">Mỗi lần chỉ có <b>một thẻ</b>. Bấm vào thẻ để lật sang nghĩa.</p></div><span class="study-flash-count">${index+1} / ${total}</span></div><div class="study-single-card-wrap">${flashCard(q,index)}</div><div class="study-flash-actions"><button type="button" class="btn secondary" onclick="studyFlipFlash()">${flipped?'↻ Xem lại từ':'↻ Lật thẻ'}</button><button type="button" class="btn study-next-flash" onclick="studyNextFlash()">${index===total-1?'Hoàn thành ✓':'Tiếp theo →'}</button></div><div class="study-flash-dots" aria-label="Tiến độ">${qs.map((_,j)=>`<span class="${j<index?'done ':''}${j===index?'current':''}"></span>`).join('')}</div></section>`;
   }
   function flashFinish(qs){const normal=qs.filter(isScored),hasQuiz=normal.length>0;return `<section class="study-flash-finish"><div class="study-finish-icon">🎉</div><span class="eyebrow">ĐÃ HOÀN THÀNH</span><h2>Bạn đã xem hết ${qs.filter(isFlash).length} flashcard</h2><p class="muted">Bạn có thể ôn lại từ đầu hoặc chuyển sang phần trắc nghiệm.</p><div class="study-finish-actions"><button type="button" class="btn secondary" onclick="studyReviewFlashcards()">↻ Ôn lại</button>${hasQuiz?'<button type="button" class="btn study-go-quiz" onclick="studyGoQuiz()">📝 Vào bài test</button>':'<button type="button" class="btn study-go-quiz" onclick="go(\'home\')">← Về trang chủ</button>'}</div></section>`}
@@ -34,7 +37,7 @@
   async function featureSubmit(auto){if(!state.exam)return;clearInterval(state.timer);const qs=questionsOf(state.exam),scored=qs.filter(isScored),wrong=[];let right=0;qs.forEach((q,i)=>{if(!isFlash(q)){if(correct(q,state.answers?.[i]))right++;else wrong.push(i)}});const total=scored.length,score=total?Math.round(right/total*100):100;const result={examId:state.exam.id,examTitle:state.exam.title,candidate:state.candidate,score,correct:right,total,timeSec:Math.min(Math.floor((Date.now()-state.startedAt)/1000),Number(state.exam.duration||0)*60),auto,wrongIndexes:wrong,answers:JSON.parse(JSON.stringify(state.answers||{}))};try{await loadSupabase();const payload={device_id:typeof deviceId==='function'?deviceId():null,exam_id:state.exam.id,exam_title:state.exam.title,student_name:state.candidate,student_code:state.code||null,score,correct:right,total,duration_seconds:result.timeSec,auto_submitted:!!auto,answers:result.answers,wrong_indexes:wrong,reviewed_indexes:[]};const {data,error}=await db.from('user_attempts').insert(payload).select().single();if(!error&&data)result.id=data.id;if(typeof deviceId==='function')await db.from('participants').upsert({name:state.candidate,code:state.code||deviceId()},{onConflict:'code'})}catch(e){console.warn('Không lưu lịch sử:',e)}state.lastResult=result;if(typeof loadHistory==='function')await loadHistory();state.page='result';render()}
 
   window.studyFlipFlash=function(){state.flashFlipped=!state.flashFlipped;document.querySelectorAll('[data-flip-card]').forEach(x=>x.classList.toggle('is-flipped',state.flashFlipped));};
-  window.studyNextFlash=function(){const qs=questionsOf(state.exam).filter(isFlash);if(!qs.length)return;state.flashFlipped=false;state.flashIndex=Number(state.flashIndex||0)+1;render();};
+  window.studyNextFlash=function(){const qs=questionsOf(state.exam).filter(isFlash);if(!qs.length)return;state.flashFlipped=false;const current=Number(state.flashIndex||0);state.flashIndex=current>=qs.length-1?qs.length:current+1;render();};
   window.studyReviewFlashcards=function(){state.studyStage='flashcards';state.flashIndex=0;state.flashFlipped=false;render();};
   window.studyGoQuiz=function(){state.studyStage='quiz';state.flashIndex=0;state.flashFlipped=false;state.startedAt=Date.now();if(scoredCount(questionsOf(state.exam))&&typeof startTimer==='function')startTimer();render();};
 

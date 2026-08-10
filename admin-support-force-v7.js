@@ -9,7 +9,6 @@
 
   const ROOT_ID='admin-support-v7-composer';
   let selectedId=null;
-
   const css=`
     #admin-support-v7-composer{display:flex!important;position:absolute!important;left:0!important;right:0!important;bottom:0!important;z-index:2147483000!important;box-sizing:border-box!important;gap:8px!important;align-items:center!important;padding:10px 12px!important;background:#fff!important;border-top:1px solid #e5eaf2!important;min-height:68px!important}
     #admin-support-v7-composer textarea{display:block!important;visibility:visible!important;opacity:1!important;flex:1 1 auto!important;min-width:0!important;width:auto!important;height:44px!important;min-height:44px!important;max-height:120px!important;box-sizing:border-box!important;border:1px solid #d9e0ee!important;border-radius:14px!important;padding:11px 14px!important;font:inherit!important;outline:none!important;background:#f7f9fd!important;resize:none!important}
@@ -28,67 +27,44 @@
   function currentId(){const a=state();return selectedId || (a&&a.thread&&a.thread.id) || null}
   function build(){
     addCss();
-    const support=document.getElementById('support');
-    const c=getConversation();
+    const support=document.getElementById('support');const c=getConversation();
     if(!support||!c)return;
     let form=document.getElementById(ROOT_ID);
     if(!form){
-      form=document.createElement('form');
-      form.id=ROOT_ID;
+      form=document.createElement('form');form.id=ROOT_ID;
       form.innerHTML='<button type="button" class="v7-tool" title="Thêm">＋</button><button type="button" class="v7-tool" title="Emoji">😊</button><button type="button" class="v7-tool" title="Sticker">✨</button><textarea id="adminSupportV7Input" rows="1" placeholder="Nhập tin nhắn cho người học..."></textarea><button type="submit" class="v7-send" title="Gửi">➤</button>';
       c.appendChild(form);
       form.addEventListener('submit',function(e){e.preventDefault();send()});
-      const input=form.querySelector('textarea');
-      input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
-    }else if(form.parentElement!==c){c.appendChild(form)}
-    const ready=!!currentId();
-    const input=form.querySelector('textarea'),button=form.querySelector('.v7-send');
-    input.disabled=!ready;button.disabled=!ready;
-    input.placeholder=ready?'Nhập tin nhắn cho người học...':'Chọn một cuộc trò chuyện bên trái...';
+      form.querySelector('textarea').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();send()}});
+    }else if(form.parentElement!==c)c.appendChild(form);
+    const ready=!!currentId();const input=form.querySelector('textarea'),button=form.querySelector('.v7-send');
+    input.disabled=!ready;button.disabled=!ready;input.placeholder=ready?'Nhập tin nhắn cho người học...':'Chọn một cuộc trò chuyện bên trái...';
   }
   async function send(){
-    const id=currentId(),input=document.getElementById('adminSupportV7Input'),text=input&&input.value.trim();
-    if(!id||!text)return;
+    const id=currentId(),input=document.getElementById('adminSupportV7Input'),text=input&&input.value.trim();if(!id||!text)return;
     const a=state();
     try{
       if(typeof loadSupabase==='function')await loadSupabase();
-      if(!window.db)throw new Error('Supabase chưa sẵn sàng');
+      if(typeof db==='undefined'||!db)throw new Error('Supabase chưa sẵn sàng');
       const thread=a&&Array.isArray(a.threads)?a.threads.find(t=>String(t.id)===String(id)):null;
       const accountId=(thread&&thread.account_id)||(a&&a.thread&&a.thread.account_id)||null;
-      const r=await window.db.from('support_messages').insert({thread_id:id,account_id:accountId,sender:'admin',sender_name:'Admin',message:text}).select('*').single();
+      const r=await db.from('support_messages').insert({thread_id:id,account_id:accountId,sender:'admin',sender_name:'Admin',message:text}).select('*').single();
       if(r.error)throw r.error;
       input.value='';
       if(a&&String(a.thread&&a.thread.id)===String(id)&&r.data){a.messages=Array.isArray(a.messages)?a.messages:[];a.messages.push(r.data)}
-      if(typeof renderChat==='function')renderChat();
-      build();
+      if(typeof renderChat==='function')renderChat();build();
       const box=document.getElementById('supportMessages');if(box)box.scrollTop=box.scrollHeight;
-      if(typeof loadSupportThreads==='function')await loadSupportThreads();
-      build();
+      if(typeof loadSupportThreads==='function')await loadSupportThreads();build();
       if(typeof toast==='function')toast('Đã gửi tin nhắn cho người học');
     }catch(e){console.error('[ADMIN SUPPORT V7]',e);if(typeof toast==='function')toast('Không gửi được: '+(e.message||e))}
   }
   function hook(){
     const original=window.openThread;
     if(typeof original==='function'&&!original.__v7){
-      const wrapped=async function(id){selectedId=String(id);const r=await original.apply(this,arguments);setTimeout(build,0);setTimeout(build,100);setTimeout(build,400);return r};
-      wrapped.__v7=true;window.openThread=wrapped;
+      const wrapped=async function(id){selectedId=String(id);const r=await original.apply(this,arguments);setTimeout(build,0);setTimeout(build,100);setTimeout(build,400);return r};wrapped.__v7=true;window.openThread=wrapped;
     }
   }
-  function tick(){
-    const support=document.getElementById('support');
-    if(!support||!support.classList.contains('active'))return;
-    const a=state();if(a&&a.thread&&a.thread.id)selectedId=String(a.thread.id);
-    hook();build();
-  }
-  function boot(){
-    addCss();tick();
-    document.addEventListener('click',function(e){
-      const t=e.target.closest&&e.target.closest('#support .thread');
-      if(t){selectedId=t.getAttribute('data-id')||null;setTimeout(tick,20);setTimeout(tick,150);setTimeout(tick,500)}
-      if(e.target.closest&&e.target.closest('[data-tab="support"]')){setTimeout(tick,100);setTimeout(tick,600)}
-    },true);
-    new MutationObserver(tick).observe(document.body,{childList:true,subtree:true});
-    setInterval(tick,500);
-  }
+  function tick(){const support=document.getElementById('support');if(!support||!support.classList.contains('active'))return;const a=state();if(a&&a.thread&&a.thread.id)selectedId=String(a.thread.id);hook();build()}
+  function boot(){addCss();tick();document.addEventListener('click',function(e){const t=e.target.closest&&e.target.closest('#support .thread');if(t){selectedId=t.getAttribute('data-id')||null;setTimeout(tick,20);setTimeout(tick,150);setTimeout(tick,500)}if(e.target.closest&&e.target.closest('[data-tab="support"]')){setTimeout(tick,100);setTimeout(tick,600)}},true);new MutationObserver(tick).observe(document.body,{childList:true,subtree:true});setInterval(tick,500)}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

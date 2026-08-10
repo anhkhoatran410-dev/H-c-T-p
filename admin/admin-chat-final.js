@@ -1,15 +1,23 @@
-/* STUDY TH final admin support chat: always-visible composer, live refresh, single-send guard. */
+/* STUDY TH — final admin support chat: guaranteed composer, live refresh, single-send guard. */
 (function(){
-  if(window.__studyAdminChatFinal)return;
-  window.__studyAdminChatFinal=true;
+  if(window.__studyAdminChatFinalBooted)return;
+  window.__studyAdminChatFinalBooted=true;
   var sending=false,timer=null,channel=null;
   function escText(v){return typeof esc==='function'?esc(v):String(v??'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]})}
   function forceComposer(){
-    var form=document.getElementById('replyForm');if(!form)return;
-    form.classList.remove('hidden');form.style.setProperty('display','flex','important');form.style.setProperty('visibility','visible','important');form.style.setProperty('opacity','1','important');
+    var form=document.getElementById('replyForm');
+    if(!form)return null;
+    form.classList.remove('hidden');
+    form.style.setProperty('display','flex','important');
+    form.style.setProperty('visibility','visible','important');
+    form.style.setProperty('opacity','1','important');
+    form.style.setProperty('position','relative','important');
+    form.style.setProperty('z-index','100','important');
     var input=document.getElementById('replyInput'),btn=form.querySelector('.send-btn');
-    if(input){input.disabled=!admin.thread;input.style.setProperty('display','block','important');input.placeholder=admin.thread?'Nhập tin nhắn...':'Chọn một cuộc trò chuyện...'}
-    if(btn){btn.disabled=!admin.thread||sending;btn.style.setProperty('display','inline-flex','important')}
+    var ready=!!admin.thread;
+    if(input){input.disabled=!ready;input.style.setProperty('display','block','important');input.style.setProperty('visibility','visible','important');input.placeholder=ready?'Nhập tin nhắn...':'Chọn một cuộc trò chuyện...'}
+    if(btn){btn.disabled=!ready||sending;btn.style.setProperty('display','inline-flex','important');btn.style.setProperty('visibility','visible','important')}
+    return form;
   }
   function media(m){if(m.attachment_url&&String(m.attachment_type||'').startsWith('image/'))return '<a href="'+escText(m.attachment_url)+'" target="_blank" rel="noopener"><img class="admin-attachment" src="'+escText(m.attachment_url)+'" alt="'+escText(m.attachment_name||'Hình ảnh')+'" loading="lazy"></a>';if(m.sticker)return '<div class="admin-sticker">'+escText(m.sticker)+'</div>';return ''}
   function renderFinal(){
@@ -21,7 +29,7 @@
   }
   async function refresh(id){
     if(!id)return;
-    try{await loadSupabase();var r=await db.from('support_messages').select('*').eq('thread_id',id).order('created_at',{ascending:true});if(r.error)throw r.error;if(!admin.thread||String(admin.thread.id)!==String(id))return;admin.messages=r.data||[];renderFinal();}catch(e){console.warn('admin final chat refresh',e)}
+    try{await loadSupabase();var r=await db.from('support_messages').select('*').eq('thread_id',id).order('created_at',{ascending:true});if(r.error)throw r.error;if(!admin.thread||String(admin.thread.id)!==String(id))return;admin.messages=r.data||[];renderFinal();}catch(e){console.warn('admin final chat refresh',e);forceComposer()}
   }
   async function sendFinal(){
     var input=document.getElementById('replyInput'),text=input?.value.trim();
@@ -34,24 +42,34 @@
   function start(){
     if(timer)clearInterval(timer);
     if(channel&&db)db.removeChannel(channel).catch(function(){});
-    loadSupportThreads();
+    if(typeof loadSupportThreads==='function')loadSupportThreads();
     loadSupabase().then(function(){
-      channel=db.channel('study-admin-final-chat').on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages'},function(p){if(admin.thread&&String(p.new.thread_id)===String(admin.thread.id))refresh(admin.thread.id);loadSupportThreads()}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'support_threads'},function(){loadSupportThreads()}).subscribe();
-      timer=setInterval(function(){if(admin.tab==='support'){loadSupportThreads();if(admin.thread)refresh(admin.thread.id)}},1200);
-    }).catch(function(e){console.warn('admin final realtime',e)});
+      channel=db.channel('study-admin-final-chat-v2').on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages'},function(p){if(admin.thread&&String(p.new.thread_id)===String(admin.thread.id))refresh(admin.thread.id);if(typeof loadSupportThreads==='function')loadSupportThreads()}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'support_threads'},function(){if(typeof loadSupportThreads==='function')loadSupportThreads()}).subscribe();
+      timer=setInterval(function(){if(admin.tab==='support'){if(typeof loadSupportThreads==='function')loadSupportThreads();if(admin.thread)refresh(admin.thread.id)}},1200);
+    }).catch(function(e){console.warn('admin final realtime',e);forceComposer()});
   }
   function install(){
-    var form=document.getElementById('replyForm');if(!form)return;
-    form.onsubmit=function(e){e.preventDefault();e.stopImmediatePropagation();sendFinal()};
-    var input=document.getElementById('replyInput');if(input&&!input.__finalBound){input.__finalBound=true;input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();sendFinal()}} ,true)}
+    var form=document.getElementById('replyForm');
+    if(!form)return;
+    if(!form.__finalBound){
+      form.__finalBound=true;
+      form.onsubmit=function(e){e.preventDefault();e.stopImmediatePropagation();sendFinal()};
+    }
+    var input=document.getElementById('replyInput');
+    if(input&&!input.__finalBound){input.__finalBound=true;input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();sendFinal()}},true)}
     var oldOpen=window.openThread;
-    if(!oldOpen.__studyFinalWrapped){
-      var wrapped=async function(id){await oldOpen(id);forceComposer();if(admin.thread)await refresh(admin.thread.id);forceComposer()};wrapped.__studyFinalWrapped=true;window.openThread=wrapped;
+    if(typeof oldOpen==='function'&&!oldOpen.__studyFinalWrapped){
+      var wrapped=async function(id){await oldOpen.call(this,id);forceComposer();if(admin.thread)await refresh(admin.thread.id);forceComposer()};
+      wrapped.__studyFinalWrapped=true;window.openThread=wrapped;
     }
     forceComposer();
   }
-  function boot(){install();if(admin&&admin.tab==='support')start()}
+  function boot(){
+    install();
+    if(typeof admin!=='undefined'&&typeof loadSupabase==='function'&&admin.tab==='support')start();
+  }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else setTimeout(boot,0);
   window.addEventListener('load',function(){setTimeout(boot,0)});
-  var tries=0,t=setInterval(function(){if(typeof admin!=='undefined'&&typeof loadSupabase==='function'){install();if(++tries%4===0&&admin.tab==='support')start()}if(++tries>40)clearInterval(t)},250);
+  var tries=0,t=setInterval(function(){if(typeof admin!=='undefined'&&typeof loadSupabase==='function'){install();if(++tries%4===0&&admin.tab==='support')start()}if(++tries>60)clearInterval(t)},250);
+  document.addEventListener('click',function(e){if(e.target.closest('.thread'))setTimeout(function(){install();forceComposer()},80)},true);
 })();

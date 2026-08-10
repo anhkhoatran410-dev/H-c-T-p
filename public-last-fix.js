@@ -10,11 +10,8 @@
     function togglePicker(id){var target=document.getElementById(id);if(!target)return;document.querySelectorAll('.support-picker').forEach(function(el){if(el!==target)el.classList.add('hidden')});target.classList.toggle('hidden')}
     function getDeviceId(){try{if(typeof window.deviceId==='function')return window.deviceId();var key='study_device_id_v2',id=localStorage.getItem(key);if(!id){id=(crypto&&crypto.randomUUID)?crypto.randomUUID():'dev_'+Date.now()+'_'+Math.random().toString(36).slice(2);localStorage.setItem(key,id)}return id}catch(e){return 'dev_fallback'}}
 
-    /* DOM-only picker toggle: never touches the app's lexical `state`. */
     window.toggleSupportPicker=function(id){togglePicker(id)};
 
-    /* Final send implementation: bypasses all older wrappers and uses the
-       race-safe ensureThread from support-fix.js. */
     window.sendSupportMessage=async function(payload){
       closePickers();
       var s=getState();if(!s)throw new Error('Hệ thống hỗ trợ chưa sẵn sàng.');
@@ -24,16 +21,16 @@
       var waiting=false;
       try{var gate=await db.from('support_threads').select('bot_waiting_admin').eq('id',t.id).maybeSingle();if(!gate.error)waiting=!!gate.data?.bot_waiting_admin}catch(_){ }
       var row={thread_id:t.id,account_id:t.account_id||s.supportAccountId||null,sender:'user',message:String(payload?.message||''),attachment_url:payload?.attachment_url||null,attachment_type:payload?.attachment_type||null,attachment_name:payload?.attachment_name||null,sticker:payload?.sticker||null,bot_handled:waiting};
-      var r=await db.from('support_messages').insert(row);if(r.error)throw r.error;
-      s.thread=Object.assign({},t,{bot_waiting_admin:waiting});window.studyState=s;closePickers();
-      if(typeof window.startSupportLive==='function'){try{await window.startSupportLive()}catch(_){ }}
+      var r=await db.from('support_messages').insert(row).select('*').single();if(r.error)throw r.error;
+      s.messages=Array.isArray(s.messages)?s.messages:[];s.messages.push(r.data||row);window.studyState=s;window.state=s;
+      if(typeof window.render==='function')await window.render();
+      closePickers();
     };
 
     window.sendSticker=async function(sticker){var value=String(sticker||'');closePickers();try{await window.sendSupportMessage({sticker:value,message:'✨ Sticker'});closePickers()}catch(err){alert('Không gửi được sticker: '+(err&&err.message||err))}};
     window.insertSupportEmoji=function(value){var input=document.getElementById('supportInput');if(!input)return;input.value+=(input.value?' ':'')+String(value||'');closePickers();input.focus()};
     window.sendSupport=async function(){var input=document.getElementById('supportInput'),text=input&&input.value.trim();if(!text)return;closePickers();try{await window.sendSupportMessage({message:text});if(input)input.value='';closePickers()}catch(err){if(input)input.value=text;alert('Không gửi được tin nhắn: '+(err&&err.message||err))}};
 
-    /* Capture picker-item clicks so stale inline handlers can never fire first. */
     document.addEventListener('click',function(e){
       var pickerButton=e.target.closest('.support-picker button');
       if(pickerButton){
@@ -52,6 +49,20 @@
 
     window.studyOpenExamFromUrl=function(){try{var s=getState(),list=window.exams||[],id=new URLSearchParams(location.search).get('exam');if(!s||!id||!Array.isArray(list))return;var e=list.find(function(x){return String(x.id)===String(id)});if(!e)return;s.subject=e.subject||'';s.page='subject';if(typeof window.render==='function')window.render()}catch(_){ }};
     afterRender();setTimeout(window.studyOpenExamFromUrl,250);
+
+    /* Final chat reliability: optimistic render plus realtime/poll fallback. */
+    var chatTimer=null,chatChannel=null,chatBusy=false;
+    async function refreshPublicChat(){
+      var s=getState();if(!s||s.page!=='support'||typeof window.ensureThread!=='function')return;if(chatBusy)return;chatBusy=true;
+      try{var t=await window.ensureThread();await load();var r=await db.from('support_messages').select('*').eq('thread_id',t.id).order('created_at',{ascending:true});if(r.error)throw r.error;s.messages=r.data||[];window.studyState=s;window.state=s;if(typeof window.render==='function')await window.render();setTimeout(function(){var box=document.querySelector('.support-message-list');if(box)box.scrollTop=box.scrollHeight},0)}catch(e){console.warn('public chat refresh',e)}finally{chatBusy=false}
+    }
+    function startPublicChatLive(){
+      if(typeof window.ensureThread!=='function'||typeof window.loadSupabase!=='function')return;
+      window.loadSupabase().then(async function(){try{var t=await window.ensureThread();if(chatChannel)db.removeChannel(chatChannel).catch(function(){});chatChannel=db.channel('public-support-final-live').on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages'},function(p){if(String(p.new.thread_id)===String(t.id))refreshPublicChat()}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'support_threads'},function(p){if(String(p.new.id)===String(t.id))refreshPublicChat()}).subscribe();clearInterval(chatTimer);chatTimer=setInterval(refreshPublicChat,1000);refreshPublicChat()}catch(e){console.warn('public support live',e)}}).catch(function(e){console.warn('public support setup',e)})
+    }
+    var oldStart=window.startSupportLive;
+    window.startSupportLive=function(){try{if(oldStart)oldStart()}catch(e){console.warn('legacy support live',e)}startPublicChatLive()};
+    if(getState()?.page==='support')startPublicChatLive();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else setTimeout(boot,0);
   window.addEventListener('study-app-loaded',function(){setTimeout(boot,0)});

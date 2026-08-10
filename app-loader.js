@@ -44,6 +44,10 @@
     return source;
   }
 
+  function bridgeRuntime(source) {
+    return source + '\n;window.state=state;window.exams=exams;window.db=db;window.__studyLoadSupabase=loadSupabase;window.loadSupabase=async function(){var value=await window.__studyLoadSupabase();window.db=db;return value;};window.__studyAppReady=true;';
+  }
+
   fetch(APP_URL, { cache: "no-store" })
     .then(function (response) {
       if (!response.ok) throw new Error("Không tải được app.js (HTTP " + response.status + ")");
@@ -51,6 +55,7 @@
     })
     .then(function (source) {
       var patched = patchBrokenRenderQuestion(source);
+      patched = bridgeRuntime(patched);
       try {
         (0, eval)(patched);
         window.dispatchEvent(new Event("study-app-loaded"));

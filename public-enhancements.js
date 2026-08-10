@@ -24,15 +24,13 @@
       state.thread=data; return data;
     };
 
-    var oldSelect=window.selectSupportAccount;
     window.selectSupportAccount=async function(id){
       state.supportAccountId=id; state.thread=null; state.messages=[];
       try{await startSupportLive();}catch(e){console.warn(e)}
-      render(); setTimeout(function(){installSupportAI();},0);
+      render(); setTimeout(function(){installSupportAI();enhanceResultPage();},0);
     };
 
     /* Keep the public support composer reliable after every render. */
-    var oldSend=window.sendSupportMessage;
     window.sendSupportMessage=async function(payload){
       var t=await ensureThread(); await loadSupabase();
       var row={thread_id:t.id,account_id:t.account_id||state.supportAccountId||null,sender:'user',message:String(payload?.message||''),attachment_url:payload?.attachment_url||null,attachment_type:payload?.attachment_type||null,attachment_name:payload?.attachment_name||null,sticker:payload?.sticker||null};
@@ -52,9 +50,51 @@
       state.reviewChoice=null;state.reviewTF=[];state.page='review';render();
     };
 
-    window.render=function(){var app=document.getElementById('app');if(app)app.innerHTML=header()+page();var box=document.getElementById('supportMessages');if(box)box.scrollTop=box.scrollHeight;setTimeout(installSupportAI,0)};
+    window.render=function(){var app=document.getElementById('app');if(app)app.innerHTML=header()+page();var box=document.getElementById('supportMessages');if(box)box.scrollTop=box.scrollHeight;setTimeout(function(){installSupportAI();enhanceResultPage();},0)};
 
     installSupportAI();
+    enhanceResultPage();
+  }
+
+  function valueLabel(q,a){
+    if(q.type==='mcq'){
+      var n=Number(a);return Number.isInteger(n)&&n>=0&&n<4?String.fromCharCode(65+n):'Chưa chọn';
+    }
+    if(q.type==='short')return String((Array.isArray(a)?a.join(''):a)||'Chưa nhập');
+    if(q.type==='true_false')return Array.isArray(a)?a.map(function(v){return v?'Đúng':'Sai'}).join(' · '):'Chưa trả lời';
+    return String(a??'Chưa trả lời');
+  }
+  function correctLabel(q){
+    if(q.type==='mcq')return Number.isInteger(Number(q.a))?String.fromCharCode(65+Number(q.a)):'—';
+    if(q.type==='short')return String(q.answer??'—');
+    if(q.type==='true_false')return (q.answers||[]).map(function(v){return v?'Đúng':'Sai'}).join(' · ');
+    return String(q.a??q.answer??'—');
+  }
+  async function enhanceResultPage(){
+    var s=window.state;
+    if(!s||s.page!=='result')return;
+    var card=document.querySelector('.container .card');
+    if(!card||card.dataset.resultDetails==='1')return;
+    var r=s.lastResult||{};
+    var wrong=Array.isArray(r.wrong_indexes)?r.wrong_indexes:(Array.isArray(r.wrongIndexes)?r.wrongIndexes:[]);
+    var exam=(window.exams||[]).find(function(e){return String(e.id)===String(r.exam_id||r.examId)});
+    if(!exam&&r.exam_id){try{await loadSupabase();var q=await db.from('exams').select('*').eq('id',r.exam_id).maybeSingle();if(!q.error)exam=q.data}catch(e){}}
+    var section=document.createElement('section');
+    section.style.cssText='margin-top:24px;text-align:left;border-top:1px solid rgba(120,130,170,.22);padding-top:20px';
+    section.innerHTML='<h3 style="margin:0 0 12px">📌 Chi tiết bài làm</h3>';
+    if(!wrong.length){section.innerHTML+='<div class="success" style="padding:12px;border-radius:12px">🎉 Bạn không có câu sai.</div>'}
+    else if(!exam){section.innerHTML+='<div class="danger-text" style="padding:12px;border-radius:12px">Không tải được đề gốc để hiển thị chi tiết câu sai. Bạn vẫn có thể bấm <b>Ôn lại</b> nếu đề còn tồn tại.</div>'}
+    else{
+      var qs=exam.questions||[];section.innerHTML+='<p class="muted">Có <b>'+wrong.length+'</b> câu sai. Dưới đây là các câu bạn đã làm sai và đáp án đúng.</p>';
+      wrong.forEach(function(index,k){
+        var q=qs[index];if(!q)return;
+        var answer=(r.answers||{})[index];
+        var item=document.createElement('article');item.style.cssText='margin:12px 0;padding:16px;border:1px solid rgba(120,130,170,.2);border-radius:14px;background:rgba(120,130,170,.05)';
+        item.innerHTML='<div style="font-weight:700;margin-bottom:8px">Câu '+(index+1)+'. '+esc(q.q||q.question||'')+'</div><div style="margin:6px 0"><span class="muted">Bạn chọn:</span> <b>'+esc(valueLabel(q,answer))+'</b></div><div style="margin:6px 0"><span class="muted">Đáp án đúng:</span> <b>'+esc(correctLabel(q))+'</b></div>'+(q.explanation?'<div class="muted" style="margin-top:8px">💡 '+esc(q.explanation)+'</div>':'');
+        section.appendChild(item);
+      });
+    }
+    card.appendChild(section);card.dataset.resultDetails='1';
   }
 
   function installSupportAI(){
@@ -74,6 +114,6 @@
     el.querySelector('textarea').focus();
   }
 
-  function boot(){if(window.__studyAppReady)install();else window.addEventListener('study-app-loaded',function(){window.__studyAppReady=true;install();setTimeout(installSupportAI,0)}, {once:true});}
+  function boot(){if(window.__studyAppReady)install();else window.addEventListener('study-app-loaded',function(){window.__studyAppReady=true;install();setTimeout(function(){installSupportAI();enhanceResultPage()},0)}, {once:true});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

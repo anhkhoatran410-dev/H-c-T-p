@@ -1,5 +1,6 @@
 -- STUDY TH final bugfix migration
 -- Run once in Supabase SQL Editor AFTER the existing support migrations.
+-- This file is idempotent and fixes the server-side state that the browser alone cannot fix.
 
 -- 1) Bot: answer once, then wait for Admin. Admin reply resets the gate.
 alter table public.support_threads
@@ -101,8 +102,20 @@ update public.support_threads t
 set bot_waiting_admin = true
 where exists (select 1 from public.support_messages m where m.thread_id=t.id and m.sender='bot');
 
--- 2) Participants: derive them from attempts too, so the Admin list can never be empty
--- just because the browser-side participants upsert was blocked.
+-- 2) Participants: derive them from attempts too, and make code safe for upsert.
+-- Remove duplicate participant codes first so the unique index cannot fail.
+delete from public.participants p
+where p.code is not null
+  and exists (
+    select 1 from public.participants newer
+    where newer.code = p.code
+      and newer.ctid > p.ctid
+  );
+
+create unique index if not exists participants_code_unique_idx
+  on public.participants(code)
+  where code is not null;
+
 create or replace function public.sync_participant_from_attempt()
 returns trigger
 language plpgsql
@@ -133,8 +146,10 @@ from public.user_attempts a
 where coalesce(nullif(a.student_code,''),nullif(a.device_id,'')) is not null
 on conflict (code) do update set name=excluded.name;
 
--- 3) Keep the public learner pages able to read saved exams/attempts.
+-- 3) Keep public learner pages able to read saved exams/attempts.
 grant select on public.exams to anon, authenticated;
 grant select,insert,update on public.user_attempts to anon, authenticated;
 grant select,insert,update on public.participants to anon, authenticated;
 
+-- Refresh PostgREST after the schema/trigger changes.
+notify pgrst, 'reload schema';

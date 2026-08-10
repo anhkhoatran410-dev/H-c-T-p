@@ -9,6 +9,33 @@
   var state = {thread:null,threads:[],messages:[],channel:null,poll:null,sending:false};
   window.studyAdminSupport = state;
 
+  /* The old admin/app.js support runtime was still starting its own
+     realtime channel and polling the same DOM. That second renderer could
+     repaint the chat from an older snapshot immediately after a successful
+     insert, making a just-sent message appear and then disappear. From this
+     point on this runtime is the single owner of the Admin support chat. */
+  function retireLegacySupportRuntime(){
+    try{
+      if(window.admin){
+        if(window.admin.channel && window.db){
+          try{window.db.removeChannel(window.admin.channel)}catch(_){}
+        }
+        if(window.admin.poll)clearInterval(window.admin.poll);
+        window.admin.channel=null;
+        window.admin.poll=null;
+      }
+    }catch(_){}
+    window.startSupportLive=function(){};
+    window.loadSupportThreads=function(){};
+    window.renderChat=function(){};
+    window.renderThreads=function(){};
+    window.sendReply=function(){};
+    var search=el('threadSearch');
+    if(search)search.oninput=function(){};
+    var refreshBtn=el('newSupportRefresh');
+    if(refreshBtn)refreshBtn.onclick=function(){};
+  }
+
   function esc(v){return String(v==null?'':v).replace(/[&<>\"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'})[c]})}
   function el(id){return document.getElementById(id)}
   function isSupportOpen(){return !!el('support')&&el('support').classList.contains('active')}
@@ -178,6 +205,7 @@
 
   function boot(){
     css();hookNavigation();installComposer();
+    retireLegacySupportRuntime();
     window.addEventListener('resize',fitMessenger);
     window.addEventListener('orientationchange',function(){setTimeout(fitMessenger,50)});
     if(window.visualViewport)window.visualViewport.addEventListener('resize',fitMessenger);

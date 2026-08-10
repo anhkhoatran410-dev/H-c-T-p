@@ -2,154 +2,17 @@
 (function(){
   function byId(id){return document.getElementById(id)}
   function safe(v){return typeof esc==='function'?esc(v):String(v??'')}
-
-  /* One scroll owner: the message list. The page/workspace must not scroll while Support is open. */
-  function syncChatLock(){
-    var open=!!document.querySelector('#support.tab.active');
-    document.body.classList.toggle('admin-chat-open',open);
-  }
-  new MutationObserver(syncChatLock).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});
-  syncChatLock();
-
-  /* Enter sends messages; Shift+Enter keeps a newline. Delegation survives chat re-renders. */
-  document.addEventListener('keydown',function(e){
-    var t=e.target;
-    if(!t||t.tagName!=='TEXTAREA')return;
-    if(e.key!=='Enter'||e.shiftKey||e.isComposing)return;
-    if(t.id==='replyInput'){
-      e.preventDefault();
-      if(typeof sendReply==='function')sendReply();
-    }else if(t.id==='assistantInput'){
-      e.preventDefault();
-      if(typeof sendAssistant==='function')sendAssistant();
-    }
-  },true);
-
-  /* Participants are derived from both participants and submitted attempts.
-     This makes the page resilient even when the participants upsert was blocked/old. */
-  window.loadParticipants=async function(){
-    var box=byId('participantRows');
-    if(!box)return;
-    try{
-      await loadSupabase();
-      var results=await Promise.all([
-        db.from('participants').select('*').order('created_at',{ascending:false}),
-        db.from('user_attempts').select('*').order('created_at',{ascending:false})
-      ]);
-      if(results[0].error)throw results[0].error;
-      if(results[1].error)throw results[1].error;
-      var participants=results[0].data||[];
-      var attempts=results[1].data||[];
-      var map=new Map();
-      participants.forEach(function(p){
-        var key=String(p.code||p.device_id||p.name||'').trim();
-        if(key)map.set(key,{name:p.name||'Không tên',code:p.code||p.device_id||key,attempts:[],latest:null});
-      });
-      attempts.forEach(function(a){
-        var key=String(a.student_code||a.device_id||a.student_name||'').trim();
-        if(!key)return;
-        if(!map.has(key))map.set(key,{name:a.student_name||'Không tên',code:a.student_code||a.device_id||key,attempts:[],latest:null});
-        var row=map.get(key);
-        row.name=a.student_name||row.name;
-        row.attempts.push(a);
-        if(!row.latest||new Date(a.created_at||0)>new Date(row.latest.created_at||0))row.latest=a;
-      });
-      var rows=Array.from(map.values()).sort(function(a,b){return new Date(b.latest?.created_at||0)-new Date(a.latest?.created_at||0)});
-      box.innerHTML=rows.map(function(p){
-        var latest=p.latest;
-        return '<tr><td><b>'+safe(p.name)+'</b></td><td>'+safe(p.code)+'</td><td>'+p.attempts.length+'</td><td><span class="badge">'+(latest?(Number(latest.score||0)+'%'):'—')+'</span></td><td>'+(latest?safe(new Date(latest.created_at).toLocaleString('vi-VN')):'—')+'</td></tr>';
-      }).join('')||'<tr><td colspan="5"><div class="participant-empty"><b>Chưa có người tham gia.</b><small>Người học sẽ xuất hiện ngay sau khi có lượt làm bài.</small></div></td></tr>';
-    }catch(e){box.innerHTML='<tr><td colspan="5" class="danger-text">'+safe(e.message)+'</td></tr>'}
-  };
-
-  /* Better Copilot: concise visual blocks + real system actions. */
-  function assistantHtml(m){
-    var role=m.role==='user'?'user':'assistant';
-    var text=String(m.message||'');
-    var lines=text.split(/\r?\n/);
-    var body='';
-    lines.forEach(function(line){
-      var s=line.trim();
-      if(!s){body+='<div class="ai-gap"></div>';return}
-      if(/^\(?[1-9]\)?[.)]\s/.test(s)||/^#{1,3}\s/.test(s)){
-        body+='<div class="ai-heading">'+safe(s.replace(/^#{1,3}\s*/,''))+'</div>';
-      }else if(/^[-•]\s/.test(s)){
-        body+='<div class="ai-point"><span>•</span><span>'+safe(s.replace(/^[-•]\s*/,''))+'</span></div>';
-      }else{
-        body+='<div class="ai-line">'+safe(s)+'</div>';
-      }
-    });
-    var action=m.action&&m.action!=='none' ? '<div class="ai-action"><span>⚡</span><b>'+safe(m.action_label||m.action)+'</b><span class="ai-action-ok">✓ Đã thực hiện</span></div>' : '';
-    return '<div class="assistant-bubble '+role+'"><div class="ai-role">'+(role==='user'?'Bạn':'✨ Admin Copilot')+'</div>'+body+action+'</div>';
-  }
-  window.renderAssistant=function(){
-    var box=byId('assistantMessages');if(!box)return;
-    box.innerHTML=(admin.assistant||[]).map(assistantHtml).join('')||'<div class="empty-chat"><span>✨</span><b>Admin Copilot sẵn sàng</b><small>Hỏi lỗi, dữ liệu, chat hoặc yêu cầu Copilot thao tác trực tiếp.</small></div>';
-    box.scrollTop=box.scrollHeight;
-  };
-
-  window.sendAssistant=async function(){
-    var input=byId('assistantInput'),message=input?.value.trim();
-    if(!message)return;
-    input.value='';
-    admin.assistant.push({role:'user',message:message});
-    admin.assistant.push({role:'assistant',message:'Đang kiểm tra và thực hiện...',action:'pending'});
-    renderAssistant();
-    var pending=admin.assistant[admin.assistant.length-1];
-    try{
-      var r=await fetch('/api/admin-command',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify({message:message,history:admin.assistant.slice(-14)})});
-      var data=await r.json().catch(function(){return {}});
-      if(!r.ok)throw new Error(data.error||'Copilot lỗi');
-      pending.message=data.answer||'Đã xử lý.';
-      pending.action=data.action||'none';
-      pending.action_label=data.actionLabel||'';
-    }catch(e){pending.message='(1) Kết quả\n- Không thể thực hiện yêu cầu: '+e.message;pending.action='none'}
-    renderAssistant();
-    if(admin.tab==='participants')loadParticipants();
-    if(admin.tab==='support'){loadSupportThreads();if(admin.thread)openThread(admin.thread.id)}
-    if(admin.tab==='tests')renderTests();
-    loadDashboard();
-  };
-
-  /* Multi-file exam input. Text files are extracted locally; images/scanned PDFs are sent as Gemini attachments. */
-  var fileInput=byId('file');
-  if(fileInput){fileInput.multiple=true;fileInput.accept='.pdf,.doc,.docx,.txt,.md,.csv,.rtf,image/*';var lab=fileInput.closest('label');if(lab&&!lab.querySelector('.multi-file-hint')){var h=document.createElement('small');h.className='multi-file-hint';h.textContent='Có thể chọn nhiều file: PDF, DOC/DOCX, TXT, MD, CSV, RTF và hình ảnh.';lab.appendChild(h)}}
-
+  function syncChatLock(){var open=!!document.querySelector('#support.tab.active');document.body.classList.toggle('admin-chat-open',open)}
+  new MutationObserver(syncChatLock).observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});syncChatLock();
+  document.addEventListener('keydown',function(e){var t=e.target;if(!t||t.tagName!=='TEXTAREA'||e.key!=='Enter'||e.shiftKey||e.isComposing)return;if(t.id==='replyInput'){e.preventDefault();if(typeof sendReply==='function')sendReply()}else if(t.id==='assistantInput'){e.preventDefault();if(typeof sendAssistant==='function')sendAssistant()}},true);
+  window.loadParticipants=async function(){var box=byId('participantRows');if(!box)return;try{await loadSupabase();var results=await Promise.all([db.from('participants').select('*').order('created_at',{ascending:false}),db.from('user_attempts').select('*').order('created_at',{ascending:false})]);var participants=results[0].error?[]:(results[0].data||[]);if(results[1].error)throw results[1].error;var attempts=results[1].data||[],map=new Map();participants.forEach(function(p){var key=String(p.code||p.device_id||p.name||'').trim();if(key)map.set(key,{name:p.name||'Không tên',code:p.code||p.device_id||key,attempts:[],latest:null})});attempts.forEach(function(a){var key=String(a.student_code||a.device_id||a.student_name||'').trim();if(!key)return;if(!map.has(key))map.set(key,{name:a.student_name||'Không tên',code:a.student_code||a.device_id||key,attempts:[],latest:null});var row=map.get(key);row.name=a.student_name||row.name;row.attempts.push(a);if(!row.latest||new Date(a.created_at||0)>new Date(row.latest.created_at||0))row.latest=a});var rows=Array.from(map.values()).sort(function(a,b){return new Date(b.latest?.created_at||0)-new Date(a.latest?.created_at||0)});box.innerHTML=rows.map(function(p){var latest=p.latest;return '<tr><td><b>'+safe(p.name)+'</b></td><td>'+safe(p.code)+'</td><td>'+p.attempts.length+'</td><td><span class="badge">'+(latest?(Number(latest.score||0)+'%'):'—')+'</span></td><td>'+(latest?safe(new Date(latest.created_at).toLocaleString('vi-VN')):'—')+'</td></tr>'}).join('')||'<tr><td colspan="5"><div class="participant-empty"><b>Chưa có người tham gia.</b><small>Người học sẽ xuất hiện ngay sau khi có lượt làm bài.</small></div></td></tr>'}catch(e){box.innerHTML='<tr><td colspan="5" class="danger-text">'+safe(e.message)+'</td></tr>'}};
+  function assistantHtml(m){var role=m.role==='user'?'user':'assistant',lines=String(m.message||'').split(/\r?\n/),body='';lines.forEach(function(line){var s=line.trim();if(!s){body+='<div class="ai-gap"></div>';return}if(/^\(?[1-9]\)?[.)]\s/.test(s)||/^#{1,3}\s/.test(s))body+='<div class="ai-heading">'+safe(s.replace(/^#{1,3}\s*/,''))+'</div>';else if(/^[-•]\s/.test(s))body+='<div class="ai-point"><span>•</span><span>'+safe(s.replace(/^[-•]\s*/,''))+'</span></div>';else body+='<div class="ai-line">'+safe(s)+'</div>'});var action=m.action&&m.action!=='none'&&m.action!=='pending'?'<div class="ai-action"><span>⚡</span><b>'+safe(m.action_label||m.action)+'</b><span class="ai-action-ok">✓ Đã thực hiện</span></div>':'';return '<div class="assistant-bubble '+role+'"><div class="ai-role">'+(role==='user'?'Bạn':'✨ Admin Copilot')+'</div>'+body+action+'</div>'}
+  window.renderAssistant=function(){var box=byId('assistantMessages');if(!box)return;box.innerHTML=(admin.assistant||[]).map(assistantHtml).join('')||'<div class="empty-chat"><span>✨</span><b>Admin Copilot sẵn sàng</b><small>Hỏi lỗi, dữ liệu, chat hoặc yêu cầu Copilot thao tác trực tiếp.</small></div>';box.scrollTop=box.scrollHeight};
+  window.sendAssistant=async function(){var input=byId('assistantInput'),message=input?.value.trim();if(!message)return;input.value='';admin.assistant.push({role:'user',message:message});admin.assistant.push({role:'assistant',message:'Đang kiểm tra và thực hiện...',action:'pending'});renderAssistant();var pending=admin.assistant[admin.assistant.length-1];try{var r=await fetch('/api/admin-command',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify({message:message,history:admin.assistant.slice(-14)})});var data=await r.json().catch(function(){return {}});if(!r.ok)throw new Error(data.error||'Copilot lỗi');pending.message=data.answer||'Đã xử lý.';pending.action=data.action||'none';pending.action_label=data.actionLabel||''}catch(e){pending.message='(1) Kết quả\n- Không thể thực hiện yêu cầu: '+e.message;pending.action='none'}renderAssistant();if(admin.tab==='participants')loadParticipants();if(admin.tab==='support'){loadSupportThreads();if(admin.thread)openThread(admin.thread.id)}if(admin.tab==='tests')renderTests();loadDashboard()};
+  var fileInput=byId('file');if(fileInput){fileInput.multiple=true;fileInput.accept='.pdf,.doc,.docx,.txt,.md,.csv,.rtf,image/*';var lab=fileInput.closest('label');if(lab&&!lab.querySelector('.multi-file-hint')){var h=document.createElement('small');h.className='multi-file-hint';h.textContent='Có thể chọn nhiều file: PDF, DOC/DOCX, TXT, MD, CSV, RTF và hình ảnh.';lab.appendChild(h)}}
   function dataUrl(file){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(String(r.result||''))};r.onerror=reject;r.readAsDataURL(file)})}
   function compressImage(file){return new Promise(async function(resolve){try{var url=await dataUrl(file),img=new Image();img.onload=function(){var max=1600,w=img.width,h=img.height;if(w>max||h>max){if(w>=h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}}var c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);resolve(c.toDataURL('image/jpeg',.78))};img.onerror=function(){resolve(url)};img.src=url}catch(e){resolve(null)}})}
-
-  window.createExam=async function(){
-    var files=Array.from(byId('file')?.files||[]),msg=byId('msg');
-    var title=byId('title').value.trim(),subject=byId('subject').value,difficulty=byId('level').value,duration=Number(byId('minutes').value||45),questionCount=Number(byId('questions').value||20),types=[...document.querySelectorAll('input[name="questionType"]:checked')].map(function(x){return x.value});
-    if(!files.length)return msg.textContent='⚠️ Hãy chọn ít nhất một tài liệu.';
-    if(files.length>5)return msg.textContent='⚠️ Tối đa 5 file mỗi lần.';
-    if(!title)return msg.textContent='⚠️ Hãy đặt tên bài.';
-    if(!types.length)return msg.textContent='⚠️ Chọn ít nhất một dạng câu.';
-    try{
-      msg.textContent='⏳ Đang đọc '+files.length+' tài liệu...';
-      var attachments=[],texts=[];
-      for(var f of files){
-        var n=(f.name||'').toLowerCase();
-        if(n.endsWith('.txt')||n.endsWith('.md')||n.endsWith('.csv')||n.endsWith('.rtf')){texts.push('--- '+f.name+' ---\n'+await f.text());continue}
-        if(n.endsWith('.pdf')||n.endsWith('.docx')){
-          var txt='';try{txt=await extractDoc(f)}catch(e){}
-          if(txt)texts.push('--- '+f.name+' ---\n'+txt);
-          else if(f.size<=4*1024*1024)attachments.push({fileName:f.name,mimeType:f.type||'application/pdf',fileData:await dataUrl(f)});
-          else throw new Error(f.name+' quá lớn để gửi trực tiếp. Hãy dùng PDF có text hoặc file dưới 4MB.');
-          continue;
-        }
-        if(f.type.startsWith('image/')){attachments.push({fileName:f.name,mimeType:'image/jpeg',fileData:await compressImage(f)});continue}
-        throw new Error('Chưa hỗ trợ '+f.name);
-      }
-      var documentText=texts.join('\n\n');if(documentText.length>180000)documentText=documentText.slice(0,180000)+'\n[Đã giới hạn văn bản]';
-      if(!documentText&&!attachments.length)throw new Error('Không đọc được nội dung tài liệu.');
-      msg.textContent='⏳ Gemini đang tạo, kiểm tra và tự sửa đề nếu cần...';
-      var r=await fetch('/api/generate-exam-multi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:files.map(function(x){return x.name}).join(', '),documentText,attachments,subject,difficulty,questionCount,types})});
-      var data=await r.json().catch(function(){return {}});if(!r.ok)throw new Error(data.error||'Không tạo được đề');
-      await loadSupabase();var ins=await db.from('exams').insert({title:title,subject:subject,difficulty:difficulty,duration:duration,question_count:questionCount,questions:data.questions,status:'active'});if(ins.error)throw ins.error;
-      msg.textContent='✅ Đã tạo '+data.questions.length+' câu từ '+files.length+' file và lưu thành công.';byId('title').value='';byId('file').value='';await renderTests();loadDashboard();
-    }catch(e){msg.textContent='❌ '+e.message}
-  };
-
-  window.addEventListener('load',function(){setTimeout(syncChatLock,0);renderAssistant()});
+  window.createExam=async function(){var files=Array.from(byId('file')?.files||[]),msg=byId('msg'),title=byId('title').value.trim(),subject=byId('subject').value,difficulty=byId('level').value,duration=Number(byId('minutes').value||45),questionCount=Number(byId('questions').value||20),types=[...document.querySelectorAll('input[name="questionType"]:checked')].map(function(x){return x.value});if(!files.length)return msg.textContent='⚠️ Hãy chọn ít nhất một tài liệu.';if(files.length>5)return msg.textContent='⚠️ Tối đa 5 file mỗi lần.';if(!title)return msg.textContent='⚠️ Hãy đặt tên bài.';if(!types.length)return msg.textContent='⚠️ Chọn ít nhất một dạng câu.';try{msg.textContent='⏳ Đang đọc '+files.length+' tài liệu...';var attachments=[],texts=[];for(var f of files){var n=(f.name||'').toLowerCase();if(n.endsWith('.txt')||n.endsWith('.md')||n.endsWith('.csv')||n.endsWith('.rtf')){texts.push('--- '+f.name+' ---\n'+await f.text());continue}if(n.endsWith('.pdf')||n.endsWith('.docx')){var txt='';try{txt=await extractDoc(f)}catch(e){}if(txt)texts.push('--- '+f.name+' ---\n'+txt);else if(f.size<=4*1024*1024)attachments.push({fileName:f.name,mimeType:f.type||'application/pdf',fileData:await dataUrl(f)});else throw new Error(f.name+' quá lớn để gửi trực tiếp. Hãy dùng PDF có text hoặc file dưới 4MB.');continue}if(f.type.startsWith('image/')){attachments.push({fileName:f.name,mimeType:'image/jpeg',fileData:await compressImage(f)});continue}throw new Error('Chưa hỗ trợ '+f.name)}var documentText=texts.join('\n\n');if(documentText.length>180000)documentText=documentText.slice(0,180000)+'\n[Đã giới hạn văn bản]';if(!documentText&&!attachments.length)throw new Error('Không đọc được nội dung tài liệu.');msg.textContent='⏳ Gemini đang tạo, kiểm tra và tự sửa đề nếu cần...';var r=await fetch('/api/generate-exam-multi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:files.map(function(x){return x.name}).join(', '),documentText,attachments,subject,difficulty,questionCount,types})});var data=await r.json().catch(function(){return {}});if(!r.ok)throw new Error(data.error||'Không tạo được đề');await loadSupabase();var ins=await db.from('exams').insert({title:title,subject:subject,difficulty:difficulty,duration:duration,question_count:questionCount,questions:data.questions,status:'active'});if(ins.error)throw ins.error;msg.textContent='✅ Đã tạo '+data.questions.length+' câu từ '+files.length+' file và lưu thành công.';byId('title').value='';byId('file').value='';await renderTests();loadDashboard()}catch(e){msg.textContent='❌ '+e.message}};
+  /* app.js binds handlers before this patch file loads, so rebind the controls to the patched functions. */
+  setTimeout(function(){var c=byId('createBtn');if(c)c.onclick=window.createExam;var a=byId('assistantForm');if(a)a.onsubmit=function(e){e.preventDefault();window.sendAssistant()};syncChatLock();renderAssistant()},0);
 })();

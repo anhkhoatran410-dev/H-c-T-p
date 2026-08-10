@@ -12,9 +12,9 @@
     if(!list)return;
     var seen=false;
     Array.from(list.children).forEach(function(row){
-      if(adminRow(row)){seen=false;return;}
+      if(adminRow(row)){seen=false;return}
       if(!botRow(row))return;
-      if(!seen){seen=true;return;}
+      if(!seen){seen=true;return}
       row.remove();
     });
   }
@@ -45,4 +45,58 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(install,0)});else install();
   window.addEventListener('study-app-loaded',function(){setTimeout(install,0)});
   var tries=0;var timer=setInterval(function(){install();if(++tries>40)clearInterval(timer)},250);
+})();
+
+/* STUDY TH ultimate chat/AI input guard. */
+(function(){
+  function ready(){
+    if(window.__studyUltimateInputFix)return;
+    if(!window.state&&!window.studyState)return;
+    window.__studyUltimateInputFix=true;
+    function getState(){return window.state||window.studyState||null}
+    function dedupePublicDom(){
+      var list=document.querySelector('.support-message-list');if(!list)return;
+      var seen=new Set();
+      Array.from(list.children).forEach(function(row){
+        var text=String(row.textContent||'').replace(/\s+/g,' ').trim();
+        var bubble=row.querySelector('.support-bubble')||row.querySelector('.bubble');
+        if(!text||!bubble)return;
+        var sender=String(bubble.className||'').replace(/\s+/g,' ');
+        var msg=(bubble.querySelector('div')?.textContent||text).replace(/\s+/g,' ').trim();
+        var stamp=(bubble.querySelector('small')?.textContent||'').trim();
+        var key=sender+'|'+msg+'|'+stamp;
+        if(seen.has(key)){row.remove();return}seen.add(key);
+      });
+    }
+    var originalSend=window.sendSupport;
+    if(typeof originalSend==='function'&&!originalSend.__ultimateGuard){
+      var send=async function(){
+        var s=getState();if(!s)return;
+        if(s.__supportSending)return;
+        s.__supportSending=true;
+        var btn=document.querySelector('.support-composer .send-btn,.support-shell .send-btn');if(btn)btn.disabled=true;
+        try{return await originalSend.apply(this,arguments)}finally{s.__supportSending=false;if(btn)btn.disabled=false;dedupePublicDom()}
+      };
+      send.__ultimateGuard=true;window.sendSupport=send;
+    }
+    document.addEventListener('keydown',function(e){
+      var target=e.target;if(!(target instanceof HTMLTextAreaElement))return;
+      if(e.key!=='Enter'||e.shiftKey||e.isComposing)return;
+      if(target.id==='supportInput'){
+        e.preventDefault();e.stopPropagation();if(typeof window.sendSupport==='function')window.sendSupport();return;
+      }
+      if(target.closest('#study-ai-support')){
+        e.preventDefault();e.stopPropagation();var form=target.closest('form');if(form)form.requestSubmit();return;
+      }
+    },true);
+    var oldRender=window.render;
+    if(typeof oldRender==='function'&&!oldRender.__ultimateInputFix){
+      var render=async function(){var r=oldRender.apply(this,arguments);if(r&&typeof r.then==='function')await r;setTimeout(dedupePublicDom,0);return r};
+      render.__ultimateInputFix=true;window.render=render;
+    }
+    setTimeout(dedupePublicDom,100);setTimeout(dedupePublicDom,500);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(ready,0)});else ready();
+  window.addEventListener('study-app-loaded',function(){setTimeout(ready,0)});
+  var tries=0,timer=setInterval(function(){ready();if(++tries>40)clearInterval(timer)},250);
 })();

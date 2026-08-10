@@ -96,10 +96,40 @@
     var oldOpen=window.openThread;
     window.openThread=async function(id){if(oldOpen)await oldOpen(id);composer();if(admin.thread)await refreshThread(admin.thread.id);composer()};
     var oldSend=window.sendReply;
-    window.sendReply=async function(){var input=document.getElementById('replyInput');var before=input?input.value:'';if(typeof oldSend==='function')await oldSend();if(admin.thread){await refreshThread(admin.thread.id);await loadSupportThreads()}composer();if(input&&!input.value&&before&&admin.thread)input.value=''};
+    window.sendReply=async function(){var input=document.getElementById('replyInput');var before=input?input.value:'';if(typeof oldSend==='function')await oldSend();if(admin.thread){await refreshThread(admin.thread.id);await loadSupportThreads()}composer();if(input&&!input.value&&before&&admin.thread)input.value=before};
     var oldOpenTab=window.openTab;
     window.openTab=function(id){var r=oldOpenTab?oldOpenTab(id):null;if(id==='support')setTimeout(function(){composer();start()},50);return r};
     composer();start();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else setTimeout(boot,0);
+})();
+
+/* STUDY TH ultimate Admin composer/AI keyboard and double-send guard. */
+(function(){
+  function boot(){
+    if(window.__adminUltimateFix)return;
+    if(typeof admin==='undefined')return;
+    window.__adminUltimateFix=true;
+    var oldAssistant=window.sendAssistant;
+    if(typeof oldAssistant==='function'&&!oldAssistant.__ultimateAssistant){
+      var assistantBusy=false;
+      var wrappedAssistant=async function(){if(assistantBusy)return;assistantBusy=true;var input=document.getElementById('assistantInput');var btn=document.querySelector('#assistantForm .send-btn');if(btn)btn.disabled=true;try{return await oldAssistant.apply(this,arguments)}finally{assistantBusy=false;if(btn)btn.disabled=false}};
+      wrappedAssistant.__ultimateAssistant=true;window.sendAssistant=wrappedAssistant;
+    }
+    var oldReply=window.sendReply;
+    if(typeof oldReply==='function'&&!oldReply.__ultimateReply){
+      var replyBusy=false;
+      var wrappedReply=async function(){if(replyBusy)return;replyBusy=true;var btn=document.querySelector('#replyForm .send-btn');if(btn)btn.disabled=true;try{return await oldReply.apply(this,arguments)}finally{replyBusy=false;if(btn)btn.disabled=false}};
+      wrappedReply.__ultimateReply=true;window.sendReply=wrappedReply;
+    }
+    document.addEventListener('keydown',function(e){
+      var target=e.target;if(!(target instanceof HTMLTextAreaElement)||e.key!=='Enter'||e.shiftKey||e.isComposing)return;
+      if(target.id==='assistantInput'||target.id==='replyInput'){
+        e.preventDefault();e.stopPropagation();var form=target.closest('form');if(form)form.requestSubmit();
+      }
+    },true);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else boot();
+  window.addEventListener('load',function(){setTimeout(boot,0)});
+  var tries=0,timer=setInterval(function(){boot();if(++tries>40)clearInterval(timer)},250);
 })();

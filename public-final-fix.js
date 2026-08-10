@@ -1,0 +1,112 @@
+/* Final public bug sweep: support state, stickers, bot gating and attempt details. */
+(function(){
+  function ready(){
+    if(typeof state==='undefined')return;
+    window.studyState=state;
+
+    /* Never let a sticker click leave the picker open. */
+    window.sendSticker=async function(sticker){
+      document.querySelectorAll('.support-picker').forEach(function(x){x.classList.add('hidden')});
+      try{
+        await window.sendSupportMessage({sticker:String(sticker||''),message:'✨ Sticker'});
+      }catch(e){alert('Không gửi được sticker: '+(e?.message||e))}
+    };
+
+    var originalSend=window.sendSupportMessage;
+    window.sendSupportMessage=async function(payload){
+      var t=await ensureThread();
+      await loadSupabase();
+      var waiting=false;
+      try{
+        var tr=await db.from('support_threads').select('bot_waiting_admin').eq('id',t.id).maybeSingle();
+        if(!tr.error)waiting=!!tr.data?.bot_waiting_admin;
+      }catch(_){/* older schema: normal insert below */}
+      var row={
+        thread_id:t.id,
+        account_id:t.account_id||state.supportAccountId||null,
+        sender:'user',
+        message:String(payload?.message||''),
+        attachment_url:payload?.attachment_url||null,
+        attachment_type:payload?.attachment_type||null,
+        attachment_name:payload?.attachment_name||null,
+        sticker:payload?.sticker||null,
+        bot_handled:waiting
+      };
+      var r=await db.from('support_messages').insert(row);
+      if(r.error)throw r.error;
+      state.thread={...state.thread,bot_waiting_admin:waiting};
+    };
+
+    /* Keep the public support UI usable even if realtime is slow. */
+    var originalToggle=window.toggleSupportPicker;
+    window.toggleSupportPicker=function(id){
+      if(originalToggle)return originalToggle(id);
+      document.querySelectorAll('.support-picker').forEach(function(x){if(x.id!==id)x.classList.add('hidden')});
+      document.getElementById(id)?.classList.toggle('hidden');
+    };
+
+    function answerText(q,a){
+      if(!q)return '—';
+      if(q.type==='mcq')return a===null||a===undefined?'Chưa trả lời':String.fromCharCode(65+Number(a))+'. '+String((q.opts||[])[Number(a)]||'');
+      if(q.type==='short')return Array.isArray(a)?a.join(''):String(a??'')||'Chưa trả lời';
+      if(q.type==='true_false')return Array.isArray(a)?a.map(function(v,i){return String.fromCharCode(97+i)+': '+(v?'Đúng':'Sai')}).join(' · '):'Chưa trả lời';
+      return String(a??'')||'Chưa trả lời';
+    }
+    function correctText(q){
+      if(!q)return '—';
+      if(q.type==='mcq')return String.fromCharCode(65+Number(q.a))+'. '+String((q.opts||[])[Number(q.a)]||'');
+      if(q.type==='short')return String(q.answer??'');
+      if(q.type==='true_false')return (q.answers||[]).map(function(v,i){return String.fromCharCode(97+i)+': '+(v?'Đúng':'Sai')}).join(' · ');
+      return '—';
+    }
+    function detailHtml(r,exam){
+      var qs=exam?.questions||[];
+      return '<main class="container"><div class="card attempt-detail"><div class="attempt-detail-head"><div><span class="eyebrow">BÀI LÀM</span><h1>'+esc(r.exam_title||r.examTitle||exam?.title||'Bài kiểm tra')+'</h1><p class="muted">'+esc(r.student_name||r.candidate||state.candidate||'Người học')+' · '+Number(r.score||0)+'% · '+Number(r.correct||0)+'/'+Number(r.total||qs.length)+' câu</p></div><div class="score">'+Number(r.score||0)+'%</div></div>'+
+        qs.map(function(q,i){var a=r.answers?.[i],ok=answerIsCorrect(q,a);return '<article class="attempt-question '+(ok?'is-correct':'is-wrong')+'"><div class="attempt-q-title"><b>Câu '+(i+1)+'</b><span>'+(ok?'✓ Đúng':'✕ Sai')+'</span></div><h3>'+esc(q.q||'')+'</h3><div class="attempt-answer"><span>Bạn trả lời</span><b>'+esc(answerText(q,a))+'</b></div><div class="attempt-answer"><span>Đáp án đúng</span><b>'+esc(correctText(q))+'</b></div>'+(q.explanation?'<p class="muted">'+esc(q.explanation)+'</p>':'')+'</article>'}).join('')+
+        '<div class="attempt-detail-actions">'+((r.wrong_indexes||r.wrongIndexes||[]).length?'<button class="btn" onclick="openReview(\''+esc(r.id||'')+'\')">🧠 Ôn lại câu sai</button>':'<span class="success">🎉 Không có câu sai.</span>')+'<button class="btn secondary" onclick="go(\'history\')">← Quay lại lịch sử</button></div></div></main>';
+    }
+
+    var originalPage=window.page;
+    window.page=function(){
+      if(state.page==='attemptDetail'&&state.historyDetail){
+        return detailHtml(state.historyDetail,state.historyDetailExam||{});
+      }
+      return originalPage();
+    };
+
+    window.openHistory=async function(id){
+      var r=(state.history||[]).find(function(x){return String(x.id)===String(id)});
+      if(!r)return;
+      try{
+        await loadSupabase();
+        var exam=null;
+        if(r.exam_id){var er=await db.from('exams').select('*').eq('id',r.exam_id).maybeSingle();if(!er.error)exam=er.data}
+        if(!exam)exam=(exams||[]).find(function(e){return String(e.id)===String(r.exam_id)});
+        state.historyDetail={...r,wrongIndexes:r.wrong_indexes||[]};
+        state.historyDetailExam=exam||{};
+        state.lastResult=state.historyDetail;
+        state.page='attemptDetail';render();
+      }catch(e){alert('Không mở được bài làm: '+(e?.message||e))}
+    };
+
+    window.openReview=async function(id){
+      var r=(state.history||[]).find(function(x){return String(x.id)===String(id)})||state.lastResult;
+      if(!r)return;
+      try{
+        await loadSupabase();
+        var exam=null;
+        if(r.exam_id||r.examId){var er=await db.from('exams').select('*').eq('id',r.exam_id||r.examId).maybeSingle();if(!er.error)exam=er.data}
+        if(!exam)exam=(exams||[]).find(function(e){return String(e.id)===String(r.exam_id||r.examId)})||(exams||[]).find(function(e){return e.title===(r.exam_title||r.examTitle)});
+        if(!exam)return alert('Không tìm thấy đề gốc để ôn lại.');
+        state.review={attempt:r,exam:exam,items:(r.wrong_indexes||r.wrongIndexes||[]).map(function(i){return {index:i,question:exam.questions?.[i],answer:r.answers?.[i]}}).filter(function(x){return !!x.question}),cursor:0};
+        state.reviewChoice=null;state.reviewTF=[];state.page='review';render();
+      }catch(e){alert('Không mở được phần ôn câu sai: '+(e?.message||e))}
+    };
+
+    /* Re-render after the app is fully booted so overrides are not lost. */
+    var oldRender=window.render;
+    window.render=async function(){var r=oldRender?.();if(r&&typeof r.then==='function')await r();document.querySelectorAll('.support-picker').forEach(function(x){x.classList.add('hidden')});};
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready);else ready();
+  window.addEventListener('study-app-loaded',function(){setTimeout(ready,0)});
+})();

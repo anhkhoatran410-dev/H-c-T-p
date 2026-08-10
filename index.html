@@ -17,11 +17,11 @@
     </main>
   </div>
 
-  <!-- Boot runs FIRST so a broken app.js can never leave the page spinning forever. -->
-  <script src="/boot.js?v=20260810-11" defer></script>
-  <script src="/app.js?v=20260810-12" defer></script>
-  <script src="/support-fix.js?v=20260810-4" defer></script>
-  <script src="/review.js?v=20260810-4" defer></script>
+  <!-- Load the safety boot first. app-loader fetches and syntax-patches app.js before evaluation. -->
+  <script src="/boot.js?v=20260810-12" defer></script>
+  <script src="/app-loader.js?v=20260810-1" defer></script>
+  <script src="/support-fix.js?v=20260810-5" defer></script>
+  <script src="/review.js?v=20260810-5" defer></script>
 
   <script>
     (function () {
@@ -58,7 +58,7 @@
             card.appendChild(b);
           }
         }
-      }, 5000);
+      }, 7000);
     })();
   </script>
 </body>

@@ -51,6 +51,10 @@
     if(window.__studyAdminModesLoaded)return;
     var s=document.createElement('script');s.src='/admin/study-modes.js?v=20260810-1';s.async=false;s.onload=function(){window.__studyAdminModesLoaded=true};document.head.appendChild(s);
   }
+  function loadMathFileFix(){
+    if(window.__studyMathFileInputFixLoaded)return;
+    var s=document.createElement('script');s.src='/admin/math-file-input-fix.js?v=20260811-math-file';s.async=false;s.onload=function(){window.__studyMathFileInputFixLoaded=true};document.head.appendChild(s);
+  }
 
   function ready(){
     document.addEventListener('click',function(e){
@@ -71,6 +75,7 @@
     if(typeof originalRenderChat==='function'){
       window.renderChat=function(){dedupeAdminMessages();return originalRenderChat.apply(this,arguments)};
     }
+    loadMathFileFix();
     loadStudyModes();
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready);else ready();

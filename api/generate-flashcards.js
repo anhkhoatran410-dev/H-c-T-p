@@ -5,46 +5,60 @@ export default async function handler(req, res) {
     const {
       fileName,
       mimeType = "",
+      mimeTypes = [],
       documentText = "",
-      fileData = "",
+      fileData = [],
       subject = "Tiếng Anh"
     } = req.body || {};
 
     const text = String(documentText || "").slice(0, 220000).trim();
-    const imageData = String(fileData || "").replace(/^data:[^;]+;base64,/, "").trim();
-    const imageMime = String(mimeType || "").toLowerCase().split(";")[0].trim();
-    const isImage = /^image\/(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(imageMime);
+    const rawImages = Array.isArray(fileData) ? fileData : (fileData ? [fileData] : []);
+    const imageMimes = Array.isArray(mimeTypes) ? mimeTypes : [];
+    const images = rawImages.map((value, index) => {
+      const raw = String(value || "").trim();
+      if (!raw) return null;
+      const match = raw.match(/^data:([^;]+);base64,(.+)$/s);
+      const mime = String(imageMimes[index] || match?.[1] || mimeType || "image/jpeg")
+        .toLowerCase().split(";")[0].trim();
+      const data = match ? match[2] : raw.replace(/^data:[^;]+;base64,/, "");
+      return { mime, data };
+    }).filter(Boolean).filter(x => /^image\/(png|jpe?g|webp|gif|bmp)$/i.test(x.mime));
 
-    if (!text && !imageData) {
-      return res.status(400).json({ error: "Thiếu nội dung tài liệu hoặc ảnh." });
+    if (!text && !images.length) {
+      return res.status(400).json({ error: "Thiếu nội dung tài liệu hoặc ảnh. PDF scan sẽ được chuyển thành ảnh trước khi gửi AI." });
     }
-    if (imageData && !isImage) {
-      return res.status(400).json({ error: "Ảnh flashcard phải là PNG, JPG, WEBP, GIF, BMP, HEIC hoặc HEIF." });
-    }
-    if (imageData.length > 14 * 1024 * 1024) {
-      return res.status(413).json({ error: "Ảnh quá lớn. Hãy chọn ảnh nhỏ hơn hoặc để trình duyệt tự nén ảnh." });
+    const totalImageBytes = images.reduce((sum, x) => sum + Math.floor((x.data.length * 3) / 4), 0);
+    if (totalImageBytes > 9 * 1024 * 1024) {
+      return res.status(413).json({ error: "Tổng ảnh quá lớn. Hãy chọn ít trang hơn hoặc ảnh nhẹ hơn." });
     }
 
     const prompt = `
 Bạn là AI trích xuất dữ liệu để tạo FLASHCARD học tiếng Anh.
 
 ĐÂY LÀ CHẾ ĐỘ FLASHCARD RIÊNG, KHÔNG PHẢI TRẮC NGHIỆM.
-Mục tiêu là biến tài liệu hoặc ảnh bảng từ vựng thành các thẻ 2 mặt.
+Mục tiêu là biến tài liệu, PDF scan, ảnh chụp bảng hoặc nhiều ảnh thành các thẻ 2 mặt.
 
 QUY TẮC BẮT BUỘC:
-1. Đọc TOÀN BỘ tài liệu/ảnh. Nếu là ảnh, dùng khả năng nhìn ảnh để đọc chữ, kể cả bảng, nhiều cột, ảnh chụp màn hình, ảnh chụp tài liệu và chữ xuống dòng.
-2. Tự suy luận cấu trúc bảng. Các cột có thể có tên Word, Vocabulary, Term, Phrase, Transcription, Pronunciation, Meaning, Definition, Vietnamese, Example, For example hoặc tên tương đương bằng tiếng Việt.
-3. MỖI từ hoặc cụm từ hợp lệ là MỘT flashcard riêng.
-4. front = chính xác từ/cụm từ tiếng Anh trong tài liệu.
-5. back = nghĩa tiếng Việt tương ứng. Ưu tiên nghĩa đã có trong tài liệu; nếu chỉ có định nghĩa tiếng Anh thì dịch sang tiếng Việt sát ngữ cảnh.
-6. phonetic = phiên âm nếu tài liệu có, nếu không có thì để chuỗi rỗng.
-7. example = câu ví dụ nếu tài liệu có, nếu không có thì để chuỗi rỗng. Không cần tự bịa ví dụ.
-8. Không lấy tiêu đề, tên cột, số trang, watermark, quảng cáo hoặc ghi chú không phải từ vựng.
-9. Không tự thêm từ ngoài nguồn. Nếu một hàng bị mờ/không chắc chắn, chỉ đưa vào khi có đủ bằng chứng về cả từ và nghĩa.
-10. Loại bỏ dòng trống và từ/cụm từ trùng nhau, không phân biệt hoa thường.
-11. Giữ thứ tự xuất hiện trong nguồn.
-12. Có bao nhiêu thẻ hợp lệ thì trả về bấy nhiêu, tối đa 100 thẻ.
-13. Tuyệt đối không tạo MCQ, đúng/sai hoặc câu hỏi.
+1. Đọc TOÀN BỘ nguồn. Nếu có nhiều ảnh/trang, xem tất cả và ghép chúng theo đúng thứ tự.
+2. Với PDF scan/ảnh, dùng khả năng nhìn ảnh để đọc chữ trong bảng; KHÔNG được yêu cầu nguồn phải có text layer.
+3. Tự suy luận cấu trúc bảng. Các cột có thể là Word, Vocabulary, Term, Phrase, Transcription, Pronunciation, Meaning, Definition, Vietnamese, Example, For example hoặc tên tương đương.
+4. MỖI từ hoặc cụm từ hợp lệ là MỘT flashcard riêng.
+5. front = từ/cụm từ tiếng Anh ở cột Word/Vocabulary/Term/Phrase. Giữ nguyên cách viết trong nguồn, chỉ bỏ khoảng trắng thừa do OCR.
+6. back = nghĩa tiếng Việt tương ứng ở cột Meaning/Definition/Vietnamese. Nếu nguồn có nghĩa tiếng Việt thì PHẢI ưu tiên nghĩa đó, không thay bằng nghĩa chung chung.
+7. phonetic = phiên âm nếu nguồn có; nếu không chắc thì để chuỗi rỗng.
+8. example = câu ví dụ nếu nguồn có; không tự bịa ví dụ khi nguồn đã không có.
+9. Bỏ tiêu đề, tên cột, số trang, watermark, quảng cáo, URL và ghi chú không phải từ vựng.
+10. Không lấy một từ chỉ vì nó xuất hiện trong câu ví dụ. Chỉ lấy mục từ/cụm từ thuộc danh sách từ vựng.
+11. Nếu một hàng bị xuống dòng trong ô, ghép lại thành cùng một mục; không tách một mục thành nhiều thẻ.
+12. Loại bỏ dòng trống và từ/cụm từ trùng nhau, không phân biệt hoa thường.
+13. Giữ thứ tự xuất hiện trong nguồn.
+14. Có bao nhiêu thẻ hợp lệ thì trả về bấy nhiêu, tối đa 100 thẻ. KHÔNG cố tạo đủ một số lượng giả định.
+15. Tuyệt đối không tạo MCQ, đúng/sai hoặc câu hỏi.
+
+QUAN TRỌNG VỚI BẢNG TỪ VỰNG:
+- Nếu nhìn thấy bảng có các cột Word | Transcription | Meaning | For example thì lấy đúng từng hàng của bảng.
+- Ví dụ một hàng `accessible | /əkˈsesəbəl/ | dễ tiếp cận | These documents...` phải trở thành một flashcard với front=`accessible`, back=`dễ tiếp cận`, phonetic=`/əkˈsesəbəl/` và example là câu ví dụ.
+- Không để watermark hoặc dòng `Chỉ Đăng Kí Học Tại...` trở thành flashcard.
 
 ĐỊNH DẠNG JSON DUY NHẤT:
 {
@@ -90,14 +104,10 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       try {
         const parts = [{ text: prompt }];
-        if (imageData) {
-          parts.push({
-            inlineData: {
-              mimeType: imageMime,
-              data: imageData
-            }
-          });
-        }
+        images.forEach((image, index) => {
+          parts.push({ text: `\n--- ẢNH/TRANG ${index + 1} ---` });
+          parts.push({ inlineData: { mimeType: image.mime, data: image.data } });
+        });
 
         const response = await fetch(url, {
           method: "POST",
@@ -106,7 +116,8 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
             contents: [{ role: "user", parts }],
             generationConfig: {
               responseMimeType: "application/json",
-              temperature: 0.15
+              temperature: 0.1,
+              maxOutputTokens: 10000
             }
           })
         });
@@ -145,14 +156,14 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
       example: String(c?.example ?? "").trim(),
       explanation: ""
     })).filter(c => {
-      const key = c.front.toLowerCase();
+      const key = c.front.toLowerCase().replace(/\s+/g, " ");
       if (!c.front || !c.back || seen.has(key)) return false;
       seen.add(key);
       return true;
     }).slice(0, 100);
 
-    if (!normalized.length) throw new Error("AI không tìm thấy từ/cụm từ hợp lệ. Hãy dùng ảnh rõ hơn hoặc tài liệu có bảng từ và nghĩa.");
-    return res.status(200).json({ questions: normalized, flashcards: normalized, provider: "gemini", vision: !!imageData, validated: true });
+    if (!normalized.length) throw new Error("AI không tìm thấy từ/cụm từ hợp lệ sau khi đọc nguồn. Nếu đây là PDF scan, hệ thống đã chuyển từng trang thành ảnh; hãy kiểm tra ảnh/trang có hiển thị rõ không.");
+    return res.status(200).json({ questions: normalized, flashcards: normalized, provider: "gemini", vision: images.length > 0, imageCount: images.length, validated: true });
   } catch (e) {
     console.error("generate-flashcards:", e);
     return res.status(Number(e?.status) === 413 ? 413 : 500).json({ error: e.message || "Lỗi máy chủ." });

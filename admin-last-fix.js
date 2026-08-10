@@ -68,3 +68,38 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,50)});else setTimeout(boot,50);
 })();
+
+/* STUDY TH final admin chat: composer is forced visible and current chat refreshes every second. */
+(function(){
+  function boot(){
+    if(typeof admin==='undefined'||typeof loadSupabase!=='function')return;
+    var timer=null,channel=null,busy=false;
+    function composer(){
+      var form=document.getElementById('replyForm');if(!form)return null;
+      form.classList.remove('hidden');form.style.display='flex';form.style.visibility='visible';form.style.opacity='1';form.style.position='relative';form.style.zIndex='30';
+      var input=document.getElementById('replyInput');if(input){input.disabled=false;input.style.display='block';input.style.visibility='visible'}
+      var btn=form.querySelector('.send-btn');if(btn){btn.disabled=false;btn.style.display='inline-flex'}
+      return form;
+    }
+    async function refreshThread(id){
+      if(!id||busy)return;busy=true;
+      try{await loadSupabase();var r=await db.from('support_messages').select('*').eq('thread_id',id).order('created_at',{ascending:true});if(r.error)throw r.error;if(!admin.thread||String(admin.thread.id)!==String(id))return;admin.messages=r.data||[];if(typeof window.renderChat==='function')window.renderChat();composer()}catch(e){console.warn('admin chat refresh',e)}finally{busy=false}
+    }
+    function start(){
+      loadSupportThreads();
+      loadSupabase().then(function(){
+        if(channel)db.removeChannel(channel).catch(function(){});
+        channel=db.channel('admin-support-final-live').on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages'},function(p){if(admin.thread&&String(p.new.thread_id)===String(admin.thread.id))refreshThread(admin.thread.id);loadSupportThreads()}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'support_threads'},function(){loadSupportThreads()}).subscribe(function(status){var live=document.getElementById('liveState');if(live&&status==='SUBSCRIBED')live.innerHTML='<span></span> Live'});
+        clearInterval(timer);timer=setInterval(function(){if(admin.tab!=='support')return;loadSupportThreads();if(admin.thread)refreshThread(admin.thread.id)},1000);
+      }).catch(function(e){console.warn('admin support live',e)});
+    }
+    var oldOpen=window.openThread;
+    window.openThread=async function(id){if(oldOpen)await oldOpen(id);composer();if(admin.thread)await refreshThread(admin.thread.id);composer()};
+    var oldSend=window.sendReply;
+    window.sendReply=async function(){var input=document.getElementById('replyInput');var before=input?input.value:'';if(typeof oldSend==='function')await oldSend();if(admin.thread){await refreshThread(admin.thread.id);await loadSupportThreads()}composer();if(input&&!input.value&&before&&admin.thread)input.value=''};
+    var oldOpenTab=window.openTab;
+    window.openTab=function(id){var r=oldOpenTab?oldOpenTab(id):null;if(id==='support')setTimeout(function(){composer();start()},50);return r};
+    composer();start();
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else setTimeout(boot,0);
+})();

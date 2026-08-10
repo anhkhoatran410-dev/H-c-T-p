@@ -1,4 +1,4 @@
-/* STUDY TH final runtime guardrails: dedupe support bot bubbles, close pickers, and keep shared exam URLs usable. */
+/* STUDY TH final runtime guardrails: dedupe support bot bubbles, close pickers, and keep shared exam URLs usable. Deployment trigger: 2026-08-10 15:35 +07. */
 (function(){
   function boot(){
     if(window.__studyLastFixInstalled)return;

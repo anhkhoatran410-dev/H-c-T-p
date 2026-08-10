@@ -24,3 +24,14 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,300)});else setTimeout(boot,300)
 })();
+
+/* Load the last two runtime guards after every older admin patch. */
+(function(){
+  function loadScript(src){var s=document.createElement('script');s.src=src+'?v=20260810-final';s.async=false;document.body.appendChild(s)}
+  function loadStyle(src){var l=document.createElement('link');l.rel='stylesheet';l.href=src+'?v=20260810-final';document.head.appendChild(l)}
+  function boot(){
+    if(window.__studyFinalGuardsLoader)return;window.__studyFinalGuardsLoader=true;
+    loadStyle('/admin-chat-final.css');loadScript('/admin/admin-chat-final.js');loadScript('/admin/admin-copilot-final.js');
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,50)});else setTimeout(boot,50);
+})();

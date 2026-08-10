@@ -1,0 +1,10 @@
+/* Final support composer visibility/layout. */
+#replyForm{display:flex!important;visibility:visible!important;opacity:1!important;position:relative;z-index:20;align-items:center;gap:10px;min-height:68px;padding:12px 14px!important;background:rgba(255,255,255,.96);border-top:1px solid rgba(100,110,150,.16)}
+#replyForm.hidden{display:flex!important}
+#replyForm #replyInput{display:block!important;visibility:visible!important;opacity:1!important;flex:1;min-width:0;resize:none;min-height:44px}
+#replyForm .send-btn{display:inline-flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto}
+#replyForm .composer-tool{flex:0 0 auto}
+.admin-attachment{display:block;max-width:min(320px,80vw);max-height:260px;border-radius:12px;margin-top:8px;object-fit:contain}
+.admin-sticker{font-size:34px;margin-top:6px}
+@media(max-width:700px){#replyForm{padding:8px!important;gap:6px}#replyForm .composer-tool{display:none!important}}
+body.dark #replyForm{background:rgba(20,27,45,.96);border-top-color:rgba(180,190,220,.16)}

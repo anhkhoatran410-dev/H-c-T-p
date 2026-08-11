@@ -1,41 +1,24 @@
-/* STUDY Admin — final support composer guard. */
+/* STUDY Admin — final support messenger runtime. */
 (function(){
 'use strict';
-if(window.__studyAdminSupportV9)return;window.__studyAdminSupportV9=true;
-var state=window.studyAdminSupport||{thread:null,sending:false};window.studyAdminSupport=state;
+if(window.__studyAdminSupportV10)return;window.__studyAdminSupportV10=true;
+var state={thread:null,threads:[],messages:[],channel:null,poll:null,sending:false};window.studyAdminSupport=state;
 function el(id){return document.getElementById(id)}
-function isOpen(){var x=el('support');return !!x&&x.classList.contains('active')}
-async function dbReady(){if(typeof window.loadSupabase==='function'){var d=await window.loadSupabase();if(d)return d}if(window.db)return window.db;throw new Error('Supabase chưa sẵn sàng.')}
-async function send(){
- var input=el('replyInput'),text=input&&input.value.trim(),thread=state.thread;
- if(!thread||!text||state.sending)return false;
- state.sending=true;if(input)input.disabled=true;
- document.querySelectorAll('#replyForm .send-btn,#replyForm button[type="submit"]').forEach(function(b){b.disabled=true});
- try{
-  var d=await dbReady();
-  var r=await d.from('support_messages').insert({thread_id:thread.id,account_id:thread.account_id||null,sender:'admin',sender_name:'Admin',message:text}).select('*').single();
-  if(r.error)throw r.error;
-  if(input)input.value='';
-  if(typeof window.openAdminSupportThread==='function')await window.openAdminSupportThread(thread.id);
-  if(typeof window.loadSupportThreads==='function')await window.loadSupportThreads();
-  return true;
- }catch(e){
-  if(input)input.value=text;
-  console.error('STUDY Admin support send:',e);
-  if(typeof window.toast==='function')window.toast('Không gửi được: '+(e.message||e));else alert('Không gửi được: '+(e.message||e));
-  return false;
- }finally{state.sending=false;if(input)input.disabled=!thread;document.querySelectorAll('#replyForm .send-btn,#replyForm button[type="submit"]').forEach(function(b){b.disabled=false})}
-}
+function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]})}
+function open(){return !!el('support')&&el('support').classList.contains('active')}
+async function db(){if(typeof window.loadSupabase==='function'){var x=await window.loadSupabase();if(x)return x}if(window.db)return window.db;throw new Error('Supabase chưa sẵn sàng.')}
+function css(){if(el('study-admin-v10-css'))return;var s=document.createElement('style');s.id='study-admin-v10-css';s.textContent='#support .messenger{display:grid!important;grid-template-columns:330px minmax(0,1fr)!important;min-height:330px!important;overflow:hidden!important}#support .conversation{display:grid!important;grid-template-rows:auto minmax(0,1fr) auto!important;min-width:0!important;min-height:0!important;overflow:hidden!important}#support #supportMessages{min-height:0!important;overflow:auto!important}#support #replyForm{display:flex!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:100!important;min-height:68px!important;align-items:center!important;gap:8px!important}#support #replyInput{flex:1 1 auto!important;min-width:0!important;resize:none!important;font-size:16px!important}@media(max-width:650px){#support .messenger{grid-template-columns:1fr!important}#support .conversation-list{width:100%!important;max-width:none!important}#support #replyForm{padding:8px!important}#support #replyForm .composer-tool{display:none!important}}';document.head.appendChild(s)}
+function fit(){var m=document.querySelector('#support .messenger');if(!m)return;var h=Math.max(330,Math.min(690,window.innerHeight-m.getBoundingClientRect().top-12));m.style.setProperty('height',h+'px','important');m.style.setProperty('max-height',h+'px','important')}
+function renderThreads(){var box=el('supportThreads');if(!box)return;var q=(el('threadSearch')?.value||'').trim().toLowerCase();var rows=state.threads.filter(function(t){return !q||String(t.student_name||'').toLowerCase().includes(q)||String(t.device_id||'').toLowerCase().includes(q)});box.innerHTML=rows.map(function(t){var active=state.thread&&String(state.thread.id)===String(t.id);return '<button type="button" class="thread '+(active?'active':'')+'" data-thread="'+esc(t.id)+'"><span class="avatar">'+esc(t.support_accounts?.avatar||'💬')+'</span><span class="thread-main"><b>'+esc(t.student_name||'Người dùng')+'</b><small>'+esc(t.last_message||'Chưa có tin nhắn')+'</small></span><span>'+(Number(t.unread_admin||0)>0?'<i class="unread-dot"></i>':'')+'<small>'+esc(t.updated_at?new Date(t.updated_at).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):'')+'</small></span></button>'}).join('')||'<div style="padding:28px;text-align:center">💬<br>Chưa có cuộc trò chuyện.</div>';box.querySelectorAll('[data-thread]').forEach(function(b){b.onclick=function(){openThread(b.dataset.thread)}})}
+function renderMessages(){var head=el('chatHeader'),box=el('supportMessages'),input=el('replyInput'),form=el('replyForm');if(!head||!box)return;if(!state.thread){head.innerHTML='<div class="empty-chat"><span>💬</span><b>Chọn một cuộc trò chuyện</b><small>Tin nhắn sẽ xuất hiện ở đây.</small></div>';box.innerHTML='<div style="padding:28px;text-align:center">✨<br>Chọn người ở bên trái để bắt đầu.</div>';if(input){input.disabled=true;input.placeholder='Chọn một cuộc trò chuyện...'}if(form)form.classList.remove('hidden');fit();return}head.innerHTML='<div class="chat-person"><span class="avatar">'+esc(state.thread.support_accounts?.avatar||'💬')+'</span><div><b>'+esc(state.thread.student_name||'Người dùng')+'</b><small>'+esc(state.thread.support_accounts?.name||'Hỗ trợ chung')+'</small></div></div>';var seen={};box.innerHTML=state.messages.filter(function(m){var k=String(m.id||m.created_at+'|'+m.sender+'|'+m.message);if(seen[k])return false;seen[k]=1;return true}).map(function(m){var sender=m.sender||'user',name=m.sender_name||(sender==='admin'?'Admin':sender==='bot'?'Bot':'Người dùng');var media=m.sticker?'<div style="font-size:44px">'+esc(m.sticker)+'</div>':'';if(m.attachment_url&&String(m.attachment_type||'').indexOf('image/')===0)media+='<img src="'+esc(m.attachment_url)+'" style="max-width:320px;max-height:280px;border-radius:12px;display:block">';return '<div style="display:flex;justify-content:'+(sender==='user'?'flex-start':'flex-end')+';margin:8px 0"><div style="max-width:82%;padding:10px 13px;border-radius:16px;background:'+(sender==='user'?'#fff':'#e9e6ff')+';word-break:break-word"><b>'+esc(name)+'</b>'+media+(m.message?'<div>'+esc(m.message)+'</div>':'')+'<small style="display:block;opacity:.6;margin-top:4px">'+esc(m.created_at?new Date(m.created_at).toLocaleString('vi-VN'):'')+'</small></div></div>'}).join('')||'<div style="padding:28px;text-align:center">Chưa có tin nhắn.</div>';box.scrollTop=box.scrollHeight;if(input){input.disabled=false;input.placeholder='Nhập tin nhắn...'}if(form)form.classList.remove('hidden');fit()}
+async function loadThreads(){var d=await db(),r=await d.from('support_threads').select('*,support_accounts(name,avatar)').order('updated_at',{ascending:false});if(r.error)throw r.error;state.threads=r.data||[];renderThreads()}
+async function openThread(id){var t=state.threads.find(function(x){return String(x.id)===String(id)});if(!t)return;state.thread=t;state.messages=[];renderThreads();renderMessages();try{var d=await db();await d.from('support_threads').update({unread_admin:0}).eq('id',id);var r=await d.from('support_messages').select('*').eq('thread_id',id).order('created_at',{ascending:true});if(r.error)throw r.error;state.messages=r.data||[];t.unread_admin=0;renderThreads();renderMessages()}catch(e){var box=el('supportMessages');if(box)box.innerHTML='<div class="danger-text">Không mở được: '+esc(e.message)+'</div>'}}
+window.openAdminSupportThread=openThread;
+async function send(){var input=el('replyInput'),text=input?.value.trim();if(!text||!state.thread||state.sending)return;state.sending=true;if(input)input.disabled=true;try{var d=await db();var r=await d.from('support_messages').insert({thread_id:state.thread.id,account_id:state.thread.account_id||null,sender:'admin',sender_name:'Admin',message:text}).select('*').single();if(r.error)throw r.error;if(input)input.value='';state.messages.push(r.data);renderMessages();await loadThreads()}catch(e){if(input)input.value=text;console.error(e);alert('Không gửi được: '+(e.message||e))}finally{state.sending=false;if(input)input.disabled=false}}
 window.sendAdminSupportMessage=send;
-function bind(){
- if(!isOpen())return;
- var form=el('replyForm'),input=el('replyInput');if(!form||!input)return;
- form.classList.remove('hidden');form.style.setProperty('display','flex','important');
- if(!form.dataset.v9submit){form.dataset.v9submit='1';form.addEventListener('submit',function(e){e.preventDefault();e.stopImmediatePropagation();send()},true)}
- if(!input.dataset.v9enter){input.dataset.v9enter='1';input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();send()}},true)}
- if(!form.dataset.v9click){form.dataset.v9click='1';form.addEventListener('click',function(e){var b=e.target.closest('.send-btn,button[type="submit"]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();send()},true)}
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);else bind();
-window.addEventListener('study-app-loaded',function(){setTimeout(bind,100)});
-setInterval(bind,500);
+function bind(){css();var form=el('replyForm'),input=el('replyInput');if(!form||!input)return;form.classList.remove('hidden');form.style.setProperty('display','flex','important');if(!form.dataset.v10){form.dataset.v10='1';form.addEventListener('submit',function(e){e.preventDefault();e.stopImmediatePropagation();send()},true);form.addEventListener('click',function(e){var b=e.target.closest('.send-btn,button[type="submit"]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();send()},true)}if(!input.dataset.v10){input.dataset.v10='1';input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();send()}},true)}}
+function startLive(){db().then(function(d){if(state.channel)try{d.removeChannel(state.channel)}catch(_){}state.channel=d.channel('study-admin-support-v10').on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages'},function(p){if(state.thread&&String(p.new.thread_id)===String(state.thread.id)){state.messages.push(p.new);renderMessages()}loadThreads().catch(function(){})}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'support_threads'},function(){loadThreads().catch(function(){})}).subscribe(function(s){console.log('Admin support realtime',s)})}).catch(function(e){console.warn(e)})}
+function refresh(){if(!open())return;loadThreads().then(function(){if(state.thread){var t=state.threads.find(function(x){return String(x.id)===String(state.thread.id)});if(t)state.thread=t}renderThreads();renderMessages();bind()}).catch(function(e){console.warn('Admin support refresh',e)})}
+function boot(){bind();if(open()){refresh();startLive()}}
+document.addEventListener('click',function(e){var n=e.target.closest('[data-tab="support"],button[data-go="support"]');if(n)setTimeout(boot,100);},true);window.addEventListener('resize',fit);window.addEventListener('study-app-loaded',function(){setTimeout(boot,100)});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();setInterval(function(){if(open())bind()},1000);
 })();

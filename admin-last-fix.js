@@ -1,146 +1,19 @@
-/* STUDY TH — safe Admin participant guard.
-   IMPORTANT: this file must not own the support chat runtime.
-   The participant view uses the same Supabase client as admin/app.js.
-*/
+/* STUDY TH — safe Admin participant guard + persistent multi-file picker. */
 (function(){
   'use strict';
-  if(window.__studyAdminParticipantGuardV3)return;
-  window.__studyAdminParticipantGuardV3=true;
-
-  function safeEsc(v){
-    return typeof window.esc==='function' ? window.esc(v) : String(v==null?'':v).replace(/[&<>"']/g,function(c){
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c];
-    });
-  }
-
-  async function getDb(){
-    if(typeof window.loadSupabase!=='function')throw new Error('Supabase chưa sẵn sàng.');
-    var client=await window.loadSupabase();
-    if(!client || typeof client.from!=='function')throw new Error('Không khởi tạo được kết nối dữ liệu.');
-    return client;
-  }
-
-  function modal(title,html){
-    var m=document.getElementById('examEditorModal');
-    if(!m && typeof window.ensureModal==='function'){
-      window.ensureModal();
-      m=document.getElementById('examEditorModal');
-    }
-    if(!m)return;
-    var titleEl=document.getElementById('examEditorTitle');
-    var body=document.getElementById('examEditorBody');
-    if(titleEl)titleEl.textContent=title;
-    if(body)body.innerHTML=html;
-    m.classList.remove('hidden');
-    document.getElementById('saveExamEditor')?.classList.add('hidden');
-    document.getElementById('addQuestionBtn')?.classList.add('hidden');
-    var close=document.getElementById('cancelExamEditor');
-    if(close){close.classList.remove('hidden');close.textContent='Đóng';}
-  }
-
-  window.loadParticipants=async function(){
-    var box=document.getElementById('participantRows');
-    if(!box)return;
-    try{
-      var client=await getDb();
-      var results=await Promise.all([
-        client.from('participants').select('*').order('created_at',{ascending:false}),
-        client.from('user_attempts').select('*').order('created_at',{ascending:false})
-      ]);
-      var peopleRes=results[0], attemptsRes=results[1];
-      if(peopleRes.error)throw peopleRes.error;
-      if(attemptsRes.error)throw attemptsRes.error;
-
-      var attempts=attemptsRes.data||[];
-      var people=peopleRes.data||[];
-      var byCode={};
-      people.forEach(function(p){
-        var code=String(p.code||p.device_id||p.id||'');
-        if(!code)return;
-        byCode[code]={name:p.name||'Không tên',code:code,attempts:[]};
-      });
-      attempts.forEach(function(a){
-        var code=String(a.student_code||a.device_id||a.student_name||'unknown');
-        if(!byCode[code])byCode[code]={name:a.student_name||'Không tên',code:code,attempts:[]};
-        if(!byCode[code].name || byCode[code].name==='Không tên')byCode[code].name=a.student_name||byCode[code].name;
-        byCode[code].attempts.push(a);
-      });
-
-      var rows=Object.keys(byCode).map(function(k){return byCode[k];}).sort(function(a,b){
-        return String((b.attempts[0]||{}).created_at||'').localeCompare(String((a.attempts[0]||{}).created_at||''));
-      });
-      box.innerHTML=rows.map(function(p){
-        var latest=p.attempts[0];
-        return '<tr class="clickable-row" data-person-last="'+safeEsc(p.code)+'">'+
-          '<td><b>'+safeEsc(p.name)+'</b></td>'+
-          '<td>'+safeEsc(p.code)+'</td>'+
-          '<td>'+p.attempts.length+'</td>'+
-          '<td><span class="badge">'+(latest?Number(latest.score||0)+'%':'—')+'</span></td>'+
-          '<td>'+(latest?safeEsc(new Date(latest.created_at).toLocaleString('vi-VN')):'—')+'</td>'+
-          '</tr>';
-      }).join('') || '<tr><td colspan="5">Chưa có người tham gia.</td></tr>';
-
-      box.querySelectorAll('[data-person-last]').forEach(function(row){
-        row.onclick=function(){window.showPersonLast(row.getAttribute('data-person-last'));};
-      });
-    }catch(e){
-      box.innerHTML='<tr><td colspan="5" class="danger-text">'+safeEsc(e&&e.message||e)+'</td></tr>';
-    }
-  };
-
-  window.showPersonLast=async function(code){
-    try{
-      var client=await getDb();
-      var r=await client.from('user_attempts').select('*').order('created_at',{ascending:false});
-      if(r.error)throw r.error;
-      var rows=(r.data||[]).filter(function(a){
-        return String(a.student_code||a.device_id||a.student_name||'')===String(code);
-      });
-      if(!rows.length){
-        if(typeof window.toast==='function')window.toast('Không tìm thấy lượt làm của người này.');
-        return;
-      }
-      var name=rows[0].student_name||'Người tham gia';
-      modal('Theo dõi '+name,
-        '<div class="person-summary"><h3>'+safeEsc(name)+'</h3><p class="muted">Mã: '+safeEsc(code)+' · '+rows.length+' lượt làm</p></div>'+ 
-        '<div class="person-attempts">'+rows.map(function(r){
-          return '<div class="person-attempt"><div><b>'+safeEsc(r.exam_title||'Bài kiểm tra')+'</b><small>'+safeEsc(r.created_at?new Date(r.created_at).toLocaleString('vi-VN'):'')+'</small></div>'+ 
-            '<span class="badge">'+Number(r.score||0)+'% · '+Number(r.correct||0)+'/'+Number(r.total||0)+'</span>'+ 
-            '<div class="row-actions"><button class="soft-btn" data-view-last="'+safeEsc(r.id)+'">👁 Xem</button>'+ 
-            ((r.wrong_indexes||[]).length?'<button class="soft-btn" data-review-last="'+safeEsc(r.id)+'">🧠 Ôn câu sai</button>':'')+'</div></div>';
-        }).join('')+'</div>'
-      );
-      var body=document.getElementById('examEditorBody');
-      if(!body)return;
-      body.querySelectorAll('[data-view-last]').forEach(function(b){
-        b.onclick=function(){if(typeof window.showAttempt==='function')window.showAttempt(b.dataset.viewLast,false);};
-      });
-      body.querySelectorAll('[data-review-last]').forEach(function(b){
-        b.onclick=function(){if(typeof window.showAttempt==='function')window.showAttempt(b.dataset.reviewLast,true);};
-      });
-    }catch(e){
-      if(typeof window.toast==='function')window.toast('Không mở được người tham gia: '+(e&&e.message||e));
-    }
-  };
-
-  function installTabHook(){
-    if(typeof window.openTab!=='function' || window.openTab.__studyParticipantGuardV3)return false;
-    var nativeOpenTab=window.openTab;
-    var wrapped=function(id){
-      var result=nativeOpenTab.apply(this,arguments);
-      if(id==='participants')setTimeout(function(){window.loadParticipants();},0);
-      return result;
-    };
-    wrapped.__studyParticipantGuardV3=true;
-    window.openTab=wrapped;
-    return true;
-  }
-
-  function boot(){
-    installTabHook();
-    if(document.getElementById('participantRows'))setTimeout(function(){window.loadParticipants();},0);
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});
-  else boot();
+  if(window.__studyAdminParticipantGuardV4)return;
+  window.__studyAdminParticipantGuardV4=true;
+  function safeEsc(v){return typeof window.esc==='function'?window.esc(v):String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]})}
+  async function getDb(){if(typeof window.loadSupabase!=='function')throw new Error('Supabase chưa sẵn sàng.');var client=await window.loadSupabase();if(!client||typeof client.from!=='function')throw new Error('Không khởi tạo được kết nối dữ liệu.');return client}
+  function modal(title,html){var m=document.getElementById('examEditorModal');if(!m&&typeof window.ensureModal==='function'){window.ensureModal();m=document.getElementById('examEditorModal')}if(!m)return;var t=document.getElementById('examEditorTitle'),b=document.getElementById('examEditorBody');if(t)t.textContent=title;if(b)b.innerHTML=html;m.classList.remove('hidden');document.getElementById('saveExamEditor')?.classList.add('hidden');document.getElementById('addQuestionBtn')?.classList.add('hidden');var c=document.getElementById('cancelExamEditor');if(c){c.classList.remove('hidden');c.textContent='Đóng'}}
+  window.loadParticipants=async function(){var box=document.getElementById('participantRows');if(!box)return;try{var client=await getDb();var results=await Promise.all([client.from('participants').select('*').order('created_at',{ascending:false}),client.from('user_attempts').select('*').order('created_at',{ascending:false})]);var peopleRes=results[0],attemptsRes=results[1];if(peopleRes.error)throw peopleRes.error;if(attemptsRes.error)throw attemptsRes.error;var attempts=attemptsRes.data||[],people=peopleRes.data||[],byCode={};people.forEach(function(p){var code=String(p.code||p.device_id||p.id||'');if(code)byCode[code]={name:p.name||'Không tên',code:code,attempts:[]}});attempts.forEach(function(a){var code=String(a.student_code||a.device_id||a.student_name||'unknown');if(!byCode[code])byCode[code]={name:a.student_name||'Không tên',code:code,attempts:[]};if(!byCode[code].name||byCode[code].name==='Không tên')byCode[code].name=a.student_name||byCode[code].name;byCode[code].attempts.push(a)});var rows=Object.keys(byCode).map(function(k){return byCode[k]}).sort(function(a,b){return String((b.attempts[0]||{}).created_at||'').localeCompare(String((a.attempts[0]||{}).created_at||''))});box.innerHTML=rows.map(function(p){var latest=p.attempts[0];return '<tr class="clickable-row" data-person-last="'+safeEsc(p.code)+'"><td><b>'+safeEsc(p.name)+'</b></td><td>'+safeEsc(p.code)+'</td><td>'+p.attempts.length+'</td><td><span class="badge">'+(latest?Number(latest.score||0)+'%':'—')+'</span></td><td>'+(latest?safeEsc(new Date(latest.created_at).toLocaleString('vi-VN')):'—')+'</td></tr>'}).join('')||'<tr><td colspan="5">Chưa có người tham gia.</td></tr>';box.querySelectorAll('[data-person-last]').forEach(function(row){row.onclick=function(){window.showPersonLast(row.getAttribute('data-person-last'))}})}catch(e){box.innerHTML='<tr><td colspan="5" class="danger-text">'+safeEsc(e&&e.message||e)+'</td></tr>'}};
+  window.showPersonLast=async function(code){try{var client=await getDb(),r=await client.from('user_attempts').select('*').order('created_at',{ascending:false});if(r.error)throw r.error;var rows=(r.data||[]).filter(function(a){return String(a.student_code||a.device_id||a.student_name||'')===String(code)});if(!rows.length){if(typeof window.toast==='function')window.toast('Không tìm thấy lượt làm của người này.');return}var name=rows[0].student_name||'Người tham gia';modal('Theo dõi '+name,'<div class="person-summary"><h3>'+safeEsc(name)+'</h3><p class="muted">Mã: '+safeEsc(code)+' · '+rows.length+' lượt làm</p></div><div class="person-attempts">'+rows.map(function(r){return '<div class="person-attempt"><div><b>'+safeEsc(r.exam_title||'Bài kiểm tra')+'</b><small>'+safeEsc(r.created_at?new Date(r.created_at).toLocaleString('vi-VN'):'')+'</small></div><span class="badge">'+Number(r.score||0)+'% · '+Number(r.correct||0)+'/'+Number(r.total||0)+'</span><div class="row-actions"><button class="soft-btn" data-view-last="'+safeEsc(r.id)+'">👁 Xem</button>'+((r.wrong_indexes||[]).length?'<button class="soft-btn" data-review-last="'+safeEsc(r.id)+'">🧠 Ôn câu sai</button>':'')+'</div></div>'}).join('')+'</div>');var body=document.getElementById('examEditorBody');if(!body)return;body.querySelectorAll('[data-view-last]').forEach(function(b){b.onclick=function(){if(typeof window.showAttempt==='function')window.showAttempt(b.dataset.viewLast,false)}});body.querySelectorAll('[data-review-last]').forEach(function(b){b.onclick=function(){if(typeof window.showAttempt==='function')window.showAttempt(b.dataset.reviewLast,true)}})}catch(e){if(typeof window.toast==='function')window.toast('Không mở được người tham gia: '+(e&&e.message||e))}};
+  function installTabHook(){if(typeof window.openTab!=='function'||window.openTab.__studyParticipantGuardV4)return false;var nativeOpenTab=window.openTab,wrapped=function(id){var result=nativeOpenTab.apply(this,arguments);if(id==='participants')setTimeout(function(){window.loadParticipants()},0);return result};wrapped.__studyParticipantGuardV4=true;window.openTab=wrapped;return true}
+  function uniqueFiles(files){var out=[],seen=new Set();Array.from(files||[]).forEach(function(f){var key=[f.name,f.size,f.lastModified,f.type].join('|');if(!seen.has(key)){seen.add(key);out.push(f)}});return out}
+  function mergeFileList(input,files){try{var dt=new DataTransfer();uniqueFiles(files).forEach(function(f){dt.items.add(f)});input.files=dt.files;return true}catch(e){console.warn('Cannot merge FileList',e);return false}}
+  function updateFileUI(input){var label=input.closest('label');if(!label)return;var old=label.querySelector('.study-multi-file-list');if(old)old.remove();var files=Array.from(input.files||[]),box=document.createElement('div');box.className='study-multi-file-list';if(!files.length)box.innerHTML='<small>Chưa chọn tài liệu</small>';else box.innerHTML='<b>📚 '+files.length+' tài liệu đã chọn</b>'+files.map(function(f,i){return '<div class="study-multi-file-row"><span>'+safeEsc((i+1)+'. '+f.name)+'</span><small>'+(f.size/1048576).toFixed(1)+' MB</small></div>'}).join('')+'<small class="study-multi-file-hint">Bấm chọn tệp lần nữa để thêm Unit/chương khác — các file đã chọn sẽ được giữ lại.</small>';label.appendChild(box)}
+  function bindFilePicker(){var input=document.getElementById('file');if(!input||input.__studyMultiFileBound)return;input.__studyMultiFileBound=true;input.multiple=true;input.addEventListener('change',function(){var old=input.__studySelectedFiles||[],picked=Array.from(input.files||[]),merged=uniqueFiles(old.concat(picked));input.__studySelectedFiles=merged;mergeFileList(input,merged);updateFileUI(input)});input.__studySelectedFiles=[];updateFileUI(input);var s=document.createElement('style');s.textContent='.study-multi-file-list{margin-top:10px;padding:10px 12px;border:1px dashed var(--line,#dfe5ef);border-radius:12px;background:rgba(99,102,241,.04);display:grid;gap:5px}.study-multi-file-row{display:flex;justify-content:space-between;gap:10px;font-size:13px}.study-multi-file-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.study-multi-file-hint{opacity:.7}';document.head.appendChild(s)}
+  function boot(){installTabHook();bindFilePicker();if(document.getElementById('participantRows'))setTimeout(function(){window.loadParticipants()},0)}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
+  new MutationObserver(function(){bindFilePicker()}).observe(document.documentElement,{childList:true,subtree:true});
 })();

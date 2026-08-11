@@ -1,35 +1,40 @@
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  try {
-    const {
-      fileName,
-      mimeType = "",
-      mimeTypes = [],
-      documentText = "",
-      fileData = [],
-      subject = "Tiếng Anh"
-    } = req.body || {};
+  function normalizeBase64(value) {
+    let raw = String(value || "").trim();
+    raw = raw.replace(/^data:[^;]+;base64,/i, "");
+    raw = raw.replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+    if (!raw) return "";
+    if (!/^[A-Za-z0-9+/]*={0,2}$/.test(raw)) throw new Error("Dữ liệu ảnh/PDF có chuỗi Base64 không hợp lệ.");
+    raw = raw.replace(/=+$/g, "");
+    const remainder = raw.length % 4;
+    if (remainder === 1) throw new Error("Dữ liệu ảnh/PDF bị thiếu hoặc hỏng khi mã hóa Base64.");
+    if (remainder) raw += "=".repeat(4 - remainder);
+    return raw;
+  }
 
+  try {
+    const { fileName, mimeType = "", mimeTypes = [], documentText = "", fileData = [], subject = "Tiếng Anh" } = req.body || {};
     const text = String(documentText || "").slice(0, 900000).trim();
     const rawFiles = Array.isArray(fileData) ? fileData : (fileData ? [fileData] : []);
     const imageMimes = Array.isArray(mimeTypes) ? mimeTypes : [];
+
     const media = rawFiles.map((value, index) => {
       const raw = String(value || "").trim();
       if (!raw) return null;
-      const match = raw.match(/^data:([^;]+);base64,(.+)$/s);
+      const match = raw.match(/^data:([^;]+);base64,/is);
       const mime = String(imageMimes[index] || match?.[1] || mimeType || "application/octet-stream")
         .toLowerCase().split(";")[0].trim();
-      const data = match ? match[2] : raw.replace(/^data:[^;]+;base64,/, "");
+      const data = normalizeBase64(raw);
       return { mime, data };
     }).filter(Boolean).filter(x => /^(image\/(png|jpe?g|webp|gif|bmp)|application\/pdf)$/i.test(x.mime));
 
-    if (!text && !media.length) {
-      return res.status(400).json({ error: "Thiếu nội dung tài liệu hoặc ảnh/PDF. Hãy chọn lại tài liệu rồi thử lại." });
-    }
+    if (!text && !media.length) return res.status(400).json({ error: "Thiếu nội dung tài liệu hoặc ảnh/PDF. Hãy chọn lại tài liệu rồi thử lại." });
+
     const totalBytes = media.reduce((sum, x) => sum + Math.floor((x.data.length * 3) / 4), 0);
-    if (totalBytes > 12 * 1024 * 1024) {
-      return res.status(413).json({ error: "Tài liệu ảnh/PDF quá lớn. Hãy chọn ít trang/file hơn hoặc tài liệu nhẹ hơn." });
+    if (totalBytes > 3 * 1024 * 1024) {
+      return res.status(413).json({ error: "Ảnh/PDF quá lớn để gửi an toàn tới AI. Hãy chọn file nhẹ hơn hoặc ít file hơn." });
     }
 
     const prompt = `
@@ -108,19 +113,12 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
         const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": rawKey },
-          body: JSON.stringify({
-            contents: [{ role: "user", parts }],
-            generationConfig: {
-              responseMimeType: "application/json",
-              maxOutputTokens: 20000
-            }
-          })
+          body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 20000 } })
         });
 
         const raw = await response.text();
         let data = {};
-        try { data = raw ? JSON.parse(raw) : {}; }
-        catch { throw new Error(`Gemini trả về dữ liệu không hợp lệ (HTTP ${response.status}).`); }
+        try { data = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`Gemini trả về dữ liệu không hợp lệ (HTTP ${response.status}).`); }
         if (!response.ok) {
           const error = new Error(data?.error?.message || `Gemini lỗi HTTP ${response.status}.`);
           error.status = response.status;

@@ -8,8 +8,8 @@
 }
 
 #support .conversation {
-  display: flex !important;
-  flex-direction: column !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
@@ -17,29 +17,37 @@
 }
 
 #support #chatHeader {
-  flex: 0 0 auto !important;
+  grid-row: 1 !important;
   min-height: 0 !important;
+  flex: none !important;
 }
 
 #support #supportMessages {
-  flex: 1 1 auto !important;
+  grid-row: 2 !important;
   min-height: 0 !important;
+  height: auto !important;
+  max-height: none !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   overscroll-behavior: contain !important;
 }
 
-#support #replyForm {
-  flex: 0 0 auto !important;
+#support #replyForm,
+#support #replyForm.hidden,
+#support #replyForm:not(.hidden) {
+  grid-row: 3 !important;
+  display: flex !important;
+  flex: none !important;
   width: 100% !important;
-  min-height: 0 !important;
+  min-height: 64px !important;
+  height: auto !important;
+  max-height: 180px !important;
   box-sizing: border-box !important;
   position: relative !important;
+  inset: auto !important;
   z-index: 20 !important;
-}
-
-#support #replyForm:not(.hidden) {
-  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 #support #replyInput {
@@ -63,10 +71,12 @@
 
   #support .conversation {
     grid-row: 2 !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
     min-height: 0 !important;
   }
 
   #support #replyForm {
+    min-height: 60px !important;
     padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
   }
 

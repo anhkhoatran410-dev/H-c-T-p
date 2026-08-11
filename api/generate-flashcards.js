@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
   try {
     const { fileName, mimeType = "", mimeTypes = [], documentText = "", fileData = [], subject = "Tiếng Anh" } = req.body || {};
-    const text = String(documentText || "").slice(0, 900000).trim();
+    const text = String(documentText || "").slice(0, 120000).trim();
     const rawFiles = Array.isArray(fileData) ? fileData : (fileData ? [fileData] : []);
     const imageMimes = Array.isArray(mimeTypes) ? mimeTypes : [];
 
@@ -32,9 +32,11 @@ export default async function handler(req, res) {
 
     if (!text && !media.length) return res.status(400).json({ error: "Thiếu nội dung tài liệu hoặc ảnh/PDF. Hãy chọn lại tài liệu rồi thử lại." });
 
+    // Vercel Functions have a 4.5 MB request-body limit. Base64 expands the file,
+    // so keep the raw media comfortably below that limit.
     const totalBytes = media.reduce((sum, x) => sum + Math.floor((x.data.length * 3) / 4), 0);
     if (totalBytes > 3 * 1024 * 1024) {
-      return res.status(413).json({ error: "Ảnh/PDF quá lớn để gửi an toàn tới AI. Hãy chọn file nhẹ hơn hoặc ít file hơn." });
+      return res.status(413).json({ error: "PDF/ảnh này quá lớn để gửi qua Vercel trực tiếp (giới hạn an toàn khoảng 3 MB). Hãy chọn file nhẹ hơn. PDF chữ có thể được đọc từ text; PDF scan lớn cần cơ chế upload trực tiếp." });
     }
 
     const prompt = `
@@ -93,10 +95,13 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
       "gemini-2.0-flash",
       "gemini-2.0-flash-lite"
     ]);
-    const models = [configuredModel, "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"]
+
+    // Flashcard is a document-extraction workload, so prefer Flash-Lite.
+    // If GEMINI_MODEL is explicitly configured, keep it as the second option.
+    const models = ["gemini-3.5-flash-lite", configuredModel, "gemini-3.6-flash", "gemini-2.5-flash"]
       .filter(m => m && !retired.has(m))
       .filter((m, i, a) => a.indexOf(m) === i);
-    if (!models.length) models.push("gemini-3.6-flash");
+    if (!models.length) models.push("gemini-3.5-flash-lite");
 
     let lastError = null;
     let parsed = null;
@@ -113,7 +118,7 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
         const response = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": rawKey },
-          body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 20000 } })
+          body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 12000 } })
         });
 
         const raw = await response.text();
@@ -134,11 +139,21 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
         break;
       } catch (e) {
         lastError = e;
-        if (![400, 404].includes(Number(e?.status || 0))) break;
+        const status = Number(e?.status || 0);
+        // 429 can be model-specific. Try the next model once; do not retry the
+        // same model repeatedly because that only burns quota.
+        if (![400, 404, 429].includes(status)) break;
       }
     }
 
-    if (!parsed) throw lastError || new Error("Không gọi được Gemini để tạo flashcard.");
+    if (!parsed) {
+      const status = Number(lastError?.status || 0);
+      if (status === 429) {
+        const message = String(lastError?.message || "");
+        throw new Error(`Gemini đang hết quota/tốc độ API. Hãy chờ thời gian Retry-After trong thông báo rồi thử lại. Đây không phải lỗi PDF. Chi tiết: ${message}`);
+      }
+      throw lastError || new Error("Không gọi được Gemini để tạo flashcard.");
+    }
 
     const cards = Array.isArray(parsed?.flashcards) ? parsed.flashcards : [];
     const seen = new Set();
@@ -157,7 +172,7 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
     }).slice(0, 100);
 
     if (!normalized.length) throw new Error("AI đọc được tài liệu nhưng không tìm thấy mục từ vựng hợp lệ. Hãy kiểm tra tài liệu có bảng/danh sách từ vựng hay không.");
-    return res.status(200).json({ questions: normalized, flashcards: normalized, provider: "gemini", vision: media.length > 0, sourceCount: media.length, validated: true });
+    return res.status(200).json({ questions: normalized, flashcards: normalized, provider: "gemini", model: models.find(m => m) || "gemini-3.5-flash-lite", vision: media.length > 0, sourceCount: media.length, validated: true });
   } catch (e) {
     console.error("generate-flashcards:", e);
     return res.status(Number(e?.status) === 413 ? 413 : 500).json({ error: e.message || "Lỗi máy chủ khi tạo flashcard." });

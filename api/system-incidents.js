@@ -1,0 +1,3 @@
+import { isAdminRequest } from './admin-login.js';
+const URL=String(process.env.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabase.co').trim();const KEY=String(process.env.SUPABASE_SERVICE_ROLE_KEY||'').trim();
+export default async function handler(req,res){if(!isAdminRequest(req))return res.status(401).json({error:'Admin session required'});try{const r=await fetch(`${URL}/rest/v1/system_incidents?select=*&order=created_at.desc&limit=30`,{headers:{apikey:KEY,Authorization:`Bearer ${KEY}`}});const d=await r.json();return res.status(r.ok?200:500).json(r.ok?d:{error:'Không đọc được sự cố'});}catch(e){return res.status(500).json({error:e.message});}}

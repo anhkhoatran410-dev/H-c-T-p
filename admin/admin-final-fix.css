@@ -2,14 +2,14 @@
 #support .messenger {
   display: grid !important;
   grid-template-columns: 330px minmax(0, 1fr) !important;
-  height: min(690px, calc(100dvh - 205px)) !important;
+  height: min(620px, calc(100dvh - 205px)) !important;
   min-height: 0 !important;
   overflow: hidden !important;
 }
 
 #support .conversation {
   display: grid !important;
-  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  grid-template-rows: auto 350px auto !important;
   height: 100% !important;
   min-height: 0 !important;
   max-height: 100% !important;
@@ -24,12 +24,13 @@
 
 #support #supportMessages {
   grid-row: 2 !important;
-  min-height: 0 !important;
-  height: auto !important;
-  max-height: none !important;
+  min-height: 150px !important;
+  height: 350px !important;
+  max-height: 350px !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
   overscroll-behavior: contain !important;
+  box-sizing: border-box !important;
 }
 
 #support #replyForm,
@@ -45,6 +46,7 @@
   box-sizing: border-box !important;
   position: relative !important;
   inset: auto !important;
+  margin-top: 10px !important;
   z-index: 20 !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -71,8 +73,13 @@
 
   #support .conversation {
     grid-row: 2 !important;
-    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    grid-template-rows: auto minmax(150px, 350px) auto !important;
     min-height: 0 !important;
+  }
+
+  #support #supportMessages {
+    height: 350px !important;
+    max-height: 350px !important;
   }
 
   #support #replyForm {

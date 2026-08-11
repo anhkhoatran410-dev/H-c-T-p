@@ -67,14 +67,19 @@
       if(text)texts.push(`\n===== FILE ${i+1}: ${file.name} =====\n${text}`);
       const isImage=/^image\/(png|jpe?g|webp|gif|bmp)$/i.test(file.type);
       const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
-      if((isImage||isPdf)&&(!text||isImage)){
+
+      // PDF must always be forwarded as media for scan/OCR. A text extraction
+      // alone cannot read scanned pages, formulas, layout or images.
+      // Keep the raw file under ~3 MB because Base64 expands the request and
+      // Vercel Functions have a 4.5 MB request-body limit.
+      if(isPdf||isImage){
         const size=Number(file.size||0);
-        if(totalMediaBytes+size<=4*1024*1024){
+        if(totalMediaBytes+size<=3*1024*1024){
           try{const data=await readAsDataURL(file);media.push({data,mimeType:file.type||'application/pdf',name:file.name});totalMediaBytes+=size}catch(e){console.warn('Không đọc được media',file.name,e)}
         }
       }
     }
-    return {documentText:texts.join('\n').slice(0,900000),media};
+    return {documentText:texts.join('\n').slice(0,120000),media};
   }
 
   async function enhancedCreateExam(){
@@ -91,7 +96,9 @@
     try{
       if(msg)msg.textContent=flashcardOnly?'⏳ AI đang đọc toàn bộ tài liệu và tách từng từ/cụm từ thành flashcard...':'⏳ AI đang đọc tài liệu và tạo '+questionCount+' nội dung...';
       const source=await collectSources(files);
-      if(!source.documentText&&!source.media.length)throw new Error('Không đọc được nội dung tài liệu. Với PDF scan/ảnh, hãy kiểm tra file có rõ chữ và dung lượng không quá lớn.');
+      const oversized=files.filter(f=>((f.type==='application/pdf'||/\.pdf$/i.test(f.name)||/^image\//i.test(f.type))&&Number(f.size||0)>3*1024*1024));
+      if(oversized.length&&!source.documentText&&!source.media.length)throw new Error('File PDF/ảnh quá lớn để gửi trực tiếp qua Vercel. Hãy dùng file dưới 3 MB hoặc cần bật upload trực tiếp (Blob/File API) cho file lớn.');
+      if(!source.documentText&&!source.media.length)throw new Error('Không đọc được nội dung tài liệu. Với PDF scan/ảnh, hãy kiểm tra file có rõ chữ và dung lượng không quá 3 MB.');
 
       let questions=[];
       if(flashcardOnly){

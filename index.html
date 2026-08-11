@@ -34,6 +34,7 @@
   <script src="/public-ux-final.js?v=20260811-1" defer></script>
   <script src="/public-practice-result-fix.js?v=20260811-1" defer></script>
   <script src="/public-flashcard-ai-test.js?v=20260811-4" defer></script>
+  <script src="/public-chat-final-v2.js?v=20260811-1" defer></script>
   <script>(function(){document.title='STUDY TH';function status(text,danger){var el=document.getElementById('boot-status');if(!el)return;el.textContent=text;if(danger)el.className='danger-text'}window.addEventListener('error',function(e){var target=e&&e.target;if(target&&target.tagName==='SCRIPT'){status('Không tải được '+(target.src||'tệp JavaScript')+'.',true);console.error('Study script failed:',target.src)}else if(e&&e.error)console.error('Study runtime error:',e.error)},true);window.addEventListener('unhandledrejection',function(e){console.error('Study unhandled rejection:',e.reason)});setTimeout(function(){var app=document.getElementById('app'),text=document.getElementById('boot-status');if(app&&text&&text.textContent.indexOf('Đang tải hệ thống')!==-1){status('Không khởi động được ứng dụng. Một tệp JavaScript không chạy.',true);var card=text.closest('.card');if(card&&!card.querySelector('.boot-retry')){var b=document.createElement('button');b.className='btn boot-retry';b.textContent='↻ Tải lại';b.onclick=function(){location.reload()};card.appendChild(b)}}},7000)})();</script>
 </body>
 </html>

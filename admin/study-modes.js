@@ -36,7 +36,7 @@
   function updateHint(){
     const subject=document.getElementById('subject')?.value||'';const box=document.querySelector('.type-picks');if(!box)return;
     let hint=box.querySelector('.study-type-hint');if(!hint){hint=document.createElement('small');hint.className='study-type-hint';box.appendChild(hint)}
-    hint.textContent=subject==='Tiếng Anh'?'Tiếng Anh: Trắc nghiệm 4 đáp án và Flashcard là 2 chế độ riêng. Flashcard sẽ quét tài liệu, tách từng từ/cụm từ → mỗi từ một thẻ 2 mặt.':'Chọn từng dạng hoặc dùng “Tạo đề Hoàn chỉnh” để AI tự phân bố các dạng phù hợp với môn.';
+    hint.textContent=subject==='Tiếng Anh'?'Tiếng Anh: Trắc nghiệm 4 đáp án và Flashcard là 2 chế độ riêng. Flashcard quét toàn bộ file đã chọn, tách từng từ/cụm từ → mỗi từ một thẻ 2 mặt.':'Chọn từng dạng hoặc dùng “Tạo đề Hoàn chỉnh” để AI tự phân bố các dạng phù hợp với môn.';
   }
   function ensureControls(){
     injectStyle();const picks=document.querySelector('.type-picks');if(!picks)return;
@@ -54,40 +54,71 @@
     return (Array.isArray(qs)?qs:[]).map(q=>q.type==='flashcard'?{type:'flashcard',front:String(q.front??q.term??q.q??'').trim(),back:String(q.back??q.definition??q.answer??'').trim(),phonetic:String(q.phonetic??q.pronunciation??'').trim(),example:String(q.example??'').trim(),explanation:String(q.explanation??'').trim()}:q);
   }
 
+  function readAsDataURL(file){
+    return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=()=>reject(r.error||new Error('Không đọc được file '+file.name));r.readAsDataURL(file)});
+  }
+
+  async function collectSources(files){
+    const texts=[];const media=[];let totalMediaBytes=0;
+    for(let i=0;i<files.length;i++){
+      const file=files[i];
+      let text='';
+      try{text=await extractDoc(file).catch(()=>"")}catch(e){text=''}
+      if(text)texts.push(`\n===== FILE ${i+1}: ${file.name} =====\n${text}`);
+      const isImage=/^image\/(png|jpe?g|webp|gif|bmp)$/i.test(file.type);
+      const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+      if((isImage||isPdf)&&(!text||isImage)){
+        const size=Number(file.size||0);
+        if(totalMediaBytes+size<=4*1024*1024){
+          try{const data=await readAsDataURL(file);media.push({data,mimeType:file.type||'application/pdf',name:file.name});totalMediaBytes+=size}catch(e){console.warn('Không đọc được media',file.name,e)}
+        }
+      }
+    }
+    return {documentText:texts.join('\n').slice(0,900000),media};
+  }
+
   async function enhancedCreateExam(){
-    const file=document.getElementById('file')?.files?.[0],msg=document.getElementById('msg');
+    const input=document.getElementById('file');
+    const files=[...(input?.files||[])];
+    const msg=document.getElementById('msg');
     const title=document.getElementById('title')?.value.trim(),subject=document.getElementById('subject')?.value||'',difficulty=document.getElementById('level')?.value||'Trung bình',duration=Number(document.getElementById('minutes')?.value||45),questionCount=Number(document.getElementById('questions')?.value||20);
     let types=currentTypes();
     if(subject==='Tiếng Anh')types=types.filter(x=>x==='mcq'||x==='flashcard');else types=types.filter(x=>x!=='flashcard');
     const flashcardOnly=types.length===1&&types[0]==='flashcard';
-    if(!file){if(msg)msg.textContent='⚠️ Hãy chọn tài liệu.';return}
+    if(!files.length){if(msg)msg.textContent='⚠️ Hãy chọn ít nhất một tài liệu.';return}
     if(!title){if(msg)msg.textContent='⚠️ Hãy đặt tên bài.';return}
     if(!types.length){if(msg)msg.textContent='⚠️ Chọn ít nhất một dạng nội dung.';return}
     try{
-      if(msg)msg.textContent=flashcardOnly?'⏳ AI đang quét tài liệu và tách từng từ/cụm từ thành flashcard...':'⏳ AI đang đọc tài liệu và tạo '+questionCount+' nội dung...';
-      let documentText=await extractDoc(file).catch(()=>"");
-      if(documentText.length>220000)documentText=documentText.slice(0,220000)+'\n[Đã giới hạn văn bản để giữ request nhẹ]';
-      if(!documentText)throw new Error('Không trích xuất được chữ từ tài liệu. Hãy dùng PDF có text hoặc DOCX.');
+      if(msg)msg.textContent=flashcardOnly?'⏳ AI đang đọc toàn bộ tài liệu và tách từng từ/cụm từ thành flashcard...':'⏳ AI đang đọc tài liệu và tạo '+questionCount+' nội dung...';
+      const source=await collectSources(files);
+      if(!source.documentText&&!source.media.length)throw new Error('Không đọc được nội dung tài liệu. Với PDF scan/ảnh, hãy kiểm tra file có rõ chữ và dung lượng không quá lớn.');
 
       let questions=[];
       if(flashcardOnly){
-        const r=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:file.name,documentText,subject})});
+        const r=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:files.map(f=>f.name).join(' + '),documentText:source.documentText,fileData:source.media.map(x=>x.data),mimeTypes:source.media.map(x=>x.mimeType),subject})});
         const data=await r.json().catch(()=>({}));
-        if(!r.ok)throw new Error(data.error||'Không tạo được flashcard');
+        if(!r.ok)throw new Error(data.error||`Không tạo được flashcard (HTTP ${r.status}).`);
         questions=normalizeGenerated(data.flashcards||data.questions);
         if(!questions.length)throw new Error('AI không tìm thấy từ/cụm từ hợp lệ trong tài liệu.');
       }else{
-        const r=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:file.name,mimeType:file.type,documentText,fileData:'',subject,difficulty,questionCount,types})});
+        const first=files[0];
+        let fileData='';
+        if(source.media[0]?.data)fileData=source.media[0].data;
+        const r=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:files.map(f=>f.name).join(' + '),mimeType:first?.type||'',documentText:source.documentText,fileData,subject,difficulty,questionCount,types})});
         const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Không tạo được đề');
         questions=normalizeGenerated(data.questions);if(!questions.length)throw new Error('AI không trả về nội dung.');
       }
 
       await loadSupabase();
       const {error}=await db.from('exams').insert({title,subject,difficulty,duration:flashcardOnly?0:duration,question_count:questions.length,questions,status:'active'});if(error)throw error;
-      if(msg)msg.textContent=flashcardOnly?`✅ Đã tạo ${questions.length} flashcard — mỗi từ/cụm từ là một thẻ 2 mặt.`:`✅ Đã tạo ${questions.length} nội dung (${types.map(x=>LABELS[x]||x).join(' + ')}) và lưu thành công.`;
+      if(msg)msg.textContent=flashcardOnly?`✅ Đã tạo ${questions.length} flashcard từ ${files.length} file — mỗi từ/cụm từ là một thẻ 2 mặt.`:`✅ Đã tạo ${questions.length} nội dung (${types.map(x=>LABELS[x]||x).join(' + ')}) và lưu thành công.`;
       document.getElementById('title').value='';document.getElementById('file').value='';
       if(typeof renderTests==='function')await renderTests();if(typeof loadDashboard==='function')loadDashboard();
-    }catch(e){console.error(e);if(msg)msg.textContent='❌ '+(e.message||e)}
+    }catch(e){
+      console.error('STUDY flashcard/exam creation:',e);
+      const detail=e?.message||String(e);
+      if(msg)msg.textContent='❌ '+detail;
+    }
   }
 
   function decorateTestList(){

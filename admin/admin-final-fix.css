@@ -1,0 +1,77 @@
+/* Admin-only support messenger layout fix. Scoped to #support so STUDY TH client UI is untouched. */
+#support .messenger {
+  display: grid !important;
+  grid-template-columns: 330px minmax(0, 1fr) !important;
+  height: min(690px, calc(100dvh - 205px)) !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+#support .conversation {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+}
+
+#support #chatHeader {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+}
+
+#support #supportMessages {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain !important;
+}
+
+#support #replyForm {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 20 !important;
+}
+
+#support #replyForm:not(.hidden) {
+  display: flex !important;
+}
+
+#support #replyInput {
+  min-width: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 650px) {
+  #support .messenger {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 112px minmax(0, 1fr) !important;
+    height: calc(var(--admin-vh, 100dvh) - 245px) !important;
+    min-height: 0 !important;
+  }
+
+  #support .conversation-list {
+    height: 112px !important;
+    max-height: 112px !important;
+  }
+
+  #support .conversation {
+    grid-row: 2 !important;
+    min-height: 0 !important;
+  }
+
+  #support #replyForm {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+  }
+
+  #support #replyInput {
+    min-height: 48px !important;
+    max-height: 120px !important;
+  }
+}

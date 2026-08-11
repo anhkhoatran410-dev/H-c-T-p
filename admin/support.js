@@ -97,3 +97,14 @@ async function startAdminSupportRealtime(){
 }
 
 startAdminSupportRealtime();
+
+/* Load the final Admin UX layer after the existing support/admin code. */
+(function(){
+  if(window.__studyAdminUxLoader)return;window.__studyAdminUxLoader=true;
+  const s=document.createElement("script");
+  s.src="/admin/ux-admin-v2.js?v=20260811-1";
+  s.defer=true;
+  s.onload=()=>console.log("STUDY Admin UX v2 loaded");
+  s.onerror=e=>console.warn("Admin UX v2 failed to load",e);
+  document.head.appendChild(s);
+})();

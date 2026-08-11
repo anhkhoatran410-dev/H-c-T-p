@@ -1,116 +1,20 @@
-let adminSupportThread=null;
-let adminSupportRealtime=null;
-let adminSupportPoll=null;
-
-const originalOpenTab=window.openTab;
-window.openTab=async function(id){
-  originalOpenTab(id);
-  if(id==="history")await loadAdminHistory();
-  if(id==="support"){
-    await loadSupportThreads();
-    startAdminSupportRealtime();
-  }
-};
-
-async function loadAdminHistory(){
-  const box=document.getElementById("historyList");
-  if(!box)return;
-  try{
-    await loadSupabase();
-    const {data,error}=await db.from("user_attempts").select("*").order("created_at",{ascending:false}).limit(200);
-    if(error)throw error;
-    const rows=data||[];
-    box.innerHTML=rows.length?rows.map(r=>`<div class="test"><div><b>${esc(r.student_name||"Không tên")}</b><p>${esc(r.exam_title||"—")} · ${Number(r.score||0)}% · ${Number(r.correct||0)}/${Number(r.total||0)} câu</p><small class="muted">Thiết bị ${esc(String(r.device_id||"").slice(0,8))} · ${r.created_at?new Date(r.created_at).toLocaleString("vi-VN"):"—"}</small></div><span class="badge">${Array.isArray(r.wrong_indexes)&&r.wrong_indexes.length?`Sai ${r.wrong_indexes.length}`:"Đúng hết"}</span></div>`).join(""):"Chưa có lịch sử mới.";
-  }catch(e){box.textContent="Không đọc được lịch sử: "+e.message}
-}
-
-async function loadSupportThreads(){
-  const box=document.getElementById("supportThreads");
-  if(!box)return;
-  try{
-    await loadSupabase();
-    const {data,error}=await db.from("support_threads").select("*").order("updated_at",{ascending:false});
-    if(error)throw error;
-    const rows=data||[];
-    box.innerHTML=rows.length?rows.map(t=>`<button class="test" style="width:100%;text-align:left;border:0;cursor:pointer" onclick="openSupportThread('${t.id}')"><div><b>${esc(t.student_name||"Người dùng")}</b><p>Mã thiết bị: ${esc(String(t.device_id||"").slice(0,8))}</p></div><span class="badge">${esc(t.status||"open")}</span></button>`).join(""):`<div><p class="muted">Chưa có cuộc trò chuyện nào.</p><p class="muted">Mở trang học sinh → <b>Hỗ trợ</b> → gửi một tin nhắn. Cuộc trò chuyện sẽ xuất hiện tự động.</p></div>`;
-  }catch(e){box.innerHTML=`<div class="danger-text">Không đọc được tin nhắn hỗ trợ: ${esc(e.message)}<br><small>Hãy chạy migration <b>20260810_support_chat_fix.sql</b> trong Supabase SQL Editor.</small></div>`}
-}
-
-async function openSupportThread(id){
-  adminSupportThread=id;
-  const box=document.getElementById("supportChat");
-  try{
-    await loadSupabase();
-    const {data,error}=await db.from("support_messages").select("*").eq("thread_id",id).order("created_at",{ascending:true});
-    if(error)throw error;
-    box.innerHTML=`<div style="max-height:420px;overflow:auto">${(data||[]).map(m=>`<div style="padding:10px;margin:8px 0;border-radius:10px;background:${m.sender==="admin"?"#eef6ff":"#f5f5f5"}"><b>${m.sender==="admin"?"Admin":"Người dùng"}</b><div>${esc(m.message)}</div><small class="muted">${new Date(m.created_at).toLocaleString("vi-VN")}</small></div>`).join("")||"<p class='muted'>Chưa có tin nhắn.</p>"}</div><div style="display:flex;gap:8px;margin-top:12px"><input id="adminSupportInput" placeholder="Nhập trả lời..."><button class="primary" onclick="sendAdminReply()">Trả lời</button></div>`;
-  }catch(e){box.innerHTML=`<div class="danger-text">Không mở được cuộc trò chuyện: ${esc(e.message)}</div>`}
-}
-
-async function sendAdminReply(){
-  const input=document.getElementById("adminSupportInput");
-  const text=input?.value.trim();
-  if(!text||!adminSupportThread)return;
-  try{
-    await loadSupabase();
-    const {error}=await db.from("support_messages").insert({thread_id:adminSupportThread,sender:"admin",message:text});
-    if(error)throw error;
-    const {error:updateError}=await db.from("support_threads").update({updated_at:new Date().toISOString(),status:"open"}).eq("id",adminSupportThread);
-    if(updateError)throw updateError;
-    input.value="";
-    await openSupportThread(adminSupportThread);
-    await loadSupportThreads();
-  }catch(e){alert("Không gửi được trả lời: "+e.message)}
-}
-
-function stopAdminSupportRealtime(){
-  if(adminSupportRealtime&&db){db.removeChannel(adminSupportRealtime).catch(()=>{});adminSupportRealtime=null;}
-  clearInterval(adminSupportPoll);
-  adminSupportPoll=null;
-}
-
-async function startAdminSupportRealtime(){
-  try{
-    await loadSupabase();
-    if(adminSupportRealtime)db.removeChannel(adminSupportRealtime).catch(()=>{});
-    adminSupportRealtime=db.channel("admin-support-live")
-      .on("postgres_changes",{event:"INSERT",schema:"public",table:"support_messages"},async payload=>{
-        if(document.getElementById("support")?.classList.contains("active")){
-          if(adminSupportThread&&String(payload.new.thread_id)===String(adminSupportThread))await openSupportThread(adminSupportThread);
-          await loadSupportThreads();
-        }
-      })
-      .on("postgres_changes",{event:"UPDATE",schema:"public",table:"support_threads"},async()=>{
-        if(document.getElementById("support")?.classList.contains("active"))await loadSupportThreads();
-      })
-      .subscribe(status=>console.log("Admin support realtime:",status));
-
-    clearInterval(adminSupportPoll);
-    adminSupportPoll=setInterval(async()=>{
-      if(!document.getElementById("support")?.classList.contains("active"))return;
-      await loadSupportThreads();
-      if(adminSupportThread)await openSupportThread(adminSupportThread);
-    },1500);
-  }catch(e){
-    console.warn("Admin support realtime unavailable:",e);
-  }
-}
-
-startAdminSupportRealtime();
-
-/* Load the final Admin UX layer after the existing support/admin code. */
+/* STUDY TH — authoritative Admin support messenger. */
 (function(){
-  if(window.__studyAdminV8Loader)return;window.__studyAdminV8Loader=true;
-  var v8=document.createElement("script");
-  v8.src="/admin-support-force-v7.js?v=20260811-2";
-  v8.defer=true;
-  v8.onload=function(){console.log("STUDY Admin support V8 loaded")};
-  v8.onerror=function(e){console.warn("STUDY Admin support V8 failed to load",e)};
-  document.head.appendChild(v8);
-  var ux=document.createElement("script");
-  ux.src="/admin/ux-admin-v2.js?v=20260811-2";
-  ux.defer=true;
-  ux.onload=function(){console.log("STUDY Admin UX v2 loaded")};
-  ux.onerror=function(e){console.warn("STUDY Admin UX v2 failed to load",e)};
-  document.head.appendChild(ux);
+'use strict';
+if(window.__studyAdminSupportV3)return;window.__studyAdminSupportV3=true;
+var adminSupportThread=null,adminSupportRealtime=null,adminSupportPoll=null,loadingThread=false,sendingReply=false;
+function escText(v){return typeof window.esc==='function'?window.esc(v):String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]})}
+function supportActive(){var x=document.getElementById('support');return !!(x&&x.classList.contains('active'))}
+async function dbReady(){if(typeof window.loadSupabase!=='function')throw new Error('Supabase chưa sẵn sàng.');await window.loadSupabase();if(!window.db)throw new Error('Supabase chưa sẵn sàng.');return window.db}
+async function loadSupportThreads(){var box=document.getElementById('supportThreads');if(!box)return;try{var d=await dbReady(),r=await d.from('support_threads').select('*').order('updated_at',{ascending:false});if(r.error)throw r.error;var rows=r.data||[];box.innerHTML=rows.length?rows.map(function(t){return '<button type="button" class="test thread" data-support-thread="'+escText(t.id)+'" style="width:100%;text-align:left;border:0;cursor:pointer"><div><b>'+escText(t.student_name||'Người dùng')+'</b><p>'+escText(t.last_message||('Thiết bị '+String(t.device_id||'').slice(0,8)))+'</p></div><span class="badge">'+(Number(t.unread_admin||0)>0?'● ':'')+escText(t.status||'open')+'</span></button>'}).join(''):'<div class="empty-chat"><span>💬</span><b>Chưa có cuộc trò chuyện</b><small>Người học gửi tin nhắn sẽ xuất hiện ở đây.</small></div>';box.querySelectorAll('[data-support-thread]').forEach(function(b){b.onclick=function(){openSupportThread(b.getAttribute('data-support-thread'))}})}catch(e){box.innerHTML='<div class="danger-text">Không đọc được hỗ trợ: '+escText(e&&e.message||e)+'</div>'}}
+function renderMessages(rows){var box=document.getElementById('supportMessages'),head=document.getElementById('chatHeader');if(!box)return;if(head&&adminSupportThread)head.innerHTML='<div><b>💬 Hỗ trợ trực tiếp</b><small>Đang trò chuyện với người học</small></div>';box.innerHTML=(rows||[]).map(function(m){var mine=m.sender==='admin';var media=m.attachment_url?'<div><a href="'+escText(m.attachment_url)+'" target="_blank" rel="noopener">📎 '+escText(m.attachment_name||'Tệp đính kèm')+'</a></div>':'';return '<div class="message '+(mine?'mine':'theirs')+'" data-message-id="'+escText(m.id||'')+'"><div class="support-bubble"><b>'+(mine?'Admin':m.sender==='bot'?'Bot':'Người dùng')+'</b><div>'+escText(m.message||'')+'</div>'+media+(m.sticker?'<div style="font-size:32px">'+escText(m.sticker)+'</div>':'')+'<small>'+escText(m.created_at?new Date(m.created_at).toLocaleString('vi-VN'):'')+'</small></div></div>'}).join('')||'<div class="empty-chat"><span>💬</span><b>Chưa có tin nhắn</b></div>';requestAnimationFrame(function(){box.scrollTop=box.scrollHeight})}
+async function openSupportThread(id){if(loadingThread)return;loadingThread=true;adminSupportThread=id;try{var d=await dbReady(),r=await d.from('support_messages').select('*').eq('thread_id',id).order('created_at',{ascending:true});if(r.error)throw r.error;renderMessages(r.data||[]);await d.from('support_threads').update({unread_admin:0}).eq('id',id)}catch(e){var box=document.getElementById('supportMessages');if(box)box.innerHTML='<div class="danger-text">Không mở được cuộc trò chuyện: '+escText(e&&e.message||e)+'</div>'}finally{loadingThread=false}}
+async function sendAdminReply(){if(sendingReply||!adminSupportThread)return;var input=document.getElementById('replyInput'),text=input&&input.value.trim();if(!text)return;sendingReply=true;if(input)input.disabled=true;var btn=document.querySelector('#replyForm .send-btn');if(btn)btn.disabled=true;try{var d=await dbReady(),r=await d.from('support_messages').insert({thread_id:adminSupportThread,sender:'admin',message:text,bot_handled:false}).select('*').single();if(r.error)throw r.error;await openSupportThread(adminSupportThread);await loadSupportThreads();if(input)input.value=''}catch(e){alert('Không gửi được trả lời: '+(e&&e.message||e))}finally{sendingReply=false;if(input)input.disabled=false;if(btn)btn.disabled=false}}
+window.sendAdminReply=sendAdminReply;
+function bindComposer(){var form=document.getElementById('replyForm');if(!form||form.dataset.studySupportBound)return;form.dataset.studySupportBound='1';form.addEventListener('submit',function(e){e.preventDefault();e.stopImmediatePropagation();sendAdminReply()},true);var input=document.getElementById('replyInput');if(input)input.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();sendAdminReply()}},true)}
+function stopRealtime(){if(adminSupportRealtime&&window.db){window.db.removeChannel(adminSupportRealtime).catch(function(){});adminSupportRealtime=null}clearInterval(adminSupportPoll);adminSupportPoll=null}
+async function startAdminSupportRealtime(){try{var d=await dbReady();if(adminSupportRealtime)return;adminSupportRealtime=d.channel('admin-support-stable-v3').on('postgres_changes',{event:'INSERT',schema:'public',table:'support_messages'},function(p){if(!supportActive())return;if(adminSupportThread&&String(p.new.thread_id)===String(adminSupportThread))openSupportThread(adminSupportThread);loadSupportThreads()}).on('postgres_changes',{event:'UPDATE',schema:'public',table:'support_threads'},function(p){if(!supportActive())return;loadSupportThreads();if(adminSupportThread&&String(p.new.id)===String(adminSupportThread))openSupportThread(adminSupportThread)}).subscribe(function(status){console.log('STUDY Admin support realtime:',status)});clearInterval(adminSupportPoll);adminSupportPoll=setInterval(function(){if(!supportActive())return;loadSupportThreads();if(adminSupportThread)openSupportThread(adminSupportThread)},10000)}catch(e){console.warn('Admin support realtime unavailable:',e)}}
+function hookTabs(){if(typeof window.openTab!=='function'||window.openTab.__studySupportV3){if(typeof window.openTab==='function'){var native=window.openTab;var wrapped=function(id){var r=native.apply(this,arguments);if(id==='support')setTimeout(function(){bindComposer();loadSupportThreads();startAdminSupportRealtime()},0);return r};wrapped.__studySupportV3=true;window.openTab=wrapped}}}
+function boot(){bindComposer();hookTabs();if(supportActive()){loadSupportThreads();startAdminSupportRealtime()}}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();var tries=0,timer=setInterval(function(){hookTabs();bindComposer();if(supportActive())startAdminSupportRealtime();if(++tries>30)clearInterval(timer)},500);
 })();

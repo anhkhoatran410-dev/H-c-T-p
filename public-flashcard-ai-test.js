@@ -1,20 +1,134 @@
-/* STUDY TH — Flashcard -> AI vocabulary test bridge (v2) */
+/* STUDY TH — Flashcard -> Test độ nhớ (v3)
+   Flashcard is a separate learning stage.
+   When the learner finishes a flashcard-only lesson, inject a "Test độ nhớ" button.
+   The test is generated from the exact flashcards just learned; it is NOT an existing exam lookup.
+*/
 (function(){
-  if(window.__studyFlashcardAiTestV2)return;
-  window.__studyFlashcardAiTestV2=true;
-  var active=null, originalStart=null, observer=null;
-  function S(){return window.state||null}
+  if(window.__studyFlashcardAiTestV3)return;
+  window.__studyFlashcardAiTestV3=true;
+
   function esc(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-  function cards(exam){return (exam&&Array.isArray(exam.questions)?exam.questions:[]).filter(function(q){return q&&String(q.type||'').toLowerCase()==='flashcard'&&(q.front||q.term)})}
-  function isFC(exam){var c=cards(exam);return c.length>0&&c.length===(exam.questions||[]).length}
-  function style(){if(document.getElementById('study-fc-ai-style'))return;var s=document.createElement('style');s.id='study-fc-ai-style';s.textContent='.study-fc-wrap{max-width:980px;margin:0 auto}.study-fc-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.study-fc-count{display:inline-flex;border-radius:999px;padding:8px 14px;background:#eef2ff;color:#4338ca;font-weight:800}.study-fc-card{min-height:330px;border:1px solid #e2e8f0;border-radius:24px;background:linear-gradient(145deg,#fff,#f8fafc);display:flex;align-items:center;justify-content:center;text-align:center;padding:34px;box-shadow:0 12px 40px rgba(15,23,42,.08);cursor:pointer}.study-fc-card.is-back{background:linear-gradient(145deg,#eef2ff,#f8fafc)}.study-fc-label{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#64748b;margin-bottom:12px}.study-fc-front{font-size:clamp(34px,6vw,58px);font-weight:900;color:#0f172a;line-height:1.15}.study-fc-back{font-size:clamp(22px,4vw,34px);font-weight:800;color:#1e293b;line-height:1.35}.study-fc-meta{margin-top:12px;color:#64748b;font-size:15px;line-height:1.55}.study-fc-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:18px}.study-fc-progress{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin:18px 0}.study-fc-progress>span{display:block;height:100%;background:#6366f1;border-radius:999px}.study-fc-done{text-align:center;padding:38px 18px}.study-test-btn{border:0;border-radius:14px;padding:12px 18px;background:#4f46e5;color:#fff;font-weight:850;cursor:pointer}.study-test-btn.secondary{background:#eef2ff;color:#3730a3}.study-test-btn:disabled{opacity:.6;cursor:wait}.study-fc-note{margin-top:14px;color:#64748b;font-size:14px}';document.head.appendChild(s)}
-  function shell(body){var app=document.getElementById('app');if(!app||!active)return;var title=active.exam.title||'Flashcard từ vựng';app.innerHTML='<main class="container"><div class="card study-fc-wrap"><div class="study-fc-head"><div><div class="muted">🇬🇧 TIẾNG ANH · FLASHCARD</div><h1 style="margin:.35rem 0">'+esc(title)+'</h1></div><span class="study-fc-count" id="studyFcCount"></span></div>'+body+'</div></main>'}
-  function render(){style();if(!active)return;if(active.done)return done();var q=active.cards[active.i];if(!q){active.done=true;return done()}var front=String(q.front||q.term||''),back=String(q.back||q.definition||''),phon=String(q.phonetic||q.pronunciation||''),example=String(q.example||'');var content=active.flip?'<div><div class="study-fc-label">Nghĩa / ghi chú</div><div class="study-fc-back">'+esc(back)+'</div>'+(phon?'<div class="study-fc-meta">🔊 '+esc(phon)+'</div>':'')+(example?'<div class="study-fc-meta">Ví dụ: '+esc(example)+'</div>':'')+'</div>':'<div><div class="study-fc-label">Từ / cụm từ</div><div class="study-fc-front">'+esc(front)+'</div><div class="study-fc-meta">Chạm vào thẻ để xem nghĩa</div></div>';shell('<div class="study-fc-progress"><span style="width:'+Math.round(active.i/active.cards.length*100)+'%"></span></div><div class="study-fc-card '+(active.flip?'is-back':'')+'" id="studyFcCard">'+content+'</div><div class="study-fc-actions"><button type="button" class="study-test-btn secondary" id="studyFcFlip">↻ '+(active.flip?'Xem lại từ':'Lật thẻ')+'</button><button type="button" class="study-test-btn" id="studyFcNext">'+(active.i===active.cards.length-1?'Hoàn thành':'Từ tiếp theo')+' →</button></div><p class="study-fc-note" style="text-align:center">Thẻ '+(active.i+1)+' / '+active.cards.length+'</p>');document.getElementById('studyFcCount').textContent=(active.i+1)+' / '+active.cards.length;document.getElementById('studyFcCard').onclick=function(){active.flip=!active.flip;render()};document.getElementById('studyFcFlip').onclick=function(){active.flip=!active.flip;render()};document.getElementById('studyFcNext').onclick=function(){active.i++;active.flip=false;if(active.i>=active.cards.length)active.done=true;render()}}
-  function done(){shell('<div class="study-fc-done"><div style="font-size:56px">🎉</div><div class="muted">ĐÃ HOÀN THÀNH</div><h2>Bạn đã học hết '+active.cards.length+' flashcard</h2><p class="muted">Bạn vừa học xong bộ từ vựng này. Bây giờ có thể làm một bài <b>test độ nhớ bài</b> do AI tạo lại từ chính các từ vừa học.</p><div class="study-fc-actions"><button type="button" class="study-test-btn" id="studyMakeVocabTest">📝 Làm bài test</button><button type="button" class="study-test-btn secondary" id="studyFcRestart">↻ Ôn lại</button><button type="button" class="study-test-btn secondary" id="studyFcHome">← Về trang chủ</button></div><div id="studyVocabStatus" class="study-fc-note"></div></div>');var count=document.getElementById('studyFcCount');if(count)count.textContent='✓ Hoàn thành';var make=document.getElementById('studyMakeVocabTest');if(make)make.onclick=makeTest;var restart=document.getElementById('studyFcRestart');if(restart)restart.onclick=function(){active.i=0;active.flip=false;active.done=false;active.generating=false;render()};var home=document.getElementById('studyFcHome');if(home)home.onclick=function(){active=null;if(typeof window.go==='function')window.go('home');else location.reload()}}
-  function source(){return active.cards.map(function(q,i){return ['Từ/cụm từ '+(i+1)+': '+String(q.front||q.term||''),'Nghĩa: '+String(q.back||q.definition||''),q.phonetic?'Phiên âm: '+q.phonetic:'',q.example?'Ví dụ: '+q.example:''].filter(Boolean).join('\n')}).join('\n\n')}
-  async function makeTest(){if(active.generating)return;active.generating=true;var b=document.getElementById('studyMakeVocabTest'),st=document.getElementById('studyVocabStatus');if(b){b.disabled=true;b.textContent='⏳ AI đang tạo bài test...'}if(st)st.textContent='AI đang lấy lại '+active.cards.length+' từ/cụm từ vừa học...';try{var count=Math.min(15,active.cards.length);var extra='\n\nYÊU CẦU ĐẶC BIỆT:\n- Chỉ kiểm tra các từ/cụm từ có trong danh sách nguồn. Không thêm từ ngoài danh sách.\n- Tất cả câu là trắc nghiệm 4 lựa chọn, đúng một đáp án.\n- Có thể hỏi nghĩa Việt, chọn từ theo nghĩa, hoặc chọn nghĩa theo từ.\n- Ưu tiên phủ đều các từ/cụm từ.\n';var r=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:'flashcard-vocabulary-source.txt',mimeType:'text/plain',fileData:'',subject:'Tiếng Anh',difficulty:'Trung bình',questionCount:count,types:['mcq'],documentText:source()+extra})});var d=await r.json().catch(function(){return {}});if(!r.ok)throw new Error(d.error||'Không tạo được bài test');var qs=Array.isArray(d.questions)?d.questions:[];if(!qs.length)throw new Error('AI không trả về câu hỏi');await window.loadSupabase();var exam={title:'Test độ nhớ · '+(active.exam.title||'Flashcard'),subject:'Tiếng Anh',difficulty:'Trung bình',duration:15,question_count:qs.length,questions:qs,status:'active'};var ins=await window.db.from('exams').insert(exam).select().single();if(ins.error)throw ins.error;if(st)st.textContent='✅ Đã tạo '+qs.length+' câu từ đúng bộ từ vựng này. Đang mở bài test...';setTimeout(function(){if(typeof window.startExam==='function')window.startExam(ins.data.id)},250)}catch(e){console.error('flashcard AI test',e);if(st)st.textContent='❌ '+(e.message||e);if(b){b.disabled=false;b.textContent='📝 Làm bài test'}active.generating=false}}
-  function patch(){if(typeof window.startExam!=='function'||window.startExam.__studyFcWrappedV2)return;originalStart=window.startExam;window.startExam=function(id){var list=Array.isArray(window.exams)?window.exams:[];var exam=list.find(function(e){return String(e.id)===String(id)});if(exam&&isFC(exam)){active={exam:exam,cards:cards(exam),i:0,flip:false,done:false,generating:false};var s=S();if(s){s.exam=exam;s.answers={};s.page='flashcard';clearInterval(s.timer)}render();return}return originalStart.apply(this,arguments)};window.startExam.__studyFcWrappedV2=true}
-  function watch(){style();patch();if(observer)return;var root=document.getElementById('app');if(root){observer=new MutationObserver(function(){if(active&&active.done&&!document.getElementById('studyMakeVocabTest'))render();else if(!active)patch()});observer.observe(root,{childList:true,subtree:true})}}
-  function boot(){setTimeout(watch,100);setTimeout(watch,600);setTimeout(watch,1500)}
-  window.addEventListener('study-app-loaded',boot);if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+  function getState(){return window.state||null}
+  function getCards(){
+    var s=getState(), e=s&&s.exam;
+    var qs=e&&Array.isArray(e.questions)?e.questions:[];
+    return qs.filter(function(q){return q&&String(q.type||'').toLowerCase()==='flashcard'&&String(q.front||q.term||'').trim()&&String(q.back||q.definition||q.answer||'').trim()});
+  }
+  function sourceText(cards){
+    return cards.map(function(q,i){
+      return ['Từ/cụm từ '+(i+1)+': '+String(q.front||q.term||'').trim(),'Nghĩa: '+String(q.back||q.definition||q.answer||'').trim(),q.phonetic?'Phiên âm: '+q.phonetic:'',q.example?'Ví dụ: '+q.example:''].filter(Boolean).join('\n');
+    }).join('\n\n');
+  }
+  function shuffle(a){
+    a=a.slice();
+    for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}
+    return a;
+  }
+  function localQuestions(cards){
+    var out=[];
+    cards.forEach(function(card,i){
+      var front=String(card.front||card.term||'').trim();
+      var back=String(card.back||card.definition||card.answer||'').trim();
+      var others=cards.filter(function(_,j){return j!==i});
+      if(others.length>=3){
+        var meanings=shuffle(others).slice(0,3).map(function(q){return String(q.back||q.definition||q.answer||'').trim()});
+        var opts=shuffle([back].concat(meanings));
+        out.push({type:'mcq',q:'Từ "'+front+'" có nghĩa gần đúng là gì?',opts:opts,a:opts.indexOf(back),explanation:'Đáp án được lấy từ chính bộ từ vựng bạn vừa học.'});
+        var words=shuffle(others).slice(0,3).map(function(q){return String(q.front||q.term||'').trim()});
+        var opts2=shuffle([front].concat(words));
+        out.push({type:'mcq',q:'Từ nào tương ứng với nghĩa "'+back+'"?',opts:opts2,a:opts2.indexOf(front),explanation:'Câu hỏi kiểm tra nhớ từ dựa trên đúng bộ flashcard vừa học.'});
+      }else{
+        out.push({type:'mcq',q:'Từ "'+front+'" có nghĩa là gì?',opts:[back,'Chưa xác định','Không có trong bài','Một đáp án khác'],a:0,explanation:'Bộ flashcard quá ít để tạo đủ phương án nhiễu tự nhiên; đáp án đúng vẫn lấy trực tiếp từ thẻ.'});
+      }
+    });
+    return shuffle(out).slice(0,15);
+  }
+  function addExamToMemory(exam){
+    try{
+      if(Array.isArray(window.exams)){
+        var idx=window.exams.findIndex(function(e){return String(e.id)===String(exam.id)});
+        if(idx<0)window.exams.push(exam);else window.exams[idx]=exam;
+      }
+    }catch(_){ }
+  }
+  function startGeneratedExam(exam){
+    var s=getState();if(!s)return;
+    addExamToMemory(exam);
+    s.exam=exam;
+    s.answers={};
+    s.startedAt=Date.now();
+    s.flashIndex=0;
+    s.flashFlipped=false;
+    s.studyStage='quiz';
+    s.page='exam';
+    if(typeof window.render==='function')window.render();
+    setTimeout(function(){
+      if(typeof window.startTimer==='function')window.startTimer();
+    },50);
+  }
+  function status(text){var x=document.getElementById('studyVocabStatus');if(x)x.textContent=text}
+  function button(){return document.getElementById('studyMakeVocabTest')}
+  function inject(){
+    var finish=document.querySelector('.study-flash-finish');
+    var cards=getCards();
+    if(!finish||!cards.length)return;
+    if(button())return;
+    var actions=finish.querySelector('.study-finish-actions')||finish;
+    var b=document.createElement('button');
+    b.type='button';b.className='btn study-go-quiz';b.id='studyMakeVocabTest';b.textContent='📝 Test độ nhớ bài';
+    actions.insertBefore(b,actions.firstChild);
+    var st=document.createElement('div');st.id='studyVocabStatus';st.className='muted';st.style.marginTop='14px';st.style.textAlign='center';finish.appendChild(st);
+    b.onclick=makeTest;
+  }
+  function style(){
+    if(document.getElementById('study-fc-ai-test-style'))return;
+    var s=document.createElement('style');s.id='study-fc-ai-test-style';s.textContent='.study-fc-ai-loading{opacity:.65;pointer-events:none}.study-flash-finish #studyMakeVocabTest{min-width:180px}';document.head.appendChild(s);
+  }
+  async function makeTest(){
+    var b=button(),cards=getCards();
+    if(!b||!cards.length)return;
+    b.disabled=true;b.classList.add('study-fc-ai-loading');b.textContent='⏳ Đang tạo bài test...';
+    status('Đang lấy lại '+cards.length+' từ/cụm từ vừa học để tạo bài kiểm tra.');
+    var qs=[];
+    try{
+      var count=Math.min(15,Math.max(4,cards.length));
+      var prompt=sourceText(cards)+'\n\nYÊU CẦU ĐẶC BIỆT:\n- Chỉ sử dụng từ/cụm từ và nghĩa có trong danh sách nguồn.\n- Tạo đúng dạng trắc nghiệm 4 lựa chọn, mỗi câu chỉ có 1 đáp án đúng.\n- Có thể hỏi nghĩa của từ hoặc cho nghĩa rồi chọn từ.\n- Không được thêm kiến thức/từ vựng ngoài danh sách.\n- Ưu tiên phủ đều các từ vừa học.\n';
+      var r=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:'flashcard-vocabulary-source.txt',mimeType:'text/plain',fileData:'',subject:'Tiếng Anh',difficulty:'Trung bình',questionCount:count,types:['mcq'],documentText:prompt})});
+      var d=await r.json().catch(function(){return {}});
+      if(r.ok&&Array.isArray(d.questions)&&d.questions.length)qs=d.questions.filter(function(q){return q&&String(q.type||'mcq')==='mcq'&&Array.isArray(q.opts)&&q.opts.length>=4&&q.q});
+      if(!qs.length){
+        qs=localQuestions(cards);
+        if(!qs.length)throw new Error(d.error||'Không đủ dữ liệu để tạo bài test từ bộ từ vựng này.');
+        status('⚠️ AI đang hết quota/không phản hồi. Đã tạo bài test dự phòng trực tiếp từ đúng các flashcard vừa học.');
+      }
+      var id=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('vocab-test-'+Date.now());
+      var exam={id:id,title:'Test độ nhớ · '+String(getState().exam?.title||'Flashcard'),subject:'Tiếng Anh',difficulty:'Trung bình',duration:15,question_count:qs.length,questions:qs,status:'active'};
+      try{
+        if(typeof window.loadSupabase==='function')await window.loadSupabase();
+        if(window.db&&typeof window.db.from==='function'){
+          var ins=await window.db.from('exams').insert(exam).select().single();
+          if(!ins.error&&ins.data){exam=ins.data;addExamToMemory(exam)}
+        }
+      }catch(dbErr){console.warn('Không lưu bài test AI, vẫn cho làm bài:',dbErr)}
+      status('✅ Đã tạo '+qs.length+' câu từ đúng bộ từ vựng vừa học.');
+      setTimeout(function(){startGeneratedExam(exam)},150);
+    }catch(e){
+      console.error('Flashcard test generation:',e);
+      status('❌ '+(e&&e.message||e));
+      b.disabled=false;b.classList.remove('study-fc-ai-loading');b.textContent='📝 Test độ nhớ bài';
+    }
+  }
+  function watch(){
+    style();inject();
+    var root=document.getElementById('app');
+    if(root&&!root.__studyFcTestObserver){
+      var ob=new MutationObserver(function(){inject()});
+      ob.observe(root,{childList:true,subtree:true});
+      root.__studyFcTestObserver=ob;
+    }
+    setTimeout(inject,100);setTimeout(inject,500);setTimeout(inject,1500);
+  }
+  function boot(){watch()}
+  window.addEventListener('study-app-loaded',function(){setTimeout(boot,0);setTimeout(boot,800)});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

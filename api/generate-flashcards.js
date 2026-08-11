@@ -14,6 +14,19 @@ export default async function handler(req, res) {
     return raw;
   }
 
+  // Gemini sometimes reports a valid-looking browser Base64 string as invalid
+  // when the payload contains copied data-URL/padding artifacts. Decode and
+  // re-encode on the server so Gemini receives canonical Base64 bytes.
+  function canonicalBase64(value) {
+    const normalized = normalizeBase64(value);
+    if (!normalized) return "";
+    const bytes = Buffer.from(normalized, "base64");
+    if (!bytes.length) throw new Error("Dữ liệu ảnh/PDF rỗng hoặc bị hỏng.");
+    const canonical = bytes.toString("base64");
+    if (!canonical || canonical.length < 16) throw new Error("Dữ liệu ảnh/PDF quá ngắn hoặc bị hỏng.");
+    return canonical;
+  }
+
   try {
     const { fileName, mimeType = "", mimeTypes = [], documentText = "", fileData = [], subject = "Tiếng Anh" } = req.body || {};
     const text = String(documentText || "").slice(0, 120000).trim();
@@ -26,7 +39,7 @@ export default async function handler(req, res) {
       const match = raw.match(/^data:([^;]+);base64,/is);
       const mime = String(imageMimes[index] || match?.[1] || mimeType || "application/octet-stream")
         .toLowerCase().split(";")[0].trim();
-      const data = normalizeBase64(raw);
+      const data = canonicalBase64(raw);
       return { mime, data };
     }).filter(Boolean).filter(x => /^(image\/(png|jpe?g|webp|gif|bmp)|application\/pdf)$/i.test(x.mime));
 
@@ -34,9 +47,9 @@ export default async function handler(req, res) {
 
     // Vercel Functions have a 4.5 MB request-body limit. Base64 expands the file,
     // so keep the raw media comfortably below that limit.
-    const totalBytes = media.reduce((sum, x) => sum + Math.floor((x.data.length * 3) / 4), 0);
+    const totalBytes = media.reduce((sum, x) => Math.floor((x.data.length * 3) / 4), 0);
     if (totalBytes > 3 * 1024 * 1024) {
-      return res.status(413).json({ error: "PDF/ảnh này quá lớn để gửi qua Vercel trực tiếp (giới hạn an toàn khoảng 3 MB). Hãy chọn file nhẹ hơn. PDF chữ có thể được đọc từ text; PDF scan lớn cần cơ chế upload trực tiếp." });
+      return res.status(413).json({ error: "PDF/ảnh này quá lớn để gửi qua Vercel trực tiếp (giới hạn an toàn khoảng 3 MB). Hãy chọn file nhẹ hơn. PDF scan lớn cần cơ chế upload trực tiếp." });
     }
 
     const prompt = `
@@ -96,8 +109,6 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
       "gemini-2.0-flash-lite"
     ]);
 
-    // Flashcard is a document-extraction workload, so prefer Flash-Lite.
-    // If GEMINI_MODEL is explicitly configured, keep it as the second option.
     const models = ["gemini-3.5-flash-lite", configuredModel, "gemini-3.6-flash", "gemini-2.5-flash"]
       .filter(m => m && !retired.has(m))
       .filter((m, i, a) => a.indexOf(m) === i);
@@ -140,8 +151,6 @@ ${text ? `\nNỘI DUNG TEXT ĐÃ TRÍCH XUẤT:\n${text}` : ""}
       } catch (e) {
         lastError = e;
         const status = Number(e?.status || 0);
-        // 429 can be model-specific. Try the next model once; do not retry the
-        // same model repeatedly because that only burns quota.
         if (![400, 404, 429].includes(status)) break;
       }
     }

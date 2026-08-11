@@ -1,46 +1,12 @@
-/* STUDY TH runtime finalizer: compatibility hardening only. The final support messenger owns submit + realtime. */
+/* STUDY TH runtime finalizer: compatibility hardening + AI composer Enter fix. */
 (function(){
-  'use strict';
-  function closePickers(){document.querySelectorAll('.support-picker,.admin-reply-picker').forEach(function(x){x.classList.add('hidden')})}
-  function hardenText(){
-    if(document.getElementById('study-runtime-final-style'))return;
-    var s=document.createElement('style');s.id='study-runtime-final-style';s.textContent='.support-bubble,.support-bubble div,.message,.attempt-question,.attempt-answer{overflow-wrap:anywhere;word-break:break-word;white-space:normal}.support-bubble{line-height:1.6}.support-picker.hidden,.admin-reply-picker.hidden{display:none!important}@media(max-width:650px){.support-bubble{max-width:92%!important}.attempt-answer{display:block!important}.attempt-answer b{display:block;margin-top:3px}}';document.head.appendChild(s)
-  }
-  function dedupePublicDom(){
-    var list=document.querySelector('.support-message-list');if(!list)return;
-    var seen=new Set();
-    Array.from(list.children).forEach(function(row){
-      var bubble=row.querySelector('.support-bubble')||row.querySelector('.bubble');
-      if(!bubble)return;
-      var msg=(bubble.querySelector('div')?.textContent||row.textContent||'').replace(/\s+/g,' ').trim();
-      var sender=String(bubble.className||'').replace(/\s+/g,' ');
-      var stamp=(bubble.querySelector('small')?.textContent||'').trim();
-      var key=sender+'|'+msg+'|'+stamp;
-      if(!msg||seen.has(key)){if(msg)row.remove();return}seen.add(key);
-    });
-  }
-  function guardSend(){
-    if(typeof window.sendSupport!=='function'||window.sendSupport.__studyGuard)return;
-    var original=window.sendSupport;
-    var guarded=async function(){
-      var s=window.state||window.studyState;if(!s||s.__supportSending)return;
-      s.__supportSending=true;
-      var btn=document.querySelector('.support-composer .send-btn,.support-shell .send-btn');
-      if(btn)btn.disabled=true;
-      try{return await original.apply(this,arguments)}finally{setTimeout(function(){s.__supportSending=false;if(btn)btn.disabled=false},0)}
-    };
-    guarded.__studyGuard=true;window.sendSupport=guarded;
-  }
-  function install(){
-    if(!window.state&&!window.studyState)return;
-    hardenText();closePickers();guardSend();dedupePublicDom();
-    window.toggleSupportPicker=function(id){var t=document.getElementById(id);if(!t)return;document.querySelectorAll('.support-picker').forEach(function(x){if(x!==t)x.classList.add('hidden')});t.classList.toggle('hidden')};
-    window.sendSticker=async function(sticker){closePickers();try{if(typeof window.sendSupportMessage!=='function')throw new Error('Hỗ trợ chưa sẵn sàng.');await window.sendSupportMessage({sticker:String(sticker||''),message:'✨ Sticker'})}catch(e){alert('Không gửi được sticker: '+(e&&e.message||e))}};
-    window.insertSupportEmoji=function(value){var input=document.getElementById('supportInput');if(!input)return;input.value+=(input.value?' ':'')+String(value||'');closePickers();input.focus()};
-  }
-  function boot(){install();}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
-  window.addEventListener('study-app-loaded',function(){setTimeout(install,50)});
-  var tries=0,timer=setInterval(function(){install();if(++tries>80)clearInterval(timer)},250);
-  new MutationObserver(function(){dedupePublicDom();guardSend()}).observe(document.documentElement,{childList:true,subtree:true});
+'use strict';
+function closePickers(){document.querySelectorAll('.support-picker,.admin-reply-picker').forEach(function(x){x.classList.add('hidden')})}
+function hardenText(){if(document.getElementById('study-runtime-final-style'))return;var s=document.createElement('style');s.id='study-runtime-final-style';s.textContent='.support-bubble,.support-bubble div,.message,.attempt-question,.attempt-answer{overflow-wrap:anywhere;word-break:break-word;white-space:normal}.support-bubble{line-height:1.6}.support-picker.hidden,.admin-reply-picker.hidden{display:none!important}@media(max-width:650px){.support-bubble{max-width:92%!important}.attempt-answer{display:block!important}.attempt-answer b{display:block;margin-top:3px}}';document.head.appendChild(s)}
+function dedupePublicDom(){var list=document.querySelector('.support-message-list');if(!list)return;var seen=new Set();Array.from(list.children).forEach(function(row){var bubble=row.querySelector('.support-bubble')||row.querySelector('.bubble');if(!bubble)return;var msg=(bubble.querySelector('div')?.textContent||row.textContent||'').replace(/\s+/g,' ').trim();var sender=String(bubble.className||'').replace(/\s+/g,' ');var stamp=(bubble.querySelector('small')?.textContent||'').trim();var key=sender+'|'+msg+'|'+stamp;if(!msg||seen.has(key)){if(msg)row.remove();return}seen.add(key)})}
+function guardSend(){if(typeof window.sendSupport!=='function'||window.sendSupport.__studyGuard)return;var original=window.sendSupport;var guarded=async function(){var s=window.state||window.studyState;if(!s||s.__supportSending)return;s.__supportSending=true;var btn=document.querySelector('.support-composer .send-btn,.support-shell .send-btn');if(btn)btn.disabled=true;try{return await original.apply(this,arguments)}finally{setTimeout(function(){s.__supportSending=false;if(btn)btn.disabled=false},0)}};guarded.__studyGuard=true;window.sendSupport=guarded}
+function installAiEnter(){var modal=document.getElementById('study-ai-support');if(!modal)return;var form=modal.querySelector('#studyAiForm'),ta=form&&form.querySelector('textarea');if(!form||!ta||ta.dataset.studyAiEnter)return;ta.dataset.studyAiEnter='1';ta.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();if(typeof form.requestSubmit==='function')form.requestSubmit();else form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}))}},true)}
+function install(){if(!window.state&&!window.studyState)return;hardenText();closePickers();guardSend();dedupePublicDom();installAiEnter();window.toggleSupportPicker=function(id){var t=document.getElementById(id);if(!t)return;document.querySelectorAll('.support-picker').forEach(function(x){if(x!==t)x.classList.add('hidden')});t.classList.toggle('hidden')};window.sendSticker=async function(sticker){closePickers();try{if(typeof window.sendSupportMessage!=='function')throw new Error('Hỗ trợ chưa sẵn sàng.');await window.sendSupportMessage({sticker:String(sticker||''),message:'✨ Sticker'})}catch(e){alert('Không gửi được sticker: '+(e&&e.message||e))}};window.insertSupportEmoji=function(value){var input=document.getElementById('supportInput');if(!input)return;input.value+=(input.value?' ':'')+String(value||'');closePickers();input.focus()}}
+function boot(){install()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();window.addEventListener('study-app-loaded',function(){setTimeout(install,50)});var tries=0,timer=setInterval(function(){install();if(++tries>80)clearInterval(timer)},250);new MutationObserver(function(){dedupePublicDom();guardSend();installAiEnter()}).observe(document.documentElement,{childList:true,subtree:true});
 })();

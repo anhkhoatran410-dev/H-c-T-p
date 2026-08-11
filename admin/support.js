@@ -100,11 +100,17 @@ startAdminSupportRealtime();
 
 /* Load the final Admin UX layer after the existing support/admin code. */
 (function(){
-  if(window.__studyAdminUxLoader)return;window.__studyAdminUxLoader=true;
-  const s=document.createElement("script");
-  s.src="/admin/ux-admin-v2.js?v=20260811-1";
-  s.defer=true;
-  s.onload=()=>console.log("STUDY Admin UX v2 loaded");
-  s.onerror=e=>console.warn("Admin UX v2 failed to load",e);
-  document.head.appendChild(s);
+  if(window.__studyAdminV8Loader)return;window.__studyAdminV8Loader=true;
+  var v8=document.createElement("script");
+  v8.src="/admin-support-force-v7.js?v=20260811-2";
+  v8.defer=true;
+  v8.onload=function(){console.log("STUDY Admin support V8 loaded")};
+  v8.onerror=function(e){console.warn("STUDY Admin support V8 failed to load",e)};
+  document.head.appendChild(v8);
+  var ux=document.createElement("script");
+  ux.src="/admin/ux-admin-v2.js?v=20260811-2";
+  ux.defer=true;
+  ux.onload=function(){console.log("STUDY Admin UX v2 loaded")};
+  ux.onerror=function(e){console.warn("STUDY Admin UX v2 failed to load",e)};
+  document.head.appendChild(ux);
 })();

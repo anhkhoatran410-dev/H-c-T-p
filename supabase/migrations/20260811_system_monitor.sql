@@ -25,7 +25,10 @@ alter table public.system_control enable row level security;
 alter table public.system_incidents enable row level security;
 drop policy if exists system_control_public_read on public.system_control;
 create policy system_control_public_read on public.system_control for select using (true);
+drop policy if exists system_control_admin_update on public.system_control;
+create policy system_control_admin_update on public.system_control for update using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists system_control_admin_insert on public.system_control;
+create policy system_control_admin_insert on public.system_control for insert with check (auth.role() = 'authenticated');
 drop policy if exists system_incidents_admin_read on public.system_incidents;
 create policy system_incidents_admin_read on public.system_incidents for select using (auth.role() = 'authenticated');
-
 notify pgrst, 'reload schema';

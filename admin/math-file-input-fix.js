@@ -1,20 +1,22 @@
-/* STUDY TH — preserve original PDF/image/DOCX bytes for Gemini math extraction. */
+/* STUDY TH — exam creator hardening: multi-file selection + AI combination instruction + flashcard-safe upload. */
 (function(){
-  if(window.__studyMathFileInputFix)return;
-  window.__studyMathFileInputFix=true;
-  const MAX_BYTES=3*1024*1024;
+  'use strict';
+  if(window.__studyExamInputFixV2)return;
+  window.__studyExamInputFixV2=true;
+  const MAX_FILE_BYTES=3*1024*1024, MAX_FILES=8;
+  let picked=[];
+  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function input(){return document.getElementById('file')||document.querySelector('#tests input[type=file]')}
+  function key(f){return [f.name,f.size,f.lastModified].join('|')}
+  function sync(el){try{const dt=new DataTransfer();picked.slice(0,MAX_FILES).forEach(f=>dt.items.add(f));el.files=dt.files}catch(e){console.warn('multi-file sync',e)}}
+  function render(el){let box=document.getElementById('studyExamSelectedFiles');if(!box){box=document.createElement('div');box.id='studyExamSelectedFiles';box.className='study-exam-selected-files';el.parentNode&&el.parentNode.insertBefore(box,el.nextSibling)}box.innerHTML=picked.map((f,i)=>`<div class="study-exam-file-chip"><span>📄 ${esc(f.name)}</span><button type="button" data-i="${i}" aria-label="Xóa file">×</button></div>`).join('');box.querySelectorAll('button').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();picked.splice(Number(b.dataset.i),1);sync(el);render(el);updateInstruction()});updateInstruction()}
+  function ensureInstruction(){const el=input();if(!el)return null;let box=document.getElementById('studyExamCombineBox');if(box)return box;box=document.createElement('div');box.id='studyExamCombineBox';box.className='study-exam-combine-box';box.innerHTML='<div class="study-exam-combine-head"><span>🤖</span><div><strong>Yêu cầu AI khi kết hợp tài liệu</strong><small>Ghi Unit, tỷ lệ hoặc chủ đề bạn muốn AI ưu tiên.</small></div></div><textarea id="studyExamCombineInstruction" rows="3" placeholder="Ví dụ: Kết hợp từ vựng Unit 1 và Unit 2, lấy Unit 1 70% và Unit 2 30%."></textarea>';const parent=el.closest('form')||el.parentNode;parent&&parent.appendChild(box);return box}
+  function updateInstruction(){const el=input();if(!el)return;const box=ensureInstruction();if(box)box.style.display=picked.length>1?'block':'none'}
+  function forceMultiple(){const el=input();if(!el||el.__studyMulti)return;el.__studyMulti=true;el.multiple=true;el.setAttribute('multiple','multiple');el.addEventListener('change',()=>{const incoming=Array.from(el.files||[]),seen=new Set(picked.map(key));incoming.forEach(f=>{if(!seen.has(key(f))&&picked.length<MAX_FILES){picked.push(f);seen.add(key(f))}});sync(el);render(el)});ensureInstruction();render(el)}
   function dataUrl(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||''));r.onerror=()=>reject(r.error||new Error('Không đọc được file'));r.readAsDataURL(file)})}
   const originalFetch=window.fetch.bind(window);
-  window.fetch=async function(input,init){
-    const url=typeof input==='string'?input:(input&&input.url)||'';
-    if(!/\/api\/generate-exam(?:\?|$)/.test(url)||!init||typeof init.body!=='string')return originalFetch(input,init);
-    try{
-      const body=JSON.parse(init.body),file=document.getElementById('file')?.files?.[0];
-      if(file&&!body.fileData&&file.size<=MAX_BYTES){
-        body.fileData=await dataUrl(file);body.mimeType=file.type||body.mimeType||'application/octet-stream';body.__sourceFileVision=true;
-        init={...init,body:JSON.stringify(body),headers:{...(init.headers||{}),'Content-Type':'application/json'}};
-      }
-    }catch(e){console.warn('Math file input fix:',e)}
-    return originalFetch(input,init);
-  };
+  window.fetch=async function(req,init){const url=typeof req==='string'?req:(req&&req.url)||'';if(!/\/api\/generate-exam(?:\?|$)/.test(url)||!init||typeof init.body!=='string')return originalFetch(req,init);try{const body=JSON.parse(init.body),el=input(),files=(picked.length?picked:Array.from(el?.files||[])).slice(0,MAX_FILES),media=[];for(const file of files){if(file.size>MAX_FILE_BYTES){console.warn('File quá lớn để gửi trực tiếp:',file.name);continue}const raw=(await dataUrl(file)).replace(/^data:[^;]+;base64,/,'');if(raw)media.push({data:raw,mimeType:file.type||'application/octet-stream',name:file.name})}if(media.length){body.media=media;body.fileData=media[0].data;body.fileName=files[0].name;body.mimeType=media[0].mimeType;body.__sourceFileVision=true;body.sourceFileCount=files.length}const instruction=document.getElementById('studyExamCombineInstruction');if(instruction&&instruction.value.trim())body.userInstruction=instruction.value.trim();init={...init,body:JSON.stringify(body),headers:{...(init.headers||{}),'Content-Type':'application/json'}}}catch(e){console.warn('Study exam multi-file fix:',e)}return originalFetch(req,init)};
+  function css(){if(document.getElementById('study-exam-multi-file-style'))return;const s=document.createElement('style');s.id='study-exam-multi-file-style';s.textContent=`.study-exam-selected-files{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.study-exam-file-chip{display:flex;align-items:center;gap:8px;max-width:100%;padding:8px 10px;border:1px solid var(--line,#e4e8f0);border-radius:12px;background:var(--panel,#fff);font-size:12px}.study-exam-file-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:280px}.study-exam-file-chip button{border:0;background:transparent;cursor:pointer;font-size:17px;opacity:.65}.study-exam-combine-box{display:none;margin:12px 0;padding:14px;border:1px solid rgba(124,92,255,.25);border-radius:16px;background:linear-gradient(135deg,rgba(124,92,255,.08),rgba(96,165,250,.06))}.study-exam-combine-head{display:flex;gap:10px}.study-exam-combine-head>span{font-size:22px}.study-exam-combine-head strong{display:block;font-size:13px}.study-exam-combine-head small{display:block;margin-top:3px;opacity:.68}.study-exam-combine-box textarea{width:100%;margin-top:10px;box-sizing:border-box;border:1px solid var(--line,#e4e8f0);border-radius:12px;padding:11px;background:var(--panel,#fff);font:inherit;resize:vertical;min-height:78px}@media(max-width:650px){.study-exam-file-chip span{max-width:210px}}`;document.head.appendChild(s)}
+  function boot(){css();forceMultiple();setTimeout(forceMultiple,300);setTimeout(forceMultiple,1000)}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();new MutationObserver(()=>{css();forceMultiple()}).observe(document.body,{childList:true,subtree:true});
 })();

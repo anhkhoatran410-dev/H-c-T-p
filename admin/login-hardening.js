@@ -1,7 +1,4 @@
-/* STUDY Admin — login hardening.
- * This is the final, single-purpose login guard. It must never depend on
- * Supabase or the rest of the Admin app being ready before authentication.
- */
+/* STUDY Admin — authoritative, non-blocking login guard. */
 (function () {
   'use strict';
 
@@ -18,20 +15,55 @@
     box.classList.toggle('success-text', !!ok);
   }
 
+  function restoreInteractivity() {
+    const screen = $('adminLogin');
+    const card = screen?.querySelector('.login-card');
+    const form = $('loginForm');
+    const input = $('adminPassword');
+    const button = form?.querySelector('button[type="submit"]');
+
+    if (!screen || !form || !input || !button) return false;
+
+    // A previous enhancement/boot error must never leave the login layer
+    // covered, disabled, or unable to receive pointer/keyboard events.
+    screen.style.position = 'fixed';
+    screen.style.inset = '0';
+    screen.style.zIndex = '2147483000';
+    screen.style.pointerEvents = 'auto';
+    if (card) {
+      card.style.position = 'relative';
+      card.style.zIndex = '2147483001';
+      card.style.pointerEvents = 'auto';
+    }
+    form.style.pointerEvents = 'auto';
+    input.style.pointerEvents = 'auto';
+    input.disabled = false;
+    input.readOnly = false;
+    button.style.pointerEvents = 'auto';
+    button.disabled = false;
+    return true;
+  }
+
   function busy(value) {
     const form = $('loginForm');
     const input = $('adminPassword');
     const button = form && form.querySelector('button[type="submit"]');
-    if (input) input.disabled = value;
+    if (input) {
+      input.disabled = value;
+      input.readOnly = false;
+      input.style.pointerEvents = 'auto';
+    }
     if (button) {
       button.disabled = value;
       button.textContent = value ? '⏳ Đang xác thực…' : '🔐 Đăng nhập';
-      button.style.pointerEvents = value ? 'none' : '';
+      button.style.pointerEvents = value ? 'none' : 'auto';
     }
   }
 
   async function authenticate() {
     if (submitting) return;
+    restoreInteractivity();
+
     const input = $('adminPassword');
     const password = String(input?.value || '');
     if (!password) {
@@ -69,12 +101,10 @@
       sessionStorage.setItem(TOKEN_KEY, data.token);
       message('✅ Đăng nhập thành công.', true);
 
-      // Switch screens immediately. Do not wait for Supabase, realtime,
-      // Copilot, exam builder, or any optional enhancement module.
       $('adminLogin')?.classList.add('hidden');
       $('adminApp')?.classList.remove('hidden');
 
-      // Boot optional Admin data without allowing a boot error to block login.
+      // Optional Admin boot is deliberately non-blocking.
       try {
         if (typeof window.bootAdmin === 'function') {
           await Promise.race([
@@ -92,18 +122,23 @@
       } else {
         message(`❌ ${error?.message || 'Đăng nhập thất bại.'}`);
       }
+      restoreInteractivity();
     } finally {
       clearTimeout(timer);
       submitting = false;
       busy(false);
+      restoreInteractivity();
     }
   }
 
   function install() {
     const form = $('loginForm');
     const button = form?.querySelector('button[type="submit"]');
-    if (!form || !button || form.dataset.loginHardeningV2 === '1') return;
-    form.dataset.loginHardeningV2 = '1';
+    const input = $('adminPassword');
+    if (!form || !button || !input || form.dataset.loginHardeningV3 === '1') return;
+    form.dataset.loginHardeningV3 = '1';
+
+    restoreInteractivity();
 
     // Capture-phase handler wins over legacy handlers from older fixes.
     form.addEventListener('submit', function (event) {
@@ -117,10 +152,21 @@
       event.stopImmediatePropagation();
       authenticate();
     }, true);
+
+    input.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        authenticate();
+      }
+    }, true);
+
+    // If another script later toggles disabled/overlay state, recover it.
+    window.setTimeout(restoreInteractivity, 0);
+    window.setTimeout(restoreInteractivity, 300);
+    window.setTimeout(restoreInteractivity, 1000);
   }
 
   function ready() {
-    // Run immediately when possible and once again after DOMContentLoaded.
     install();
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', install, { once: true });

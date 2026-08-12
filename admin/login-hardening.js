@@ -1,12 +1,12 @@
-/* STUDY Admin — authoritative, non-blocking login guard. */
+/* STUDY Admin — final login guard: auth first, boot never blocks login. */
 (function () {
   'use strict';
 
   const TOKEN_KEY = 'study_admin_session_v2';
-  const TIMEOUT_MS = 7000;
+  const LOGIN_TIMEOUT_MS = 8000;
   let submitting = false;
 
-  function $(id) { return document.getElementById(id); }
+  const $ = id => document.getElementById(id);
 
   function message(text, ok) {
     const box = $('loginMsg');
@@ -15,17 +15,14 @@
     box.classList.toggle('success-text', !!ok);
   }
 
-  function restoreInteractivity() {
+  function repair() {
     const screen = $('adminLogin');
     const card = screen?.querySelector('.login-card');
     const form = $('loginForm');
     const input = $('adminPassword');
     const button = form?.querySelector('button[type="submit"]');
-
     if (!screen || !form || !input || !button) return false;
 
-    // A previous enhancement/boot error must never leave the login layer
-    // covered, disabled, or unable to receive pointer/keyboard events.
     screen.style.position = 'fixed';
     screen.style.inset = '0';
     screen.style.zIndex = '2147483000';
@@ -36,9 +33,9 @@
       card.style.pointerEvents = 'auto';
     }
     form.style.pointerEvents = 'auto';
-    input.style.pointerEvents = 'auto';
     input.disabled = false;
     input.readOnly = false;
+    input.style.pointerEvents = 'auto';
     button.style.pointerEvents = 'auto';
     button.disabled = false;
     return true;
@@ -47,7 +44,7 @@
   function busy(value) {
     const form = $('loginForm');
     const input = $('adminPassword');
-    const button = form && form.querySelector('button[type="submit"]');
+    const button = form?.querySelector('button[type="submit"]');
     if (input) {
       input.disabled = value;
       input.readOnly = false;
@@ -62,13 +59,12 @@
 
   async function authenticate() {
     if (submitting) return;
-    restoreInteractivity();
+    repair();
 
-    const input = $('adminPassword');
-    const password = String(input?.value || '');
+    const password = String($('adminPassword')?.value || '');
     if (!password) {
       message('⚠️ Vui lòng nhập mật khẩu Admin.');
-      input?.focus();
+      $('adminPassword')?.focus();
       return;
     }
 
@@ -77,12 +73,15 @@
     message('⏳ Đang xác thực…');
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), LOGIN_TIMEOUT_MS);
 
     try {
       const response = await fetch('/api/admin-login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({ password }),
         cache: 'no-store',
         credentials: 'same-origin',
@@ -96,38 +95,43 @@
       if (!response.ok) {
         throw new Error(data.error || `Đăng nhập thất bại (HTTP ${response.status})`);
       }
-      if (!data.token) throw new Error('Máy chủ không trả về session token.');
+      if (!data.token) {
+        throw new Error('Máy chủ đăng nhập không trả về session token.');
+      }
 
       sessionStorage.setItem(TOKEN_KEY, data.token);
       message('✅ Đăng nhập thành công.', true);
 
+      // IMPORTANT: do not await bootAdmin here. A Supabase/realtime/API
+      // problem must never make the login button look permanently loading.
       $('adminLogin')?.classList.add('hidden');
       $('adminApp')?.classList.remove('hidden');
 
-      // Optional Admin boot is deliberately non-blocking.
-      try {
-        if (typeof window.bootAdmin === 'function') {
-          await Promise.race([
-            Promise.resolve(window.bootAdmin()),
-            new Promise(resolve => setTimeout(resolve, 2500))
-          ]);
+      setTimeout(() => {
+        try {
+          if (typeof window.bootAdmin === 'function') {
+            Promise.resolve(window.bootAdmin()).catch(err => {
+              console.error('[STUDY Admin] boot error:', err);
+              message('⚠️ Đã đăng nhập. Một số dữ liệu quản trị đang tải lại.', true);
+            });
+          }
+        } catch (err) {
+          console.error('[STUDY Admin] boot error:', err);
         }
-      } catch (bootError) {
-        console.error('[STUDY Admin] non-blocking boot error:', bootError);
-      }
+      }, 0);
     } catch (error) {
       console.error('[STUDY Admin] login error:', error);
       if (error?.name === 'AbortError') {
-        message('⚠️ Máy chủ phản hồi quá lâu. Hãy thử lại sau vài giây.');
+        message('❌ Máy chủ đăng nhập không phản hồi sau 8 giây. Kiểm tra API /api/admin-login.');
       } else {
         message(`❌ ${error?.message || 'Đăng nhập thất bại.'}`);
       }
-      restoreInteractivity();
+      repair();
     } finally {
       clearTimeout(timer);
       submitting = false;
       busy(false);
-      restoreInteractivity();
+      repair();
     }
   }
 
@@ -135,43 +139,37 @@
     const form = $('loginForm');
     const button = form?.querySelector('button[type="submit"]');
     const input = $('adminPassword');
-    if (!form || !button || !input || form.dataset.loginHardeningV3 === '1') return;
-    form.dataset.loginHardeningV3 = '1';
+    if (!form || !button || !input || form.dataset.loginHardeningFinal === '1') return;
+    form.dataset.loginHardeningFinal = '1';
 
-    restoreInteractivity();
+    repair();
 
-    // Capture-phase handler wins over legacy handlers from older fixes.
-    form.addEventListener('submit', function (event) {
+    form.addEventListener('submit', event => {
       event.preventDefault();
       event.stopImmediatePropagation();
       authenticate();
     }, true);
 
-    button.addEventListener('click', function (event) {
+    button.addEventListener('click', event => {
       event.preventDefault();
       event.stopImmediatePropagation();
       authenticate();
     }, true);
 
-    input.addEventListener('keydown', function (event) {
+    input.addEventListener('keydown', event => {
       if (event.key === 'Enter') {
         event.preventDefault();
+        event.stopImmediatePropagation();
         authenticate();
       }
     }, true);
 
-    // If another script later toggles disabled/overlay state, recover it.
-    window.setTimeout(restoreInteractivity, 0);
-    window.setTimeout(restoreInteractivity, 300);
-    window.setTimeout(restoreInteractivity, 1000);
+    [0, 250, 1000, 3000].forEach(ms => setTimeout(repair, ms));
   }
 
-  function ready() {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', install, { once: true });
+  } else {
     install();
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', install, { once: true });
-    }
   }
-
-  ready();
 })();

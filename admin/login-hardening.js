@@ -1,44 +1,48 @@
-/* STUDY Admin — login hardening layer.
- * Loaded last so login remains usable even when another admin enhancement
- * script throws, hangs, or installs a competing submit handler.
+/* STUDY Admin — login hardening.
+ * This is the final, single-purpose login guard. It must never depend on
+ * Supabase or the rest of the Admin app being ready before authentication.
  */
 (function () {
   'use strict';
 
   const TOKEN_KEY = 'study_admin_session_v2';
-  const TIMEOUT_MS = 12000;
+  const TIMEOUT_MS = 7000;
+  let submitting = false;
 
   function $(id) { return document.getElementById(id); }
 
-  function setMessage(text, kind) {
+  function message(text, ok) {
     const box = $('loginMsg');
     if (!box) return;
     box.textContent = text || '';
-    box.classList.toggle('success-text', kind === 'success');
+    box.classList.toggle('success-text', !!ok);
   }
 
-  function setBusy(busy) {
+  function busy(value) {
     const form = $('loginForm');
     const input = $('adminPassword');
     const button = form && form.querySelector('button[type="submit"]');
-    if (input) input.disabled = busy;
+    if (input) input.disabled = value;
     if (button) {
-      button.disabled = busy;
-      button.textContent = busy ? '⏳ Đang đăng nhập…' : '🔐 Đăng nhập';
+      button.disabled = value;
+      button.textContent = value ? '⏳ Đang xác thực…' : '🔐 Đăng nhập';
+      button.style.pointerEvents = value ? 'none' : '';
     }
   }
 
-  async function login() {
+  async function authenticate() {
+    if (submitting) return;
     const input = $('adminPassword');
     const password = String(input?.value || '');
     if (!password) {
-      setMessage('Vui lòng nhập mật khẩu Admin.');
+      message('⚠️ Vui lòng nhập mật khẩu Admin.');
       input?.focus();
       return;
     }
 
-    setBusy(true);
-    setMessage('⏳ Đang kết nối máy chủ…');
+    submitting = true;
+    busy(true);
+    message('⏳ Đang xác thực…');
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -63,63 +67,65 @@
       if (!data.token) throw new Error('Máy chủ không trả về session token.');
 
       sessionStorage.setItem(TOKEN_KEY, data.token);
-      setMessage('✅ Đăng nhập thành công.', 'success');
+      message('✅ Đăng nhập thành công.', true);
 
-      const loginScreen = $('adminLogin');
-      const app = $('adminApp');
-      loginScreen?.classList.add('hidden');
-      app?.classList.remove('hidden');
+      // Switch screens immediately. Do not wait for Supabase, realtime,
+      // Copilot, exam builder, or any optional enhancement module.
+      $('adminLogin')?.classList.add('hidden');
+      $('adminApp')?.classList.remove('hidden');
 
-      // Boot the admin UI after the screen has switched. If a later module
-      // fails, the login itself is still successful and the app remains open.
+      // Boot optional Admin data without allowing a boot error to block login.
       try {
         if (typeof window.bootAdmin === 'function') {
-          await Promise.resolve(window.bootAdmin());
-        } else if (typeof window.showApp === 'function') {
-          await Promise.resolve(window.showApp());
+          await Promise.race([
+            Promise.resolve(window.bootAdmin()),
+            new Promise(resolve => setTimeout(resolve, 2500))
+          ]);
         }
       } catch (bootError) {
-        console.error('[STUDY Admin] boot error after login:', bootError);
-        setMessage('✅ Đã đăng nhập. Một số dữ liệu quản trị đang tải lại…', 'success');
+        console.error('[STUDY Admin] non-blocking boot error:', bootError);
       }
     } catch (error) {
+      console.error('[STUDY Admin] login error:', error);
       if (error?.name === 'AbortError') {
-        setMessage('⚠️ Máy chủ phản hồi quá lâu. Hãy thử lại sau vài giây.');
+        message('⚠️ Máy chủ phản hồi quá lâu. Hãy thử lại sau vài giây.');
       } else {
-        setMessage(error?.message || 'Đăng nhập thất bại.');
+        message(`❌ ${error?.message || 'Đăng nhập thất bại.'}`);
       }
     } finally {
       clearTimeout(timer);
-      setBusy(false);
+      submitting = false;
+      busy(false);
     }
   }
 
   function install() {
     const form = $('loginForm');
-    if (!form || form.dataset.loginHardening === '1') return;
-    form.dataset.loginHardening = '1';
+    const button = form?.querySelector('button[type="submit"]');
+    if (!form || !button || form.dataset.loginHardeningV2 === '1') return;
+    form.dataset.loginHardeningV2 = '1';
 
-    // Capture phase lets this handler win over older bubbling submit handlers.
+    // Capture-phase handler wins over legacy handlers from older fixes.
     form.addEventListener('submit', function (event) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      login();
+      authenticate();
     }, true);
 
-    // Also make the button itself reliable when a legacy form handler is broken.
-    const button = form.querySelector('button[type="submit"]');
-    if (button) {
-      button.addEventListener('click', function (event) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        login();
-      }, true);
+    button.addEventListener('click', function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      authenticate();
+    }, true);
+  }
+
+  function ready() {
+    // Run immediately when possible and once again after DOMContentLoaded.
+    install();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', install, { once: true });
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', install, { once: true });
-  } else {
-    install();
-  }
+  ready();
 })();

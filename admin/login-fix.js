@@ -1,33 +1,36 @@
-/* STUDY TH — legacy login shim. The hardened handler is authoritative. */
+/* STUDY TH — stable Admin login. One handler only; Admin boot starts after auth. */
 (function(){
   'use strict';
-  if (window.__studyLoginHardeningInstalled) return;
-
+  if(window.__studyStableLoginInstalled)return;
+  window.__studyStableLoginInstalled=true;
   function boot(){
-    if (window.__studyLoginHardeningInstalled) return;
-    const form=document.getElementById('loginForm');
-    if(!form||form.dataset.studyLoginFinal==='1')return;
-    form.dataset.studyLoginFinal='1';
+    var form=document.getElementById('loginForm');
+    if(!form||form.__stableBound)return;
+    form.__stableBound=true;
+    var input=document.getElementById('adminPassword');
+    var msg=document.getElementById('loginMsg');
+    var btn=form.querySelector('button[type="submit"]');
     form.onsubmit=async function(e){
       e.preventDefault();e.stopImmediatePropagation();
-      const input=document.getElementById('adminPassword'),msg=document.getElementById('loginMsg'),btn=form.querySelector('button[type="submit"]');
-      const password=String(input?.value||'');
-      if(!password){if(msg)msg.textContent='Vui lòng nhập mật khẩu Admin.';input?.focus();return false}
+      var password=String(input&&input.value||'');
+      if(!password){if(msg)msg.textContent='Vui lòng nhập mật khẩu Admin.';if(input)input.focus();return false}
       if(btn){btn.disabled=true;btn.textContent='⏳ Đang đăng nhập...'}
+      if(msg)msg.textContent='';
       try{
-        const r=await fetch('/api/admin-login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({password}),cache:'no-store',credentials:'same-origin'});
-        const text=await r.text();let data={};try{data=JSON.parse(text||'{}')}catch(_){ }
-        if(!r.ok)throw new Error(data.error||`Đăng nhập thất bại (HTTP ${r.status})`);
+        var r=await fetch('/api/admin-login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({password:password}),cache:'no-store',credentials:'same-origin'});
+        var text=await r.text(),data={};try{data=JSON.parse(text||'{}')}catch(_){ }
+        if(!r.ok)throw new Error(data.error||('Đăng nhập thất bại (HTTP '+r.status+')'));
         if(!data.token)throw new Error('Máy chủ không trả về session token.');
         sessionStorage.setItem('study_admin_session_v2',data.token);
-        document.getElementById('adminLogin')?.classList.add('hidden');
-        document.getElementById('adminApp')?.classList.remove('hidden');
-        if(typeof window.bootAdmin==='function')Promise.resolve(window.bootAdmin()).catch(console.error);
+        document.body.classList.add('admin-authenticated');
+        var login=document.getElementById('adminLogin'),app=document.getElementById('adminApp');
+        if(login)login.classList.add('hidden');if(app)app.classList.remove('hidden');
+        if(typeof window.bootAdmin==='function')await window.bootAdmin();
         else if(typeof window.showApp==='function')window.showApp();
-      }catch(err){if(msg)msg.textContent=err?.message||'Đăng nhập thất bại.'}
-      finally{if(btn){btn.disabled=false;btn.textContent='🔐 Đăng nhập'}input?.focus({preventScroll:true})}
+      }catch(err){if(msg)msg.textContent=err&&err.message?err.message:'Đăng nhập thất bại.'}
+      finally{if(btn){btn.disabled=false;btn.textContent='🔐 Đăng nhập'}if(input)input.focus({preventScroll:true})}
       return false;
     };
   }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

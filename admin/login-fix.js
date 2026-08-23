@@ -5,8 +5,12 @@
   window.__studyLoginBootstrap=true;
 
   const TOKEN_KEY='study_admin_session_v2';
-  const AFTER_LOGIN_SCRIPTS=[
-    'auth.js?v=20260810-1','app.js?v=20260810-4','media-fix.js?v=20260810-3','fix.js?v=20260810-1',
+  // app.js is the only critical Admin runtime. The other repair/enhancement
+  // modules must never be able to invalidate a successful authentication.
+  const CRITICAL_SCRIPT='auth.js?v=20260810-1';
+  const APP_SCRIPT='app.js?v=20260810-4';
+  const OPTIONAL_SCRIPTS=[
+    'media-fix.js?v=20260810-3','fix.js?v=20260810-1',
     'enhancements.js?v=20260810-1','final-fix.js?v=20260810-1','exam-save-fix.js?v=20260810-1',
     '/admin-media-fix.js?v=20260810-1','/admin-final-fix.js?v=20260810-1','admin-navigation-repair.js?v=20260811-1',
     'exam-builder-v2.js?v=20260812-2','exam-builder-v4-repair.js?v=20260812-4',
@@ -31,8 +35,13 @@
   }
 
   function setMessage(text){const el=$('loginMsg');if(el)el.textContent=text||'';}
+  function setAuthenticatedView(){
+    document.body.classList.add('admin-authenticated');
+    $('adminLogin')?.classList.add('hidden');
+    $('adminApp')?.classList.remove('hidden');
+  }
 
-  function loadScript(src,timeoutMs=15000){
+  function loadScript(src,timeoutMs=12000){
     return new Promise((resolve,reject)=>{
       const s=document.createElement('script');
       let done=false;
@@ -48,19 +57,42 @@
     if(window.__studyAdminStarted)return;
     window.__studyAdminStarted=true;
     try{
-      for(const src of AFTER_LOGIN_SCRIPTS) await loadScript(src);
-      document.body.classList.add('admin-authenticated');
-      $('adminLogin')?.classList.add('hidden');
-      $('adminApp')?.classList.remove('hidden');
-      if(typeof window.bootAdmin==='function') await Promise.resolve(window.bootAdmin());
-      else if(typeof window.showApp==='function') window.showApp();
+      // These two establish the Admin runtime. A failure here is a real
+      // bootstrap problem, but it still must not destroy the authenticated
+      // session or trap the user in the login screen.
+      await loadScript(CRITICAL_SCRIPT);
+      await loadScript(APP_SCRIPT);
+
+      // Show the authenticated shell as soon as the core runtime exists.
+      // Optional repair modules are isolated so one broken CDN/cache/module
+      // can never kick an already authenticated Admin back to login.
+      setAuthenticatedView();
+
+      const results=await Promise.allSettled(OPTIONAL_SCRIPTS.map(src=>loadScript(src)));
+      const failed=results.map((r,i)=>r.status==='rejected'?OPTIONAL_SCRIPTS[i]:null).filter(Boolean);
+      if(failed.length)console.warn('[STUDY Admin] optional modules skipped:',failed);
+
+      if(typeof window.bootAdmin==='function'){
+        try{await Promise.resolve(window.bootAdmin());}
+        catch(err){
+          console.error('[STUDY Admin] boot error (session preserved):',err);
+          // Do NOT revert to login. Authentication already succeeded.
+          // Keep the shell usable and let individual tabs report their own
+          // data errors instead of destroying the whole Admin session.
+        }
+      }else if(typeof window.showApp==='function'){
+        try{window.showApp();}catch(err){console.error('[STUDY Admin] showApp error:',err);}
+      }
     }catch(err){
       window.__studyAdminStarted=false;
-      console.error('[STUDY Admin] bootstrap error:',err);
-      $('adminLogin')?.classList.remove('hidden');
-      $('adminApp')?.classList.add('hidden');
-      setMessage('⚠️ Đăng nhập được nhưng không tải đủ Admin. Vui lòng thử lại.');
-      repairLogin();
+      console.error('[STUDY Admin] core bootstrap error (session preserved):',err);
+      // Authentication succeeded and the token is still valid. Never display
+      // the misleading "login failed" state merely because the UI runtime
+      // failed to boot. Keep the Admin shell visible and show a non-blocking
+      // message instead.
+      setAuthenticatedView();
+      const toast=$('toast');
+      if(toast){toast.textContent='⚠️ Admin đã đăng nhập nhưng một phần giao diện chưa tải. Hãy tải lại trang.';toast.classList.add('show');}
     }
   }
 

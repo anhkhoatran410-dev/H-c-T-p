@@ -85,13 +85,13 @@
       for(let i=0;i<selectedFiles.length;i++){
         const f=selectedFiles[i];status.textContent=`⏳ Đang đọc ${i+1}/${selectedFiles.length}: ${f.name}`;
         const text=await extract(f).catch(()=> '');if(text)texts.push(`\n===== NGUỒN ${i+1}: ${f.name} =====\n${text}`);
-        if(!text && /^(application\/pdf|image\/)/i.test(f.type||'')){const b64=await base64(f).catch(()=>null);if(b64)media.push({mimeType:f.type||'application/pdf',data:b64})}
+        if(/^(application\/pdf|image\/)/i.test(f.type||'')){const b64=await base64(f).catch(()=>null);if(b64)media.push({mimeType:f.type||'application/pdf',data:b64})}
       }
       let documentText=texts.join('\n');if(documentText.length>180000)documentText=documentText.slice(0,180000)+'\n[Đã giới hạn văn bản]';
       if(flash){
-        status.textContent='🤖 AI đang tạo bộ flashcard từ toàn bộ nguồn...';
+        status.textContent='🤖 AI đang đọc bố cục tài liệu và tạo bộ flashcard...';
         const r=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileData:media.map(x=>x.data),mimeTypes:media.map(x=>x.mimeType),fileName:selectedFiles.map(f=>f.name).join(', '),subject,documentText,userInstruction:instruction,sourceFiles:selectedFiles.map(f=>f.name),sourceCount:selectedFiles.length})});
-        const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Không tạo được flashcard.');const cards=Array.isArray(d.flashcards)?d.flashcards:(Array.isArray(d.questions)?d.questions:[]);if(!cards.length)throw new Error('AI không tạo được flashcard hợp lệ.');
+        const d=await r.json().catch(()=>({}));if(!r.ok){throw new Error(d.error||`AI endpoint trả HTTP ${r.status}.`)}const cards=Array.isArray(d.flashcards)?d.flashcards:(Array.isArray(d.questions)?d.questions:[]);if(!cards.length)throw new Error('AI không tạo được flashcard hợp lệ.');
         const client=await db();const row={title,subject,difficulty,duration:0,question_count:cards.length,questions:cards,status:'active',flashcard_only:true};const ins=await client.from('exams').insert(row).select().single();if(ins.error)throw ins.error;
         status.textContent=`✅ Đã tạo ${cards.length} flashcard từ ${selectedFiles.length} tài liệu và lưu thành công.`;
       }else{

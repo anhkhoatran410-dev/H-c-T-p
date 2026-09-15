@@ -12,7 +12,7 @@
   const $=id=>document.getElementById(id);
   const loaded=new Map();
   const moduleMap={
-    tests:['exam-save-fix.js?v=20260915-2','exam-builder-v2.js?v=20260915-2','exam-builder-v4-repair.js?v=20260915-2','exam-multi-source-flashcard-repair.js?v=20260915-2'],
+    tests:['exam-builder-v2.js?v=20260915-3'],
     support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]
   };
 

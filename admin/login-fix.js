@@ -5,139 +5,46 @@
   window.__studyLoginBootstrap=true;
 
   const TOKEN_KEY='study_admin_session_v2';
-  // app.js is the only critical Admin runtime. The other repair/enhancement
-  // modules must never be able to invalidate a successful authentication.
   const CRITICAL_SCRIPT='auth.js?v=20260810-1';
   const APP_SCRIPT='app.js?v=20260810-4';
   const OPTIONAL_SCRIPTS=[
     'media-fix.js?v=20260810-3','fix.js?v=20260810-1',
     'enhancements.js?v=20260810-1','final-fix.js?v=20260810-1','exam-save-fix.js?v=20260810-1',
     '/admin-media-fix.js?v=20260810-1','/admin-final-fix.js?v=20260810-1','admin-navigation-repair.js?v=20260811-1',
-    'exam-builder-v2.js?v=20260812-2','exam-builder-v4-repair.js?v=20260812-4',
+    'exam-builder-v2.js?v=20260812-2','exam-builder-v4-repair.js?v=20260915-1',
     'exam-multi-source-flashcard-repair.js?v=20260812-1'
   ];
-
   const $=id=>document.getElementById(id);
-
   function repairLogin(){
     const screen=$('adminLogin'),card=screen?.querySelector('.login-card'),form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');
     if(!screen||!form||!input||!btn)return;
-    screen.classList.remove('loading','is-loading');
-    screen.style.pointerEvents='auto';
-    screen.style.position='fixed';
-    screen.style.inset='0';
-    screen.style.zIndex='2147483000';
+    screen.classList.remove('loading','is-loading');screen.style.pointerEvents='auto';screen.style.position='fixed';screen.style.inset='0';screen.style.zIndex='2147483000';
     if(card){card.style.pointerEvents='auto';card.style.position='relative';card.style.zIndex='2147483001';}
-    form.style.pointerEvents='auto';
-    input.readOnly=false;
-    input.style.pointerEvents='auto';
-    if(!input.disabled)btn.style.pointerEvents='auto';
+    form.style.pointerEvents='auto';input.readOnly=false;input.style.pointerEvents='auto';if(!input.disabled)btn.style.pointerEvents='auto';
   }
-
   function setMessage(text){const el=$('loginMsg');if(el)el.textContent=text||'';}
-  function setAuthenticatedView(){
-    document.body.classList.add('admin-authenticated');
-    $('adminLogin')?.classList.add('hidden');
-    $('adminApp')?.classList.remove('hidden');
-  }
-
-  function loadScript(src,timeoutMs=12000){
-    return new Promise((resolve,reject)=>{
-      const s=document.createElement('script');
-      let done=false;
-      const timer=setTimeout(()=>{if(done)return;done=true;s.remove();reject(new Error('Module timeout: '+src));},timeoutMs);
-      s.src=src;s.async=false;
-      s.onload=()=>{if(done)return;done=true;clearTimeout(timer);resolve();};
-      s.onerror=()=>{if(done)return;done=true;clearTimeout(timer);reject(new Error('Không tải được Admin module: '+src));};
-      document.body.appendChild(s);
-    });
-  }
-
+  function setAuthenticatedView(){document.body.classList.add('admin-authenticated');$('adminLogin')?.classList.add('hidden');$('adminApp')?.classList.remove('hidden');}
+  function loadScript(src,timeoutMs=12000){return new Promise((resolve,reject)=>{const s=document.createElement('script');let done=false;const timer=setTimeout(()=>{if(done)return;done=true;s.remove();reject(new Error('Module timeout: '+src));},timeoutMs);s.src=src;s.async=false;s.onload=()=>{if(done)return;done=true;clearTimeout(timer);resolve();};s.onerror=()=>{if(done)return;done=true;clearTimeout(timer);reject(new Error('Không tải được Admin module: '+src));};document.body.appendChild(s);});}
   async function startAdmin(){
-    if(window.__studyAdminStarted)return;
-    window.__studyAdminStarted=true;
+    if(window.__studyAdminStarted)return;window.__studyAdminStarted=true;
     try{
-      // These two establish the Admin runtime. A failure here is a real
-      // bootstrap problem, but it still must not destroy the authenticated
-      // session or trap the user in the login screen.
-      await loadScript(CRITICAL_SCRIPT);
-      await loadScript(APP_SCRIPT);
-
-      // Show the authenticated shell as soon as the core runtime exists.
-      // Optional repair modules are isolated so one broken CDN/cache/module
-      // can never kick an already authenticated Admin back to login.
-      setAuthenticatedView();
-
+      await loadScript(CRITICAL_SCRIPT);await loadScript(APP_SCRIPT);setAuthenticatedView();
       const results=await Promise.allSettled(OPTIONAL_SCRIPTS.map(src=>loadScript(src)));
       const failed=results.map((r,i)=>r.status==='rejected'?OPTIONAL_SCRIPTS[i]:null).filter(Boolean);
       if(failed.length)console.warn('[STUDY Admin] optional modules skipped:',failed);
-
-      if(typeof window.bootAdmin==='function'){
-        try{await Promise.resolve(window.bootAdmin());}
-        catch(err){
-          console.error('[STUDY Admin] boot error (session preserved):',err);
-          // Do NOT revert to login. Authentication already succeeded.
-          // Keep the shell usable and let individual tabs report their own
-          // data errors instead of destroying the whole Admin session.
-        }
-      }else if(typeof window.showApp==='function'){
-        try{window.showApp();}catch(err){console.error('[STUDY Admin] showApp error:',err);}
-      }
-    }catch(err){
-      window.__studyAdminStarted=false;
-      console.error('[STUDY Admin] core bootstrap error (session preserved):',err);
-      // Authentication succeeded and the token is still valid. Never display
-      // the misleading "login failed" state merely because the UI runtime
-      // failed to boot. Keep the Admin shell visible and show a non-blocking
-      // message instead.
-      setAuthenticatedView();
-      const toast=$('toast');
-      if(toast){toast.textContent='⚠️ Admin đã đăng nhập nhưng một phần giao diện chưa tải. Hãy tải lại trang.';toast.classList.add('show');}
-    }
+      if(typeof window.bootAdmin==='function'){try{await Promise.resolve(window.bootAdmin());}catch(err){console.error('[STUDY Admin] boot error (session preserved):',err);}}
+      else if(typeof window.showApp==='function'){try{window.showApp();}catch(err){console.error('[STUDY Admin] showApp error:',err);}}
+    }catch(err){window.__studyAdminStarted=false;console.error('[STUDY Admin] core bootstrap error (session preserved):',err);setAuthenticatedView();const toast=$('toast');if(toast){toast.textContent='⚠️ Admin đã đăng nhập nhưng một phần giao diện chưa tải. Hãy tải lại trang.';toast.classList.add('show');}}
   }
-
   async function authenticate(event){
     if(event){event.preventDefault();event.stopImmediatePropagation();}
-    const form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');
-    if(!form||!input||form.__loginBusy)return;
-    form.__loginBusy=true;
-    repairLogin();
-    const password=String(input.value||'');
-    if(!password){setMessage('⚠️ Vui lòng nhập mật khẩu Admin.');form.__loginBusy=false;input.focus();return;}
-    btn.disabled=true;input.disabled=true;btn.textContent='⏳ Đang đăng nhập...';setMessage('');
-    const controller=new AbortController();
-    const timer=setTimeout(()=>controller.abort(),10000);
-    try{
-      const r=await fetch('/api/admin-login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({password}),cache:'no-store',credentials:'same-origin',signal:controller.signal});
-      const text=await r.text();
-      let data={};try{data=JSON.parse(text||'{}')}catch(_){ }
-      if(!r.ok)throw new Error(data.error||('Đăng nhập thất bại (HTTP '+r.status+')'));
-      if(!data.token)throw new Error('Máy chủ không trả về session token.');
-      sessionStorage.setItem(TOKEN_KEY,data.token);
-      await startAdmin();
-    }catch(err){
-      console.error('[STUDY Admin] login error:',err);
-      setMessage(err?.name==='AbortError'?'❌ Máy chủ đăng nhập không phản hồi sau 10 giây.':('❌ '+(err?.message||'Đăng nhập thất bại.')));
-    }finally{
-      clearTimeout(timer);
-      form.__loginBusy=false;
-      btn.disabled=false;input.disabled=false;btn.textContent='🔐 Đăng nhập';
-      repairLogin();
-      if(!$('adminLogin')?.classList.contains('hidden'))setTimeout(()=>input.focus({preventScroll:true}),0);
-    }
+    const form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');if(!form||!input||form.__loginBusy)return;
+    form.__loginBusy=true;repairLogin();const password=String(input.value||'');if(!password){setMessage('⚠️ Vui lòng nhập mật khẩu Admin.');form.__loginBusy=false;input.focus();return;}
+    btn.disabled=true;input.disabled=true;btn.textContent='⏳ Đang đăng nhập...';setMessage('');const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),10000);
+    try{const r=await fetch('/api/admin-login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({password}),cache:'no-store',credentials:'same-origin',signal:controller.signal});const text=await r.text();let data={};try{data=JSON.parse(text||'{}')}catch(_){}if(!r.ok)throw new Error(data.error||('Đăng nhập thất bại (HTTP '+r.status+')'));if(!data.token)throw new Error('Máy chủ không trả về session token.');sessionStorage.setItem(TOKEN_KEY,data.token);await startAdmin();}
+    catch(err){console.error('[STUDY Admin] login error:',err);setMessage(err?.name==='AbortError'?'❌ Máy chủ đăng nhập không phản hồi sau 10 giây.':('❌ '+(err?.message||'Đăng nhập thất bại.')))}
+    finally{clearTimeout(timer);form.__loginBusy=false;btn.disabled=false;input.disabled=false;btn.textContent='🔐 Đăng nhập';repairLogin();if(!$('adminLogin')?.classList.contains('hidden'))setTimeout(()=>input.focus({preventScroll:true}),0)}
   }
-
-  function bind(){
-    const form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');
-    if(!form||!input||!btn||form.__zeroLagBound)return;
-    form.__zeroLagBound=true;
-    repairLogin();
-    form.addEventListener('submit',authenticate,true);
-    btn.addEventListener('click',authenticate,true);
-    input.addEventListener('keydown',e=>{if(e.key==='Enter')authenticate(e)},true);
-    [0,100,500,1500,3000].forEach(ms=>setTimeout(repairLogin,ms));
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});
-  else bind();
+  function bind(){const form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');if(!form||!input||!btn||form.__zeroLagBound)return;form.__zeroLagBound=true;repairLogin();form.addEventListener('submit',authenticate,true);btn.addEventListener('click',authenticate,true);input.addEventListener('keydown',e=>{if(e.key==='Enter')authenticate(e)},true);[0,100,500,1500,3000].forEach(ms=>setTimeout(repairLogin,ms));}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
 })();

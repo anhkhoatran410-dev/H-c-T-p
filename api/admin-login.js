@@ -1,12 +1,18 @@
 import crypto from "node:crypto";
 
-const FALLBACK_PASSWORD = "0307";
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 8;
 const attempts = new Map();
 
+function configuredSecret(name){
+  return String(process.env[name] || "").trim();
+}
+
 function secret(){
-  return String(process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || FALLBACK_PASSWORD);
+  const sessionSecret = configuredSecret("ADMIN_SESSION_SECRET");
+  const password = configuredSecret("ADMIN_PASSWORD");
+  if(!sessionSecret && !password) throw new Error("ADMIN_SESSION_SECRET hoặc ADMIN_PASSWORD chưa được cấu hình trên Vercel.");
+  return sessionSecret || password;
 }
 
 function digest(value){
@@ -60,14 +66,24 @@ export default async function handler(req,res){
   if(now-entry.start > WINDOW_MS){entry.start=now;entry.count=0;}
   entry.count += 1;
   attempts.set(ip,entry);
-  if(entry.count > MAX_ATTEMPTS) return res.status(429).json({error:"Thử đăng nhập quá nhiều lần. Hãy đợi một phút."});
+  if(entry.count > MAX_ATTEMPTS){
+    res.setHeader("Retry-After", "60");
+    return res.status(429).json({error:"Thử đăng nhập quá nhiều lần. Hãy đợi một phút."});
+  }
 
   const body = readBody(req);
   const password = String(body.password || "");
-  const configured = String(process.env.ADMIN_PASSWORD || FALLBACK_PASSWORD);
+  const configured = configuredSecret("ADMIN_PASSWORD");
+  if(!configured) return res.status(500).json({error:"ADMIN_PASSWORD chưa được cấu hình trên Vercel."});
+
   const ok = digest(password) === digest(configured);
   if(!ok) return res.status(401).json({error:"Mật khẩu Admin không đúng."});
 
   attempts.delete(ip);
-  return res.status(200).json({ok:true,token:makeToken(),expiresIn:8*60*60});
+  try{
+    const token = makeToken();
+    return res.status(200).json({ok:true,token,expiresIn:8*60*60});
+  }catch(e){
+    return res.status(500).json({error:e.message || "Không tạo được phiên Admin."});
+  }
 }

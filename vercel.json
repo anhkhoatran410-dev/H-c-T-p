@@ -7,6 +7,7 @@
     { "source": "/api/admin-delete-exam", "destination": "/api/admin-tools?route=admin-delete-exam" },
     { "source": "/api/admin-delete-exams-bulk", "destination": "/api/admin-tools?route=admin-delete-exams-bulk" },
     { "source": "/api/admin-update-exam", "destination": "/api/admin-tools?route=admin-update-exam" },
-    { "source": "/api/client-meta", "destination": "/api/admin-tools?route=client-meta" }
+    { "source": "/api/client-meta", "destination": "/api/admin-tools?route=client-meta" },
+    { "source": "/api/system-incidents", "destination": "/api/system-control?route=incidents" }
   ]
 }

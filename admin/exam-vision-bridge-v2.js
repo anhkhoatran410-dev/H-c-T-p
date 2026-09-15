@@ -29,7 +29,7 @@
         if(files.length){fileData=await Promise.all(files.map(readAsDataURL));mimeTypes=files.map(f=>f.type||'application/octet-stream');fileNames=files.map(f=>f.name||'tài liệu')}
       }
       body.fileData=fileData;body.mimeTypes=mimeTypes;body.fileNames=fileNames;
-      return originalFetch('/api/generate-flashcards-vision',{...init,body:JSON.stringify(body)});
-    }catch(e){console.warn('[STUDY flashcard vision v2]',e);return originalFetch(input,init)}
+      return originalFetch('/api/generate-flashcards',{...init,body:JSON.stringify(body)});
+    }catch(e){console.warn('[STUDY flashcard bridge v3]',e);return originalFetch(input,init)}
   };
 })();

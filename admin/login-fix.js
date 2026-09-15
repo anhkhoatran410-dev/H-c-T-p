@@ -1,8 +1,8 @@
-/* STUDY TH — lightweight Admin bootstrap. Keep the core responsive; load feature modules only when needed. */
+/* STUDY TH — lightweight Admin bootstrap. */
 (function(){
   'use strict';
-  if(window.__studyLoginBootstrapV6)return;
-  window.__studyLoginBootstrapV6=true;
+  if(window.__studyLoginBootstrapV7)return;
+  window.__studyLoginBootstrapV7=true;
   const TOKEN_KEY='study_admin_session_v2';
   const CRITICAL_SCRIPT='auth.js?v=20260915-3';
   const APP_SCRIPT='app.js?v=20260915-3';
@@ -10,7 +10,7 @@
   const LOADERS={dashboard:'loadDashboard',support:'startSupportLive',participants:'loadParticipants',history:'loadHistory',tests:'renderTests',accounts:'loadAccounts',bot:'loadBotRules',assistant:'loadAssistant'};
   const $=id=>document.getElementById(id);
   const loaded=new Map();
-  const moduleMap={tests:['exam-builder-v2.js?v=20260915-7'],support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]};
+  const moduleMap={tests:['exam-builder-v2.js?v=20260916-1'],support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]};
   function repairLogin(){const screen=$('adminLogin'),form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');if(!screen||!form||!input||!btn)return;screen.style.pointerEvents='auto';form.style.pointerEvents='auto';input.style.pointerEvents='auto';btn.style.pointerEvents='auto'}
   function setAuthenticatedView(){const screen=$('adminLogin'),app=$('adminApp');if(screen){screen.classList.add('hidden');screen.style.setProperty('display','none','important');screen.style.setProperty('visibility','hidden','important');screen.style.setProperty('pointer-events','none','important')}if(app){app.classList.remove('hidden');app.style.setProperty('display','flex','important');app.style.setProperty('visibility','visible','important');app.style.setProperty('pointer-events','auto','important')}}
   function openTab(id){if(!TITLES[id])return;const app=$('adminApp'),tab=$(id);if(!app||!tab)return;window.admin=window.admin||{};admin.tab=id;app.querySelectorAll('.workspace > .tab').forEach(x=>x.classList.toggle('active',x===tab));app.querySelectorAll('#adminNav .nav-item[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));const title=$('pageTitle');if(title)title.textContent=TITLES[id];requestAnimationFrame(()=>{const loader=LOADERS[id];try{if(loader&&typeof window[loader]==='function')window[loader]()}catch(e){console.warn('[STUDY tab loader]',id,e)}loadTabModules(id)})}

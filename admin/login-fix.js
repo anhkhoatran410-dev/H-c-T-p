@@ -1,8 +1,8 @@
 /* STUDY TH — lightweight Admin bootstrap. Keep the core responsive; load feature modules only when needed. */
 (function(){
   'use strict';
-  if(window.__studyLoginBootstrapV5)return;
-  window.__studyLoginBootstrapV5=true;
+  if(window.__studyLoginBootstrapV6)return;
+  window.__studyLoginBootstrapV6=true;
   const TOKEN_KEY='study_admin_session_v2';
   const CRITICAL_SCRIPT='auth.js?v=20260915-3';
   const APP_SCRIPT='app.js?v=20260915-3';
@@ -10,13 +10,10 @@
   const LOADERS={dashboard:'loadDashboard',support:'startSupportLive',participants:'loadParticipants',history:'loadHistory',tests:'renderTests',accounts:'loadAccounts',bot:'loadBotRules',assistant:'loadAssistant'};
   const $=id=>document.getElementById(id);
   const loaded=new Map();
-  const moduleMap={
-    tests:['exam-vision-bridge-v2.js?v=20260915-5','exam-builder-v2.js?v=20260915-6'],
-    support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]
-  };
+  const moduleMap={tests:['exam-builder-v2.js?v=20260915-7'],support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]};
   function repairLogin(){const screen=$('adminLogin'),form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');if(!screen||!form||!input||!btn)return;screen.style.pointerEvents='auto';form.style.pointerEvents='auto';input.style.pointerEvents='auto';btn.style.pointerEvents='auto'}
   function setAuthenticatedView(){const screen=$('adminLogin'),app=$('adminApp');if(screen){screen.classList.add('hidden');screen.style.setProperty('display','none','important');screen.style.setProperty('visibility','hidden','important');screen.style.setProperty('pointer-events','none','important')}if(app){app.classList.remove('hidden');app.style.setProperty('display','flex','important');app.style.setProperty('visibility','visible','important');app.style.setProperty('pointer-events','auto','important')}}
-  function openTab(id){if(!TITLES[id])return;const app=$('adminApp'),tab=$(id);if(!app||!tab)return;admin.tab=id;app.querySelectorAll('.workspace > .tab').forEach(x=>x.classList.toggle('active',x===tab));app.querySelectorAll('#adminNav .nav-item[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));const title=$('pageTitle');if(title)title.textContent=TITLES[id];requestAnimationFrame(()=>{const loader=LOADERS[id];try{if(loader&&typeof window[loader]==='function')window[loader]()}catch(e){console.warn('[STUDY tab loader]',id,e)}loadTabModules(id)})}
+  function openTab(id){if(!TITLES[id])return;const app=$('adminApp'),tab=$(id);if(!app||!tab)return;window.admin=window.admin||{};admin.tab=id;app.querySelectorAll('.workspace > .tab').forEach(x=>x.classList.toggle('active',x===tab));app.querySelectorAll('#adminNav .nav-item[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));const title=$('pageTitle');if(title)title.textContent=TITLES[id];requestAnimationFrame(()=>{const loader=LOADERS[id];try{if(loader&&typeof window[loader]==='function')window[loader]()}catch(e){console.warn('[STUDY tab loader]',id,e)}loadTabModules(id)})}
   window.openTab=openTab;
   function bindNavigation(){const nav=$('adminNav');if(nav&&!nav.__studyBound){nav.__studyBound=true;nav.addEventListener('click',function(e){const b=e.target.closest('button[data-tab]');if(!b||!nav.contains(b))return;e.preventDefault();e.stopPropagation();openTab(b.dataset.tab)})}document.querySelectorAll('.quick[data-go]').forEach(b=>{if(!b.__studyBound){b.__studyBound=true;b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();openTab(b.dataset.go)})}})}
   function loadScript(src){if(loaded.has(src))return loaded.get(src);const p=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=resolve;s.onerror=()=>reject(new Error('Không tải được '+src));document.body.appendChild(s)});loaded.set(src,p);return p}

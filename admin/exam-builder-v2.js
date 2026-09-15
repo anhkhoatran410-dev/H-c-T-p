@@ -3,7 +3,7 @@
    - Separate Quiz and Flashcard modes
    - Flashcard mode never requires a quiz type
    - Multi-source AI instruction: combine units / percentage distribution
-   - Flashcard lessons are saved as flashcardOnly exams; public side can add the memory test button
+   - Flashcard mode sends staged PDF/image files as the primary AI source
 */
 (function(){
   'use strict';
@@ -13,7 +13,7 @@
   const SUPABASE_URL='https://mlqaeginqsgqacdqdzbm.supabase.co';
   const SUPABASE_KEY='sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi';
   const $=id=>document.getElementById(id);
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
   let selectedFiles=[];
   let busy=false;
 
@@ -96,17 +96,20 @@
     try{
       status.textContent=`⏳ Đang đọc ${selectedFiles.length} tài liệu...`;
       const texts=[];
-      for(let i=0;i<selectedFiles.length;i++){
-        const f=selectedFiles[i];status.textContent=`⏳ Đang đọc ${i+1}/${selectedFiles.length}: ${f.name}`;
-        const text=await extract(f).catch(()=> '');if(text)texts.push(`\n===== NGUỒN ${i+1}: ${f.name} =====\n${text}`);
+      /* Quiz needs extracted text. Flashcard mode relies on staged files + Vision instead of duplicating the entire PDF text. */
+      if(!flash){
+        for(let i=0;i<selectedFiles.length;i++){
+          const f=selectedFiles[i];status.textContent=`⏳ Đang đọc ${i+1}/${selectedFiles.length}: ${f.name}`;
+          const text=await extract(f).catch(()=> '');if(text)texts.push(`\n===== NGUỒN ${i+1}: ${f.name} =====\n${text}`);
+        }
       }
-      let documentText=texts.join('\n');if(documentText.length>180000)documentText=documentText.slice(0,180000)+'\n[Đã giới hạn văn bản]';
+      let documentText=texts.join('\n');if(documentText.length>140000)documentText=documentText.slice(0,140000)+'\n[Đã giới hạn văn bản]';
       if(flash){
         status.textContent='☁️ Đang đưa tài liệu vào kho tạm an toàn...';
         const sourceUrls=await stageFilesForAi();
         status.textContent='🤖 AI đang đọc bố cục tài liệu và tạo bộ flashcard...';
-        const r=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileData:[],mimeTypes:selectedFiles.map(f=>f.type),fileNames:selectedFiles.map(f=>f.name),fileName:selectedFiles.map(f=>f.name).join(', '),subject,documentText,userInstruction:instruction,sourceFiles:selectedFiles.map(f=>f.name),sourceCount:selectedFiles.length,sourceUrls})});
-        const d=await r.json().catch(()=>({}));if(!r.ok){throw new Error(d.error||`AI endpoint trả HTTP ${r.status}.`)}const cards=Array.isArray(d.flashcards)?d.flashcards:(Array.isArray(d.questions)?d.questions:[]);if(!cards.length)throw new Error('AI không tạo được flashcard hợp lệ.');
+        const r=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileData:[],mimeTypes:selectedFiles.map(f=>f.type),fileNames:selectedFiles.map(f=>f.name),fileName:selectedFiles.map(f=>f.name).join(', '),subject,userInstruction:instruction,sourceFiles:selectedFiles.map(f=>f.name),sourceCount:selectedFiles.length,sourceUrls})});
+        const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||`AI endpoint trả HTTP ${r.status}.`);const cards=Array.isArray(d.flashcards)?d.flashcards:(Array.isArray(d.questions)?d.questions:[]);if(!cards.length)throw new Error('AI không tạo được flashcard hợp lệ.');
         const client=await db();const row={title,subject,difficulty,duration:0,question_count:cards.length,questions:cards,status:'active',flashcard_only:true};const ins=await client.from('exams').insert(row).select().single();if(ins.error)throw ins.error;
         status.textContent=`✅ Đã tạo ${cards.length} flashcard từ ${selectedFiles.length} tài liệu và lưu thành công.`;
       }else{

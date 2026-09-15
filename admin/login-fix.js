@@ -1,17 +1,17 @@
 /* STUDY TH — lightweight Admin bootstrap. Keep the core responsive; load feature modules only when needed. */
 (function(){
   'use strict';
-  if(window.__studyLoginBootstrapV3)return;
-  window.__studyLoginBootstrapV3=true;
+  if(window.__studyLoginBootstrapV4)return;
+  window.__studyLoginBootstrapV4=true;
   const TOKEN_KEY='study_admin_session_v2';
-  const CRITICAL_SCRIPT='auth.js?v=20260915-2';
-  const APP_SCRIPT='app.js?v=20260915-2';
+  const CRITICAL_SCRIPT='auth.js?v=20260915-3';
+  const APP_SCRIPT='app.js?v=20260915-3';
   const TITLES={dashboard:'Tổng quan',support:'Hỗ trợ',participants:'Người tham gia',history:'Lịch sử làm bài',tests:'Bài kiểm tra',accounts:'Tài khoản hỗ trợ',bot:'Bot tự động',assistant:'Admin Copilot'};
   const LOADERS={dashboard:'loadDashboard',support:'startSupportLive',participants:'loadParticipants',history:'loadHistory',tests:'renderTests',accounts:'loadAccounts',bot:'loadBotRules',assistant:'loadAssistant'};
   const $=id=>document.getElementById(id);
   const loaded=new Map();
   const moduleMap={
-    tests:['exam-vision-bridge-v2.js?v=20260915-1','exam-builder-v2.js?v=20260915-4'],
+    tests:['exam-vision-bridge-v2.js?v=20260915-4','exam-builder-v2.js?v=20260915-5'],
     support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]
   };
   function repairLogin(){const screen=$('adminLogin'),form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');if(!screen||!form||!input||!btn)return;screen.style.pointerEvents='auto';form.style.pointerEvents='auto';input.style.pointerEvents='auto';btn.style.pointerEvents='auto'}

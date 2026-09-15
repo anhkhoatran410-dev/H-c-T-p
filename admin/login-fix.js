@@ -12,7 +12,7 @@
   const $=id=>document.getElementById(id);
   const loaded=new Map();
   const moduleMap={
-    tests:['exam-builder-v2.js?v=20260915-3'],
+    tests:['exam-vision-bridge.js?v=20260915-1','exam-builder-v2.js?v=20260915-4'],
     support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]
   };
 
@@ -62,8 +62,6 @@
     for(const src of list){try{await loadScript(src)}catch(e){console.warn('[STUDY module]',e.message)}}
   }
 
-  function loadScriptOnce(src){return loadScript(src).catch(e=>console.warn('[STUDY optional]',e.message))}
-
   async function startAdmin(){
     if(window.__studyAdminStarted)return;
     window.__studyAdminStarted=true;
@@ -73,7 +71,6 @@
       setAuthenticatedView();
       bindNavigation();
       if(typeof window.bootAdmin==='function'){try{await window.bootAdmin()}catch(e){console.warn('[STUDY boot]',e)}}
-      /* No bulk optional loading here. It used to start many observers/listeners at once and freeze the UI. */
     }catch(e){
       window.__studyAdminStarted=false;console.error('[STUDY bootstrap]',e);setAuthenticatedView();bindNavigation();
       const t=$('toast');if(t){t.textContent='⚠️ Admin mở nhưng một số mô-đun phụ chưa tải.';t.classList.add('show')}

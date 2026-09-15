@@ -1,4 +1,4 @@
-/* STUDY TH Flashcard AI v2026-09-15: use Gemini 3.6 Flash only. */
+/* STUDY TH Flashcard AI v2026-09-15: multimodal Gemini 3.x. */
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
@@ -53,19 +53,28 @@ CHỈ TRẢ JSON THUẦN:
     const parts=[{text:prompt}];
     if(text)parts.push({text:`\nTEXT PHỤ TRỢ (chỉ đối chiếu, không ưu tiên hơn bố cục hình ảnh):\n${text}`});
     media.forEach((x,i)=>{parts.push({text:`\n=== NGUỒN ${i+1}: ${x.fileName} ===`});parts.push({inlineData:{mimeType:x.mimeType,data:x.data}});});
-    const model='gemini-3.6-flash';
-    const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',temperature:0.1,maxOutputTokens:16000}})});
-    const rawText=await r.text();
-    let data={};try{data=rawText?JSON.parse(rawText):{}}catch{throw Object.assign(new Error('Gemini trả về dữ liệu không hợp lệ.'),{status:r.status})}
-    if(!r.ok)throw Object.assign(new Error(data?.error?.message||`Gemini lỗi HTTP ${r.status}`),{status:r.status});
+
+    const models=['gemini-3.6-flash','gemini-3.5-flash'];
+    let lastError='Gemini không phản hồi.';
+    let data=null;let usedModel='';
+    for(const model of models){
+      const payload={contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:16000}};
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify(payload)});
+      const rawText=await r.text();
+      let parsed={};try{parsed=rawText?JSON.parse(rawText):{}}catch{}
+      if(r.ok){data=parsed;usedModel=model;break;}
+      lastError=parsed?.error?.message||`Gemini lỗi HTTP ${r.status}`;
+      if(![400,404,429,500,503].includes(r.status))break;
+    }
+    if(!data)throw Object.assign(new Error(lastError),{status:502});
     const out=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||'';
     const clean=out.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'').trim();
     const a=clean.indexOf('{'),z=clean.lastIndexOf('}');
     if(a<0||z<=a)throw new Error('Gemini không trả về JSON flashcard hợp lệ.');
-    const parsed=JSON.parse(clean.slice(a,z+1));
+    const obj=JSON.parse(clean.slice(a,z+1));
     const seen=new Set();
-    const cards=(Array.isArray(parsed.flashcards)?parsed.flashcards:[]).map(c=>({type:'flashcard',front:String(c?.front||'').trim(),back:String(c?.back||'').trim(),phonetic:String(c?.phonetic||'').trim(),example:String(c?.example||'').trim(),explanation:'',source:String(c?.source||'').trim()})).filter(c=>{const k=c.front.toLowerCase().replace(/\s+/g,' ');if(!c.front||!c.back||seen.has(k))return false;seen.add(k);return true}).slice(0,100);
+    const cards=(Array.isArray(obj.flashcards)?obj.flashcards:[]).map(c=>({type:'flashcard',front:String(c?.front||'').trim(),back:String(c?.back||'').trim(),phonetic:String(c?.phonetic||'').trim(),example:String(c?.example||'').trim(),explanation:'',source:String(c?.source||'').trim()})).filter(c=>{const k=c.front.toLowerCase().replace(/\s+/g,' ');if(!c.front||!c.back||seen.has(k))return false;seen.add(k);return true}).slice(0,100);
     if(!cards.length)return res.status(422).json({error:'AI đã đọc tài liệu nhưng không xác định được mục từ vựng hợp lệ. Hãy kiểm tra bố cục bảng hoặc thử ảnh/PDF rõ hơn.'});
-    return res.status(200).json({questions:cards,flashcards:cards,provider:'gemini',model,vision:media.length>0,sourceCount:Math.max(1,media.length),validated:true});
-  }catch(e){console.error('generate-flashcards:',e);return res.status(Number(e?.status)===413?413:500).json({error:e?.message||'Lỗi máy chủ khi tạo flashcard.'});}
+    return res.status(200).json({questions:cards,flashcards:cards,provider:'gemini',model:usedModel,vision:media.length>0,sourceCount:Math.max(1,media.length),validated:true});
+  }catch(e){console.error('generate-flashcards:',e);return res.status(Number(e?.status)===413?413:502).json({error:e?.message||'Lỗi máy chủ khi tạo flashcard.'});}
 }

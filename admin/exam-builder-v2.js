@@ -31,8 +31,22 @@
     if(n.endsWith('.docx')){await loadExternal('https://unpkg.com/mammoth@1.8.0/mammoth.browser.min.js');return(await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()})).value||''}
     return '';
   }
-  async function base64(file){const r=new FileReader();return new Promise((resolve,reject)=>{r.onload=()=>resolve(String(r.result||'').replace(/^data:[^;]+;base64,/i,''));r.onerror=reject;r.readAsDataURL(file)})}
   async function db(){if(window.db)return window.db;if(!window.supabase)await loadExternal('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');window.db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);return window.db}
+  async function stageFilesForAi(){
+    const client=await db();
+    const urls=[];
+    for(const file of selectedFiles){
+      const safe=(file.name||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path=`flashcard-temp/${Date.now()}-${Math.random().toString(36).slice(2,10)}-${safe}`;
+      const up=await client.storage.from('support-media').upload(path,file,{contentType:file.type||'application/octet-stream',upsert:false});
+      if(up.error)throw new Error('Không tải được tài liệu lên kho tạm: '+up.error.message);
+      const pub=client.storage.from('support-media').getPublicUrl(path);
+      const url=pub?.data?.publicUrl;
+      if(!url)throw new Error('Không lấy được URL tài liệu tạm.');
+      urls.push(url);
+    }
+    return urls;
+  }
 
   function css(){
     if($('exam-builder-v2-style'))return;
@@ -81,23 +95,24 @@
     busy=true;$('eb2Create').disabled=true;
     try{
       status.textContent=`⏳ Đang đọc ${selectedFiles.length} tài liệu...`;
-      const texts=[];const media=[];
+      const texts=[];
       for(let i=0;i<selectedFiles.length;i++){
         const f=selectedFiles[i];status.textContent=`⏳ Đang đọc ${i+1}/${selectedFiles.length}: ${f.name}`;
         const text=await extract(f).catch(()=> '');if(text)texts.push(`\n===== NGUỒN ${i+1}: ${f.name} =====\n${text}`);
-        if(/^(application\/pdf|image\/)/i.test(f.type||'')){const b64=await base64(f).catch(()=>null);if(b64)media.push({mimeType:f.type||'application/pdf',data:b64})}
       }
       let documentText=texts.join('\n');if(documentText.length>180000)documentText=documentText.slice(0,180000)+'\n[Đã giới hạn văn bản]';
       if(flash){
+        status.textContent='☁️ Đang đưa tài liệu vào kho tạm an toàn...';
+        const sourceUrls=await stageFilesForAi();
         status.textContent='🤖 AI đang đọc bố cục tài liệu và tạo bộ flashcard...';
-        const r=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileData:media.map(x=>x.data),mimeTypes:media.map(x=>x.mimeType),fileName:selectedFiles.map(f=>f.name).join(', '),subject,documentText,userInstruction:instruction,sourceFiles:selectedFiles.map(f=>f.name),sourceCount:selectedFiles.length})});
+        const r=await fetch('/api/generate-flashcards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileData:[],mimeTypes:selectedFiles.map(f=>f.type),fileNames:selectedFiles.map(f=>f.name),fileName:selectedFiles.map(f=>f.name).join(', '),subject,documentText,userInstruction:instruction,sourceFiles:selectedFiles.map(f=>f.name),sourceCount:selectedFiles.length,sourceUrls})});
         const d=await r.json().catch(()=>({}));if(!r.ok){throw new Error(d.error||`AI endpoint trả HTTP ${r.status}.`)}const cards=Array.isArray(d.flashcards)?d.flashcards:(Array.isArray(d.questions)?d.questions:[]);if(!cards.length)throw new Error('AI không tạo được flashcard hợp lệ.');
         const client=await db();const row={title,subject,difficulty,duration:0,question_count:cards.length,questions:cards,status:'active',flashcard_only:true};const ins=await client.from('exams').insert(row).select().single();if(ins.error)throw ins.error;
         status.textContent=`✅ Đã tạo ${cards.length} flashcard từ ${selectedFiles.length} tài liệu và lưu thành công.`;
       }else{
-        if(!documentText&&!media.length)throw new Error('Không đọc được nội dung tài liệu. Hãy dùng PDF/DOCX/TXT hoặc file có nội dung chữ.');
+        if(!documentText)throw new Error('Không đọc được nội dung tài liệu. Hãy dùng PDF/DOCX/TXT hoặc file có nội dung chữ.');
         status.textContent='🤖 AI đang kết hợp nguồn và tạo bài kiểm tra...';
-        const r=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:selectedFiles.map(f=>f.name).join(', '),fileNames:selectedFiles.map(f=>f.name),mimeType:selectedFiles.length===1?selectedFiles[0].type:'application/octet-stream',documentText,fileData:'',media,subject,difficulty,questionCount:count,types,userInstruction,instruction,multiFile:selectedFiles.length>1,sourceCount:selectedFiles.length})});
+        const r=await fetch('/api/generate-exam',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:selectedFiles.map(f=>f.name).join(', '),fileNames:selectedFiles.map(f=>f.name),mimeType:selectedFiles.length===1?selectedFiles[0].type:'application/octet-stream',documentText,fileData:'',media:[],subject,difficulty,questionCount:count,types,userInstruction:instruction,instruction,multiFile:selectedFiles.length>1,sourceCount:selectedFiles.length})});
         const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Không tạo được bài kiểm tra.');if(!Array.isArray(d.questions)||!d.questions.length)throw new Error('AI không trả về nội dung hợp lệ.');
         const client=await db();const row={title,subject,difficulty,duration,question_count:d.questions.length,questions:d.questions,status:'active'};const ins=await client.from('exams').insert(row);if(ins.error)throw ins.error;status.textContent=`✅ Đã tạo ${d.questions.length} câu từ ${selectedFiles.length} tài liệu và lưu thành công.`;
       }

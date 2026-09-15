@@ -27,31 +27,6 @@
     </main>
   </div><div id="toast" class="toast"></div>
   <!-- CRITICAL: only the login bootstrap may execute before authentication. All heavy Admin modules are lazy-loaded after a successful login. -->
-  <script src="login-fix.js?v=20260814-1"></script>
-  <script>
-    /* Navigation failsafe: bind the existing Admin buttons without changing UI or routes. */
-    (function(){
-      'use strict';
-      function activate(id){
-        if(typeof window.openTab==='function'){ window.openTab(id); return; }
-        const tab=document.getElementById(id);
-        if(!tab)return;
-        document.querySelectorAll('.workspace > .tab').forEach(x=>x.classList.toggle('active',x===tab));
-        document.querySelectorAll('#adminNav .nav-item[data-tab]').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));
-        const title=document.getElementById('pageTitle');
-        const titles={dashboard:'Tổng quan',support:'Hỗ trợ',participants:'Người tham gia',history:'Lịch sử làm bài',tests:'Bài kiểm tra',accounts:'Tài khoản hỗ trợ',bot:'Bot tự động',assistant:'Admin Copilot'};
-        if(title)title.textContent=titles[id]||'Admin';
-      }
-      document.addEventListener('click',function(e){
-        const btn=e.target.closest?.('#adminNav .nav-item[data-tab], .quick[data-go]');
-        if(!btn)return;
-        const id=btn.dataset.tab||btn.dataset.go;
-        if(!id)return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        activate(id);
-      },true);
-    })();
-  </script>
+  <script src="login-fix.js?v=20260915-2"></script>
 </body>
 </html>

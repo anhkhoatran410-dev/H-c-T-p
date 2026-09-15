@@ -1,3 +1,4 @@
+/* STUDY TH Flashcard AI v2026-09-15: use Gemini 3.6 Flash only. */
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
@@ -37,6 +38,12 @@ CÁCH NHẬN DIỆN:
 13. Đọc tất cả file.
 14. Tuân theo tỷ lệ/phạm vi trong yêu cầu của người tạo.
 15. Loại trùng theo front.
+
+ĐẶC BIỆT CHO FILE DẠNG GIỐNG TÀI LIỆU UNIT TIẾNG ANH:
+- Mỗi dòng trong bảng 4 cột Word | Transcription | Meaning | For example là 1 thẻ.
+- Ví dụ nếu nhìn thấy dòng `accessible | adj /əkˈsesəbəl/ | dễ tiếp cận | These documents...` thì front phải là `accessible`, back là `dễ tiếp cận`, phonetic là phần phiên âm và example là câu ví dụ của CHÍNH dòng đó.
+- Dòng `devote something to doing something` phải giữ nguyên toàn bộ cụm ở front.
+- Không biến tên Unit hoặc dòng đăng ký ở đầu/cuối trang thành thẻ.
 
 YÊU CẦU RIÊNG:
 ${instruction||'(Không có yêu cầu thêm)'}

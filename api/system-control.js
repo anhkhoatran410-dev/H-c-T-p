@@ -3,6 +3,12 @@ const URL=String(process.env.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabas
 const KEY=String(process.env.SUPABASE_SERVICE_ROLE_KEY||'').trim();
 async function sb(path,options={}){const r=await fetch(`${URL}/rest/v1/${path}`,{...options,headers:{'Content-Type':'application/json',apikey:KEY,Authorization:`Bearer ${KEY}`,...(options.headers||{})}});const text=await r.text();let data=null;try{data=text?JSON.parse(text):null}catch{}if(!r.ok)throw new Error(data?.message||data?.hint||`Supabase ${r.status}`);return data}
 export default async function handler(req,res){
+ const route=String(req.query?.route||'').replace(/^\/+|\/+$/g,'');
+ if(route==='incidents'){
+  if(!isAdminRequest(req))return res.status(401).json({error:'Admin session required'});
+  if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
+  try{const d=await sb('system_incidents?select=*&order=created_at.desc&limit=30');return res.status(200).json(d||[]);}catch(e){return res.status(500).json({error:e.message||'Không đọc được sự cố'});}
+ }
  if(req.method==='GET'){try{const d=await sb('system_control?select=maintenance,maintenance_title,maintenance_message,updated_at&id=eq.true');return res.status(200).json(d?.[0]||{maintenance:false});}catch(e){return res.status(200).json({maintenance:false,unavailable:true});}}
  if(!isAdminRequest(req))return res.status(401).json({error:'Admin session required'});
  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});

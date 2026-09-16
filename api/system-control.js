@@ -1,5 +1,6 @@
 import { isAdminRequest } from './admin-login.js';
 import { applySecurityHeaders, enforceBodySize, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
+import { aiLockdownStatus, setAiLockdown } from './_emergency-lock.js';
 
 const URL = String(process.env.SUPABASE_URL || '').trim();
 const KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -34,15 +35,28 @@ function protect(req, res, methods) {
 
 export default async function handler(req, res) {
   const route = String(req.query?.route || '').replace(/^\/+|\/+$/g, '');
+
   if (route === 'incidents') {
     if (!protect(req, res, ['GET'])) return;
     if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin session required' });
     try {
       const d = await sb('system_incidents?select=*&order=created_at.desc&limit=30');
       return res.status(200).json(d || []);
-    } catch (e) {
+    } catch {
       return res.status(500).json({ error: 'Không đọc được sự cố.' });
     }
+  }
+
+  if (route === 'lockdown') {
+    if (!protect(req, res, req.method === 'GET' ? ['GET'] : ['POST'])) return;
+    if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin session required' });
+    if (req.method === 'GET') return res.status(200).json(await aiLockdownStatus());
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    if (body.confirmAction !== true) return res.status(409).json({ error: 'Xác nhận Admin bắt buộc để đổi trạng thái lockdown.' });
+    const enabled = body.enabled === true;
+    const seconds = Math.max(60, Math.min(24 * 60 * 60, Number(body.seconds || 3600)));
+    const state = await setAiLockdown(enabled, seconds);
+    return res.status(200).json({ ok: true, ...state });
   }
 
   if (req.method === 'GET') {
@@ -50,7 +64,7 @@ export default async function handler(req, res) {
     try {
       const d = await sb('system_control?select=maintenance,maintenance_title,maintenance_message,updated_at&id=eq.true');
       return res.status(200).json(d?.[0] || { maintenance: false });
-    } catch (e) {
+    } catch {
       return res.status(200).json({ maintenance: false, unavailable: true });
     }
   }
@@ -74,7 +88,7 @@ export default async function handler(req, res) {
       })
     });
     return res.status(200).json(d?.[0] || {});
-  } catch (e) {
+  } catch {
     return res.status(500).json({ error: 'Không cập nhật được trạng thái hệ thống.' });
   }
 }

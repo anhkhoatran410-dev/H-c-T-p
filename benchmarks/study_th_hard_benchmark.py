@@ -5,9 +5,11 @@ ENDPOINT = 'https://hoc-va-choi.vercel.app/api/solve'
 DATA_URL = 'https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/test.jsonl'
 N_HARD = 25
 N_CHALLENGE = 15
-WORKERS = 2
-TIMEOUT = 50
-RETRIES = 2
+# The previous run used two concurrent requests and produced clustered HTTP 503s.
+# Run the reliability benchmark sequentially so provider throttling does not hide solver quality.
+WORKERS = 1
+TIMEOUT = 60
+RETRIES = 4
 SEED = 20260916
 
 KEYWORDS = ['remaining', 'left', 'difference', 'less than', 'more than', 'before', 'after', 'unless', 'except', 'not', 'each', 'per', 'total', 'average', 'twice', 'percent', 'percentage', 'ratio', 'probability']
@@ -52,15 +54,19 @@ def call(item):
     prompt = item['question'] + "\n\nGiải cẩn thận từ dữ kiện đến kết luận. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: <số>"
     payload = json.dumps({'message':prompt,'subject':'Toán','history':[],'imageDataUrl':'','deep':False}).encode()
     last = None
+    started = time.time()
     for attempt in range(RETRIES + 1):
-        t0=time.time(); req=urllib.request.Request(ENDPOINT,data=payload,headers={'Content-Type':'application/json'})
+        req_start = time.time()
+        req=urllib.request.Request(ENDPOINT,data=payload,headers={'Content-Type':'application/json'})
         try:
             with urllib.request.urlopen(req,timeout=TIMEOUT) as r:
                 d=json.loads(r.read().decode()); text=str(d.get('answer',''))
-                return {'ok':True,'latency':time.time()-t0,'pred':pred(text),'gold':gold(item['answer']),'model':d.get('model'),'group':item['group'],'question':item['question'],'text':text[:1800]}
+                return {'ok':True,'latency':time.time()-req_start,'total_latency':time.time()-started,'attempts':attempt+1,'pred':pred(text),'gold':gold(item['answer']),'model':d.get('model'),'group':item['group'],'question':item['question'],'text':text[:1800]}
         except Exception as e:
-            last=repr(e); time.sleep(1.5*(attempt+1))
-    return {'ok':False,'latency':time.time()-t0,'error':last,'gold':gold(item['answer']),'group':item['group'],'question':item['question']}
+            last=repr(e)
+            if attempt < RETRIES:
+                time.sleep(min(8, 1.5*(attempt+1)))
+    return {'ok':False,'latency':time.time()-started,'total_latency':time.time()-started,'attempts':RETRIES+1,'error':last,'gold':gold(item['answer']),'group':item['group'],'question':item['question']}
 
 def stat(rows):
     graded=[r for r in rows if r.get('gold') is not None and r.get('pred') is not None]
@@ -75,8 +81,8 @@ def main():
         for i,f in enumerate(futures,1):
             r=f.result(); r['i']=i; results.append(r)
             status='PASS' if r.get('pred')==r.get('gold') else ('NO_ANSWER' if not r.get('pred') else 'FAIL')
-            print(f"[{i}/{len(items)}] {status} {r.get('group')} {r.get('latency',0):.1f}s model={r.get('model')}")
-    summary={'endpoint':ENDPOINT,'benchmark':'STUDY TH hard + challenge','selection':{'hard':N_HARD,'challenge':N_CHALLENGE},'overall':stat(results),'hard':stat([r for r in results if r.get('group')=='HARD']),'challenge':stat([r for r in results if r.get('group')=='CHALLENGE']),'avg_latency_sec':round(sum(r.get('latency',0) for r in results)/len(results),2) if results else 0,'results':results}
+            print(f"[{i}/{len(items)}] {status} {r.get('group')} {r.get('latency',0):.1f}s attempts={r.get('attempts')} model={r.get('model')}")
+    summary={'endpoint':ENDPOINT,'benchmark':'STUDY TH hard + challenge','selection':{'hard':N_HARD,'challenge':N_CHALLENGE},'overall':stat(results),'hard':stat([r for r in results if r.get('group')=='HARD']),'challenge':stat([r for r in results if r.get('group')=='CHALLENGE']),'avg_latency_sec':round(sum(r.get('total_latency',r.get('latency',0)) for r in results)/len(results),2) if results else 0,'results':results}
     print(json.dumps({k:v for k,v in summary.items() if k!='results'},ensure_ascii=False,indent=2))
     with open('benchmark-hard-results.json','w',encoding='utf-8') as f: json.dump(summary,f,ensure_ascii=False,indent=2)
 

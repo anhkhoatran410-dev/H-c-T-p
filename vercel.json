@@ -1,1 +1,44 @@
-{"$schema":"https://openapi.vercel.sh/vercel.json","version":2,"framework":null,"outputDirectory":".","functions":{"api/_ai-gateway.js":{"maxDuration":60,"supportsCancellation":true},"api/_solve-core.js":{"maxDuration":60,"supportsCancellation":true},"api/support-ai.js":{"maxDuration":60,"supportsCancellation":true},"api/admin-command.js":{"maxDuration":60,"supportsCancellation":true},"api/system-control.js":{"maxDuration":30,"supportsCancellation":true}},"headers":[{"source":"/(.*)","headers":[{"key":"X-Content-Type-Options","value":"nosniff"},{"key":"X-Frame-Options","value":"DENY"},{"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},{"key":"Permissions-Policy","value":"camera=(), microphone=(), geolocation=()"},{"key":"Cross-Origin-Opener-Policy","value":"same-origin"},{"key":"Cross-Origin-Resource-Policy","value":"same-origin"},{"key":"Strict-Transport-Security","value":"max-age=31536000; includeSubDomains"}]},{"source":"/api/(.*)","headers":[{"key":"Cache-Control","value":"no-store"}]}],"rewrites":[{"source":"/api/solve","destination":"/api/_ai-gateway?target=solve"},{"source":"/api/solve.js","destination":"/api/_ai-gateway?target=solve"},{"source":"/api/admin-health","destination":"/api/admin-tools?route=admin-health"},{"source":"/api/admin-delete-exam","destination":"/api/admin-tools?route=admin-delete-exam"},{"source":"/api/admin-delete-exams-bulk","destination":"/api/admin-tools?route=admin-delete-exams-bulk"},{"source":"/api/admin-update-exam","destination":"/api/admin-tools?route=admin-update-exam"},{"source":"/api/client-meta","destination":"/api/admin-tools?route=client-meta"},{"source":"/api/system-incidents","destination":"/api/system-control?route=incidents"},{"source":"/api/ai-lockdown","destination":"/api/system-control?route=lockdown"}]}
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "framework": null,
+  "outputDirectory": ".",
+  "functions": {
+    "api/_ai-gateway.js": { "maxDuration": 60, "supportsCancellation": true },
+    "api/_solve-core.js": { "maxDuration": 60, "supportsCancellation": true },
+    "api/support-ai.js": { "maxDuration": 60, "supportsCancellation": true },
+    "api/admin-command.js": { "maxDuration": 60, "supportsCancellation": true },
+    "api/system-control.js": { "maxDuration": 30, "supportsCancellation": true }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/solve", "destination": "/api/_ai-gateway?target=solve" },
+    { "source": "/api/solve.js", "destination": "/api/_ai-gateway?target=solve" },
+    { "source": "/api/admin-health", "destination": "/api/admin-tools?route=admin-health" },
+    { "source": "/api/admin-delete-exam", "destination": "/api/admin-tools?route=admin-delete-exam" },
+    { "source": "/api/admin-delete-exams-bulk", "destination": "/api/admin-tools?route=admin-delete-exams-bulk" },
+    { "source": "/api/admin-update-exam", "destination": "/api/admin-tools?route=admin-update-exam" },
+    { "source": "/api/client-meta", "destination": "/api/admin-tools?route=client-meta" },
+    { "source": "/api/system-incidents", "destination": "/api/system-control?route=incidents" },
+    { "source": "/api/ai-lockdown", "destination": "/api/system-control?route=lockdown" }
+  ]
+}

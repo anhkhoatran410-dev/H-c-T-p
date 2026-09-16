@@ -3,7 +3,7 @@ import './_gemini-network-guard.js';
 import solveHandler from './solve.js';
 import { applySecurityHeaders, enforceBodySize, rateLimit, safeRequestId } from './_security.js';
 
-function secret(){ return String(process.env.INTERNAL_GATEWAY_SECRET || process.env.ADMIN_SESSION_SECRET || process.env.GEMINI_API_KEY || '').trim(); }
+function secret(){ return String(process.env.INTERNAL_GATEWAY_SECRET || '').trim(); }
 function expected(){ const s=secret(); return s ? crypto.createHmac('sha256',s).update('study-th-ai-gateway').digest('hex') : ''; }
 function authorized(req){
   const got=String(req.headers?.['x-study-th-internal']||'');
@@ -12,7 +12,6 @@ function authorized(req){
   const a=Buffer.from(got); const b=Buffer.from(exp);
   return a.length===b.length && crypto.timingSafeEqual(a,b);
 }
-
 export default async function handler(req,res){
   applySecurityHeaders(res);
   const requestId=safeRequestId();

@@ -1,5 +1,6 @@
 import { applySecurityHeaders, distributedRateLimit, enforceBodySize, sameOrigin, safeRequestId } from './_security.js';
 import { internalNonce, internalSignature, internalTimestamp } from './_internal-replay.js';
+import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -21,17 +22,21 @@ export default async function handler(req,res){
   const requestId = safeRequestId();
   res.setHeader('X-Request-ID', requestId);
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
-  if(!enforceBodySize(req,res,MAX_AI_BODY)) return;
-  if(!sameOrigin(req,res)) return;
-  if(!(await distributedRateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'}))) return;
+  if(!(await shieldGate(req,res))) return;
+  if(!enforceBodySize(req,res,MAX_AI_BODY)) { await recordShieldViolation(req,'oversized-body'); return; }
+  if(!sameOrigin(req,res)) { await recordShieldViolation(req,'bad-origin'); return; }
+  if(!(await distributedRateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'}))) {
+    await recordShieldViolation(req,'rate-limit');
+    return;
+  }
   const target = String(req.query?.target || '').trim();
-  if(target !== 'solve') return res.status(404).json({error:'Gateway route not found',requestId});
+  if(target !== 'solve') { await recordShieldViolation(req,'unexpected-route'); return res.status(404).json({error:'Gateway route not found',requestId}); }
   const secret = internalSecret();
   const url = baseUrl(req);
   if(!secret || !url) return res.status(503).json({error:'AI gateway chưa được cấu hình đầy đủ.',requestId});
   const body = bodyOf(req);
-  if(!body.message && !body.imageDataUrl) return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId});
-  if(typeof body.message === 'string' && body.message.length > 30_000) return res.status(413).json({error:'Đề bài quá dài.',requestId});
+  if(!body.message && !body.imageDataUrl) { await recordShieldViolation(req,'empty-ai-request'); return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId}); }
+  if(typeof body.message === 'string' && body.message.length > 30_000) { await recordShieldViolation(req,'oversized-message'); return res.status(413).json({error:'Đề bài quá dài.',requestId}); }
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);

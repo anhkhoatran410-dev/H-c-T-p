@@ -1,4 +1,5 @@
 const GEMINI_MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash-lite'];
+const MAX_OUTPUT_TOKENS=12000;
 
 function cleanKey(value){return String(value||'').replace(/^['"`]+|['"`]+$/g,'').trim()}
 function json(res,status,payload){res.status(status).setHeader('Content-Type','application/json; charset=utf-8');return res.end(JSON.stringify(payload))}
@@ -16,7 +17,6 @@ function friendlyProviderError(status,message){
   if(status===401||status===403)return 'API AI chưa được cấp quyền hoặc khóa API không hợp lệ.';
   return 'AI chính đang bận; hệ thống đang chuyển sang bộ giải dự phòng.';
 }
-
 async function wolfram(query){
   const appid=cleanKey(process.env.WOLFRAM_APP_ID);
   if(!appid||!query)return {available:false};
@@ -26,13 +26,13 @@ async function wolfram(query){
   if(!r.ok)return {available:false,error:text||('Wolfram HTTP '+r.status)};
   return {available:true,result:text.trim()};
 }
-
 async function gemini({message,subject,history,imageDataUrl,verified}){
   const key=cleanKey(process.env.GEMINI_API_KEY);
   if(!key)throw new Error('GEMINI_API_KEY chưa được cấu hình.');
   const mode=subjectMode(subject,message);
-  const system=`Bạn là STUDY TH — trợ lý giải bài học tập chính xác.\n\nMôn: ${subject||'chưa chọn'}\nChế độ suy luận: ${mode}\n\nNguyên tắc:\n1) Nếu có ảnh, phải đọc toàn bộ đề trong ảnh trước khi giải; không đoán phần bị mờ.\n2) Với Toán/Vật lý/Hóa, kiểm tra đơn vị, điều kiện, dấu và kết quả cuối.\n3) Khi có kết quả từ bộ máy tính chính xác bên ngoài, coi đó là dữ liệu kiểm chứng và giải thích cách đi tới kết quả; nếu mâu thuẫn, nói rõ mâu thuẫn thay vì bịa.\n4) Không khẳng định tuyệt đối nếu đề thiếu dữ kiện hoặc ảnh không đủ rõ.\n5) Trình bày từng bước, dễ học, kết luận rõ.\n6) Công thức toán phải dùng LaTeX với delimiter \\( ... \\) hoặc \\[ ... \\].\n7) Với bài cực khó, ưu tiên suy luận sâu; có thể đưa ra nhiều kiểm tra độc lập.\n\n${verified?`KẾT QUẢ KIỂM CHỨNG TỪ CÔNG CỤ:\n${verified}\n`:''}`;
-  const parts=[{text:system+'\n\nLịch sử gần đây:\n'+(Array.isArray(history)?history.slice(-8).map(x=>(x.role||'user')+': '+String(x.message||'')).join('\n'):'')+'\n\nCâu hỏi: '+message}];
+  const system=`Bạn là STUDY TH — trợ lý giải bài học tập chính xác.\n\nMôn: ${subject||'chưa chọn'}\nChế độ suy luận: ${mode}\n\nQUY TẮC BẮT BUỘC:\n1) Nếu có ảnh, đọc toàn bộ đề trước rồi giải TOÀN BỘ phần nhìn thấy trong ảnh.\n2) Không tự ý dừng sau một câu hoặc một bước. Với đề nhiều câu, phải đi từ Câu 1 đến câu cuối.\n3) Nếu lời giải dài, vẫn phải hoàn thành đầy đủ trước khi kết thúc. Không để câu trả lời dang dở giữa câu, giữa công thức hoặc giữa bước giải.\n4) Nếu ảnh mờ/thiếu dữ kiện, nói rõ phần nào không đọc được; không bịa.\n5) Kiểm tra điều kiện, dấu, đơn vị và kết quả cuối.\n6) Công thức toán dùng LaTeX \\( ... \\) hoặc \\[ ... \\].\n7) Trình bày từng bước, dễ học, có kết luận cuối rõ ràng.\n${verified?'\nKẾT QUẢ KIỂM CHỨNG TỪ CÔNG CỤ:\n'+verified+'\n':''}`;
+  const historyText=Array.isArray(history)?history.slice(-8).map(x=>(x.role||'user')+': '+String(x.message||'')).join('\n'):'';
+  const parts=[{text:system+'\n\nLịch sử gần đây:\n'+historyText+'\n\nYêu cầu mới:\n'+message}];
   if(imageDataUrl && /^data:image\//i.test(imageDataUrl)){
     const m=imageDataUrl.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);
     if(m)parts.push({inlineData:{mimeType:m[1],data:m[2]}});
@@ -41,29 +41,36 @@ async function gemini({message,subject,history,imageDataUrl,verified}){
   for(const model of GEMINI_MODELS){
     let r;
     try{
-      r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:5000}}),signal:AbortSignal.timeout(30000)});
+      r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:MAX_OUTPUT_TOKENS}}),signal:AbortSignal.timeout(45000)});
     }catch(e){last=e?.message||String(e);continue}
     const raw=await r.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
-    if(r.ok){const answer=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim();if(answer)return {answer,model}}
+    if(r.ok){
+      const candidate=data?.candidates?.[0];
+      const answer=candidate?.content?.parts?.map(p=>p.text||'').join('').trim();
+      if(answer){
+        if(candidate?.finishReason==='MAX_TOKENS' && !/[.!?。！？]\s*$/.test(answer)){
+          return {answer:answer+'\n\n⚠️ Phần trên đã chạm giới hạn độ dài. Bạn có thể bấm gửi tiếp “Tiếp tục từ chỗ đang dở” để hoàn tất.',model};
+        }
+        return {answer,model};
+      }
+    }
     last=data?.error?.message||('Gemini HTTP '+r.status);
     if(r.status===429)await sleep(350);
   }
   throw new Error(friendlyProviderError(429,last)+' '+String(last||''));
 }
-
 async function openaiFallback({message,subject,history,imageDataUrl,verified}){
   const key=cleanKey(process.env.OPENAI_API_KEY); if(!key)return null;
   const model=cleanKey(process.env.OPENAI_SOLVER_MODEL||'gpt-5.6-luna');
   const historyText=Array.isArray(history)?history.slice(-8).map(x=>(x.role||'user')+': '+String(x.message||'')).join('\n'):'';
-  const prompt=`Bạn là trợ lý học tập của STUDY TH. Môn: ${subject||'chưa chọn'}. Hãy giải bài chính xác, từng bước, ưu tiên đọc kỹ ảnh trước khi kết luận. Nếu có kiểm chứng bên ngoài, dùng nó để đối chiếu.\n\nLịch sử:\n${historyText}\n\nKiểm chứng:\n${verified||'Không có'}\n\nCâu hỏi:\n${message}`;
+  const prompt=`Bạn là trợ lý học tập của STUDY TH. Môn: ${subject||'chưa chọn'}. Hãy giải TOÀN BỘ bài/các câu trong ảnh, không dừng giữa chừng. Nếu đề dài, hoàn thành đến câu cuối trước khi kết thúc. Trình bày từng câu rõ ràng, kiểm tra lại kết quả. Nếu có kiểm chứng bên ngoài, dùng nó để đối chiếu.\n\nLịch sử:\n${historyText}\n\nKiểm chứng:\n${verified||'Không có'}\n\nCâu hỏi:\n${message}`;
   const content=[{type:'input_text',text:prompt}];
   if(imageDataUrl && /^data:image\//i.test(imageDataUrl))content.push({type:'input_image',image_url:imageDataUrl,detail:'high'});
-  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,reasoning:{effort:'high'},input:[{role:'user',content}],max_output_tokens:5000}),signal:AbortSignal.timeout(45000)});
+  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,reasoning:{effort:'high'},input:[{role:'user',content}],max_output_tokens:MAX_OUTPUT_TOKENS}),signal:AbortSignal.timeout(60000)});
   const raw=await r.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
   if(!r.ok)throw new Error(data?.error?.message||('OpenAI HTTP '+r.status));
   return {answer:data.output_text||'Mình chưa có câu trả lời.',model};
 }
-
 module.exports=async function handler(req,res){
   if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
   try{
@@ -71,20 +78,14 @@ module.exports=async function handler(req,res){
     const subject=String(req.body?.subject||'');
     const history=Array.isArray(req.body?.history)?req.body.history:[];
     const imageDataUrl=String(req.body?.imageDataUrl||'');
-    const mode=subjectMode(subject,message);
-    let verified=null;
+    const mode=subjectMode(subject,message); let verified=null;
     if(mode==='math'||mode==='physics'||mode==='chemistry'){
-      try{
-        const w=await wolfram(message);
-        if(w.available)verified=w.result;
-      }catch(e){verified=null}
+      try{const w=await wolfram(message);if(w.available)verified=w.result}catch(e){verified=null}
     }
-    let primaryError=null;
     try{
       const g=await gemini({message,subject,history,imageDataUrl,verified});
       return json(res,200,{...g,tool:verified?'WolframAlpha':'Gemini'});
     }catch(primary){
-      primaryError=primary;
       const fallback=await openaiFallback({message,subject,history,imageDataUrl,verified}).catch(()=>null);
       if(fallback)return json(res,200,{...fallback,tool:verified?'WolframAlpha + OpenAI':'OpenAI fallback'});
       const pm=String(primary?.message||'');

@@ -5,8 +5,8 @@ ENDPOINT = 'https://hoc-va-choi.vercel.app/api/solve'
 DATA_URL = 'https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/test.jsonl'
 N_HARD = 25
 N_CHALLENGE = 15
-# The previous run used two concurrent requests and produced clustered HTTP 503s.
-# Run the reliability benchmark sequentially so provider throttling does not hide solver quality.
+# Reliability rerun after backend retry/fallback optimization (2026-09-16).
+# Keep one request in flight at a time so the benchmark measures solver reliability, not burst throttling.
 WORKERS = 1
 TIMEOUT = 60
 RETRIES = 4

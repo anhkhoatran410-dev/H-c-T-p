@@ -4,10 +4,12 @@ const buckets = new Map();
 const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX = 30;
 const MAX_BODY_BYTES = 1_500_000;
+const MAX_BUCKETS = 10_000;
 
 function clientIp(req) {
+  const real = String(req.headers?.['x-real-ip'] || '').split(',')[0].trim();
   const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
-  return forwarded || String(req.socket?.remoteAddress || 'unknown');
+  return real || forwarded || String(req.socket?.remoteAddress || 'unknown');
 }
 
 export function applySecurityHeaders(res) {
@@ -18,7 +20,6 @@ export function applySecurityHeaders(res) {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
 }
 
 export function enforceMethod(req, res, methods) {
@@ -55,11 +56,17 @@ export function sameOrigin(req, res) {
 }
 
 export function rateLimit(req, res, options = {}) {
-  const windowMs = Number(options.windowMs || DEFAULT_WINDOW_MS);
-  const max = Number(options.max || DEFAULT_MAX);
+  const windowMs = Math.max(1_000, Number(options.windowMs || DEFAULT_WINDOW_MS));
+  const max = Math.max(1, Number(options.max || DEFAULT_MAX));
   const keyPrefix = String(options.keyPrefix || 'api');
   const key = `${keyPrefix}:${clientIp(req)}`;
   const now = Date.now();
+  if (buckets.size >= MAX_BUCKETS && !buckets.has(key)) {
+    for (const [k, v] of buckets) {
+      if (now - v.start >= windowMs) buckets.delete(k);
+      if (buckets.size < MAX_BUCKETS) break;
+    }
+  }
   const current = buckets.get(key);
   if (!current || now - current.start >= windowMs) {
     buckets.set(key, { start: now, count: 1 });

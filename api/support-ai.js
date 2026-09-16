@@ -1,9 +1,9 @@
-const MODELS=['gemini-3.6-flash','gemini-3.5-flash-lite','gemini-2.5-flash'];
+const MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash-lite'];
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   const message=String(req.body?.message||'').trim();
   if(!message)return res.status(400).json({error:'Thiếu câu hỏi.'});
-  const key=String(process.env.GEMINI_API_KEY||'').replace(/^['"`]+|['"`]+$/g,'').replace(/[\u0000-\u0020\u007f-\u009f]/g,'').trim();
+  const key=String(process.env.GEMINI_API_KEY||'').replace(/^[\'"`]+|[\'"`]+$/g,'').replace(/[\u0000-\u0020\u007f-\u009f]/g,'').trim();
   if(!key)return res.status(500).json({error:'GEMINI_API_KEY chưa được cấu hình trên Vercel.'});
   const badIndex=[...key].findIndex(ch=>ch.charCodeAt(0)>127);
   if(badIndex>=0)return res.status(500).json({error:`GEMINI_API_KEY trên Vercel chứa ký tự không hợp lệ tại vị trí ${badIndex}.`});

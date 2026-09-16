@@ -17,17 +17,26 @@ function subjectMode(subject, text) {
   if (/hóa|chemistry|phản ứng|mol|acid|base|oxi hóa|hữu cơ/.test(s)) return 'chemistry';
   return 'general';
 }
-function transient(status, msg) {
+function transient(status, msg, err) {
   const m = String(msg || '').toLowerCase();
-  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500 || m.includes('high demand') || m.includes('resource exhausted') || m.includes('rate limit') || m.includes('temporarily unavailable') || m.includes('overloaded');
+  const name = String(err?.name || '').toLowerCase();
+  const code = String(err?.code || '').toUpperCase();
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500 ||
+    name === 'aborterror' || name === 'timeouterror' || code === 'ETIMEDOUT' || code === 'ECONNRESET' || code === 'EAI_AGAIN' ||
+    m.includes('high demand') || m.includes('resource exhausted') || m.includes('rate limit') || m.includes('temporarily unavailable') || m.includes('overloaded') || m.includes('timeout') || m.includes('timed out') || m.includes('fetch failed');
 }
 function providerError(status, msg) {
   if (status === 401 || status === 403) return 'API AI chưa được cấp quyền hoặc khóa API không hợp lệ.';
   if (status === 404) return 'Model AI không khả dụng.';
-  if (transient(status, msg)) return 'AI đang bận tạm thời.';
+  if (transient(status, msg)) return 'AI đang bận hoặc kết nối bị gián đoạn tạm thời.';
   return 'Bộ giải AI không phản hồi hợp lệ.';
 }
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function retryDelay(error, attempt) {
+  const serverDelay = Number(error?.retryAfterMs);
+  if (Number.isFinite(serverDelay) && serverDelay >= 0) return Math.min(10000, serverDelay);
+  return Math.min(8000, 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 700));
+}
 
 async function wolfram(query) {
   const appid = cleanKey(process.env.WOLFRAM_APP_ID);
@@ -53,17 +62,28 @@ async function gemini({ message, subject, history, image, cas, model, deep = tru
   if (!api) throw new Error('GEMINI_API_KEY chưa được cấu hình.');
   const parts = [{ text: solverPrompt(subject, subjectMode(subject, message), cas, message, history) }];
   const img = imagePart(image); if (img) parts.push(img);
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': api },
-    body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens, ...(model === 'gemini-3.8-flash' ? { thinkingConfig: { thinkingLevel: deep ? 'high' : 'medium' } } : {}) } }),
-    signal: AbortSignal.timeout(timeout)
-  });
-  const raw = await r.text(); let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
-  if (!r.ok) throw Object.assign(new Error(providerError(r.status, d?.error?.message)), { status: r.status, providerMessage: d?.error?.message });
-  const c = d?.candidates?.[0];
-  const answer = c?.content?.parts?.map(p => p.text || '').join('').trim();
-  if (answer) return { answer, model, finishReason: c?.finishReason || null };
-  throw new Error('AI trả về rỗng.');
+  const started = Date.now();
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': api },
+      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens, ...(model === 'gemini-3.8-flash' ? { thinkingConfig: { thinkingLevel: deep ? 'high' : 'medium' } } : {}) } }),
+      signal: AbortSignal.timeout(timeout)
+    });
+    const raw = await r.text(); let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
+    if (!r.ok) {
+      const e = Object.assign(new Error(providerError(r.status, d?.error?.message)), { status: r.status, providerMessage: d?.error?.message });
+      const retryAfter = Number(r.headers.get('retry-after'));
+      if (Number.isFinite(retryAfter)) e.retryAfterMs = retryAfter * 1000;
+      throw e;
+    }
+    const c = d?.candidates?.[0];
+    const answer = c?.content?.parts?.map(p => p.text || '').join('').trim();
+    if (answer) return { answer, model, finishReason: c?.finishReason || null, providerLatencyMs: Date.now() - started };
+    throw new Error('AI trả về rỗng.');
+  } catch (e) {
+    if (transient(e?.status, e?.providerMessage || e?.message, e)) e.isTransient = true;
+    throw e;
+  }
 }
 
 async function solveWithFallback(args) {
@@ -77,8 +97,8 @@ async function solveWithFallback(args) {
         last = e;
         if (e?.status === 401 || e?.status === 403) break;
         if (e?.status === 404) break;
-        if (!transient(e?.status, e?.providerMessage || e?.message)) break;
-        await sleep(1200 * Math.pow(2, attempt) + Math.floor(Math.random() * 700));
+        if (!transient(e?.status, e?.providerMessage || e?.message, e)) break;
+        if (attempt < 2) await sleep(retryDelay(e, attempt));
       }
     }
     if (last?.status === 401 || last?.status === 403) break;
@@ -97,16 +117,31 @@ async function verify({ message, image, cas, candidate }) {
   const api = cleanKey(process.env.GEMINI_API_KEY); if (!api || !candidate) return null;
   const prompt = `Bạn là VERIFICATION ENGINE của STUDY TH. Kiểm tra lời giải sau từ đầu đến cuối.\n\nPHẢI KIỂM TRA:\nA. Đọc lại đề/ảnh và miền điều kiện.\nB. Kiểm tra từng biến đổi quan trọng.\nC. Thế ngược vào đề gốc.\nD. Thử giá trị mẫu, biên, trường hợp đặc biệt và cố tìm phản ví dụ khi phù hợp.\nE. Kiểm tra mất/thêm nghiệm.\nF. Với bài phần trăm/tăng giảm/hao hụt, kiểm tra phần trăm áp dụng trên giá trị ban đầu hay giá trị hiện tại theo đúng câu chữ.\nG. Nếu có một lỗi toán học chắc chắn, verdict=FAIL. Nếu chưa đủ dữ kiện để kết luận, verdict=UNCERTAIN.\n\nTrả JSON duy nhất:\n{"verdict":"PASS|FAIL|UNCERTAIN","issues":["..."],"tests":[{"test":"...","result":"PASS|FAIL|NOT_APPLICABLE","note":"..."}],"repair_hint":"..."}\n\nĐỀ:\n${message}\n\nCAS/WOLFRAM:\n${cas || 'Không có'}\n\nLỜI GIẢI:\n${candidate.answer}`;
   const parts = [{ text: prompt }]; const img = imagePart(image); if (img) parts.push(img);
-  try {
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': api },
-      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens: 3200, responseMimeType: 'application/json' } }),
-      signal: AbortSignal.timeout(12000)
-    });
-    const raw = await r.text(); if (!r.ok) return null; let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
-    const txt = d?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
-    return parseJson(txt);
-  } catch (_) { return null; }
+  let last = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': api },
+        body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens: 3200, responseMimeType: 'application/json' } }),
+        signal: AbortSignal.timeout(12000)
+      });
+      const raw = await r.text(); if (!r.ok) {
+        last = Object.assign(new Error(providerError(r.status, 'verification')), { status: r.status });
+        if (transient(r.status, '', last) && attempt === 0) { await sleep(1200); continue; }
+        return null;
+      }
+      let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
+      const txt = d?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
+      const parsed = parseJson(txt);
+      if (parsed) return parsed;
+      last = new Error('Verification trả JSON không hợp lệ.');
+    } catch (e) {
+      last = e;
+      if (transient(e?.status, e?.message, e) && attempt === 0) { await sleep(1200); continue; }
+      return null;
+    }
+  }
+  return null;
 }
 
 async function repair({ message, subject, image, cas, candidate, audit, attempt }) {
@@ -122,13 +157,28 @@ async function openaiFallback({ message, subject, image, cas }) {
   const model = cleanKey(process.env.OPENAI_SOLVER_MODEL || 'gpt-5');
   const content = [{ type: 'input_text', text: `Giải toàn bộ bài từ gốc, trình bày từng bước, kiểm tra điều kiện, thế ngược và trường hợp đặc biệt. Với phần trăm/tăng giảm/hao hụt, xác định rõ phần trăm áp dụng trên đại lượng nào ở từng bước. ${cas ? 'Đối chiếu CAS/Wolfram: ' + cas : ''}\n\n${message}` }];
   const img = imagePart(image); if (img) content.push({ type: 'input_image', image_url: image, detail: 'high' });
-  const r = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + api },
-    body: JSON.stringify({ model, reasoning: { effort: 'high' }, input: [{ role: 'user', content }], max_output_tokens: MAX_OUTPUT_TOKENS }), signal: AbortSignal.timeout(30000)
-  });
-  const raw = await r.text(); let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
-  if (!r.ok) throw new Error(d?.error?.message || ('OpenAI HTTP ' + r.status));
-  return { answer: d.output_text || '', model };
+  let last = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + api },
+        body: JSON.stringify({ model, reasoning: { effort: 'high' }, input: [{ role: 'user', content }], max_output_tokens: MAX_OUTPUT_TOKENS }), signal: AbortSignal.timeout(30000)
+      });
+      const raw = await r.text(); let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
+      if (!r.ok) {
+        last = Object.assign(new Error(d?.error?.message || ('OpenAI HTTP ' + r.status)), { status: r.status });
+        if (transient(r.status, d?.error?.message, last) && attempt === 0) { await sleep(1500); continue; }
+        throw last;
+      }
+      if (d.output_text) return { answer: d.output_text, model };
+      throw new Error('OpenAI trả về rỗng.');
+    } catch (e) {
+      last = e;
+      if (transient(e?.status, e?.message, e) && attempt === 0) { await sleep(1500); continue; }
+      throw e;
+    }
+  }
+  throw last || new Error('OpenAI fallback thất bại.');
 }
 
 module.exports = async function handler(req, res) {

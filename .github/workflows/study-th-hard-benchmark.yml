@@ -1,0 +1,22 @@
+name: STUDY TH Hard Math Benchmark
+
+on:
+  push:
+    paths:
+      - 'benchmarks/study_th_hard_benchmark.py'
+      - '.github/workflows/study-th-hard-benchmark.yml'
+  workflow_dispatch:
+
+jobs:
+  hard_math:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run hard benchmark
+        run: python3 benchmarks/study_th_hard_benchmark.py
+      - name: Publish result
+        uses: actions/upload-artifact@v4
+        with:
+          name: study-th-hard-results
+          path: benchmark-hard-results.json

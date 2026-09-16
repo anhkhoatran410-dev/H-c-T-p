@@ -1,14 +1,16 @@
-import { applySecurityHeaders, distributedRateLimit, enforceBodySize, sameOrigin, safeRequestId } from './_security.js';
+import { distributedRateLimit, enforceBodySize, applySecurityHeaders, sameOrigin, safeRequestId } from './_security.js';
 import { internalNonce, internalSignature, internalTimestamp } from './_internal-replay.js';
 import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
 import { enforceCostChallenge } from './_adaptive-defense.js';
 import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
+import { guardAiResponse } from './_response-guard.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 10;
 
 function internalSecret(){ return String(process.env.INTERNAL_GATEWAY_SECRET || '').trim(); }
+function lockdown(){ return /^(1|true|yes|on)$/i.test(String(process.env.SECURITY_LOCKDOWN || '').trim()); }
 function baseUrl(req){
   const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim() || 'https';
   const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
@@ -24,6 +26,7 @@ export default async function handler(req,res){
   const requestId = safeRequestId();
   res.setHeader('X-Request-ID', requestId);
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
+  if(lockdown()) return res.status(503).json({error:'AI service temporarily locked down.',requestId});
   if(!(await shieldGate(req,res))) return;
   if(!(await enforceAgentThreatDefense(req,res))) return;
   if(!(await enforceCostChallenge(req,res))) { await recordAgentSignal(req,'cost-challenge'); return; }
@@ -53,8 +56,9 @@ export default async function handler(req,res){
       signal:AbortSignal.timeout(90_000)
     });
     const text = await upstream.text();
-    res.status(upstream.status);
-    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json; charset=utf-8');
-    return res.end(text);
+    const guarded=guardAiResponse(text, upstream.headers.get('content-type') || 'application/json; charset=utf-8');
+    res.status(guarded.ok ? upstream.status : guarded.status);
+    res.setHeader('Content-Type', guarded.contentType);
+    return res.end(guarded.body);
   }catch(e){ return res.status(504).json({error:'AI backend timeout hoặc không truy cập được.',requestId}); }
 }

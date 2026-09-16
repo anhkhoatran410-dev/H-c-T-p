@@ -1,6 +1,7 @@
 import { applySecurityHeaders, distributedRateLimit, enforceBodySize, sameOrigin, safeRequestId } from './_security.js';
 import { internalNonce, internalSignature, internalTimestamp } from './_internal-replay.js';
 import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
+import { enforceCostChallenge } from './_adaptive-defense.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -23,6 +24,7 @@ export default async function handler(req,res){
   res.setHeader('X-Request-ID', requestId);
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
   if(!(await shieldGate(req,res))) return;
+  if(!(await enforceCostChallenge(req,res))) return;
   if(!enforceBodySize(req,res,MAX_AI_BODY)) { await recordShieldViolation(req,'oversized-body'); return; }
   if(!sameOrigin(req,res)) { await recordShieldViolation(req,'bad-origin'); return; }
   if(!(await distributedRateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'}))) {

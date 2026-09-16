@@ -1,11 +1,22 @@
 import { acquireAiKey, reportAiFailure, reportAiSuccess } from './_ai-resilience.js';
+import { enforceBodySize, sameOrigin, distributedRateLimit, applySecurityHeaders, safeRequestId } from './_security.js';
+import { enforceCostChallenge } from './_adaptive-defense.js';
+import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
 
 const MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash','gemini-3.5-flash-lite'];
 function cleanKey(value){return String(value||'').replace(/^['"`]+|['"`]+$/g,'').replace(/[\u0000-\u0020\u007f-\u009f]/g,'').trim();}
 function providerMessage(data,status){return data?.error?.message||data?.message||`Gemini HTTP ${status}`;}
 function extractInteractionText(data){const direct=String(data?.output_text||'').trim();if(direct)return direct;const outputs=Array.isArray(data?.outputs)?data.outputs:[];for(const item of outputs){const text=Array.isArray(item?.content)?item.content.filter(x=>x?.type==='text').map(x=>String(x.text||'')).join(' ').trim():'';if(text)return text;}const steps=Array.isArray(data?.steps)?data.steps:[];for(let i=steps.length-1;i>=0;i--){const content=steps[i]?.content;const text=Array.isArray(content)?content.filter(x=>x?.type==='text').map(x=>String(x.text||'')).join(' ').trim():'';if(text)return text;}return '';}
 export default async function handler(req,res){
+  applySecurityHeaders(res);
+  res.setHeader('X-Request-ID',safeRequestId());
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  if(!(await enforceAgentThreatDefense(req,res)))return;
+  if(!(await enforceCostChallenge(req,res))){await recordAgentSignal(req,'cost-challenge');return;}
+  if(!enforceBodySize(req,res,1_000_000)){await recordAgentSignal(req,'oversized-body');return;}
+  if(!sameOrigin(req,res)){await recordAgentSignal(req,'bad-origin');return;}
+  if(!(await distributedRateLimit(req,res,{windowMs:60_000,max:20,keyPrefix:'support-ai'}))){await recordAgentSignal(req,'rate-limit');return;}
+
   const message=String(req.body?.message||'').trim();
   if(!message)return res.status(400).json({error:'Thiếu câu hỏi.'});
   const first=await acquireAiKey('GEMINI');
@@ -18,8 +29,7 @@ export default async function handler(req,res){
   const history=Array.isArray(req.body?.history)?req.body.history.slice(-8):[];
   const system=`Bạn là AI hỗ trợ học tập của STUDY TH. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn nhưng đủ bước. Bạn có thể giải thích kiến thức, hướng dẫn cách làm bài, sửa lỗi tư duy và hướng dẫn sử dụng website. Không bịa dữ liệu của website. Nếu câu hỏi cần dữ liệu nội bộ mà bạn không được cung cấp, nói rõ rằng cần Admin kiểm tra. Không tự nhận là Admin.\n\nQUY TẮC ĐỊNH DẠNG TOÁN BẮT BUỘC:\n- Mọi công thức toán phải dùng LaTeX có delimiter. Công thức inline bắt buộc viết dạng \\( ... \\). Công thức đứng riêng/bảng công thức bắt buộc viết dạng \\[ ... \\].\n- Không được trả về LaTeX trần như \\frac{a}{b}, \\sqrt{x}, x^2 hoặc \\infty bên ngoài delimiter.\n- Có thể dùng Unicode đơn giản như ∞, √, ≤, ≥, × khi không cần công thức LaTeX.\n- Khi có phân số, căn, đạo hàm, tích phân, giới hạn, ma trận hoặc công thức nhiều bước, ưu tiên LaTeX có delimiter để giao diện KaTeX render chính xác.`;
   const prompt=`${system}\nMôn hiện tại: ${subject||'chưa chọn'}\nLịch sử chat:\n${history.map(x=>`${x.role||'user'}: ${String(x.message||'')}`).join('\n')}\nCâu hỏi mới: ${message}`;
-  let last='';
-  const attempted=new Set();
+  let last='';const attempted=new Set();
   try{
     for(let keyAttempt=0;keyAttempt<20;keyAttempt++){
       const keyEntry=keyAttempt===0?first:await acquireAiKey('GEMINI',Array.from(attempted));
@@ -27,8 +37,7 @@ export default async function handler(req,res){
       try{
         const interaction=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key,'Api-Revision':'2026-05-20'},body:JSON.stringify({model:'gemini-3.8-flash',store:false,input:prompt}),signal:AbortSignal.timeout(30000)});
         const raw=await interaction.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
-        if(interaction.ok){const answer=extractInteractionText(data);if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model:data?.model||'gemini-3.8-flash',api:'interactions'});}last='Interactions API trả về rỗng.';await noteFailure(keyEntry,{status:502});}
-        else{last=providerMessage(data,interaction.status);await noteFailure(keyEntry,{status:interaction.status});}
+        if(interaction.ok){const answer=extractInteractionText(data);if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model:data?.model||'gemini-3.8-flash',api:'interactions'});}last='Interactions API trả về rỗng.';await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data,interaction.status);await noteFailure(keyEntry,{status:interaction.status});}
       }catch(e){last=e?.message||'Gemini Interactions API lỗi.';await noteFailure(keyEntry,{status:e?.status||0,code:e?.code});}
     }
     for(const model of MODELS){
@@ -36,8 +45,7 @@ export default async function handler(req,res){
       try{
         const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1200}}),signal:AbortSignal.timeout(30000)});
         const raw2=await r.text();let data2={};try{data2=raw2?JSON.parse(raw2):{}}catch{}
-        if(r.ok){const answer=data2?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||'';if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model});}last=`${model}: AI trả về rỗng.`;await noteFailure(keyEntry,{status:502});}
-        else{last=providerMessage(data2,r.status);await noteFailure(keyEntry,{status:r.status});}
+        if(r.ok){const answer=data2?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||'';if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model});}last=`${model}: AI trả về rỗng.`;await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data2,r.status);await noteFailure(keyEntry,{status:r.status});}
       }catch(e){last=e?.message||`${model}: request failed`;await noteFailure(keyEntry,{status:e?.status||0,code:e?.code});}
     }
     return res.status(502).json({error:last||'Gemini không phản hồi.'});

@@ -1,0 +1,80 @@
+import crypto from 'node:crypto';
+
+const buckets = new Map();
+const DEFAULT_WINDOW_MS = 60_000;
+const DEFAULT_MAX = 30;
+const MAX_BODY_BYTES = 1_500_000;
+
+function clientIp(req) {
+  const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
+  return forwarded || String(req.socket?.remoteAddress || 'unknown');
+}
+
+export function applySecurityHeaders(res) {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+}
+
+export function enforceMethod(req, res, methods) {
+  const allowed = new Set(methods.map(String));
+  if (!allowed.has(String(req.method || '').toUpperCase())) {
+    res.setHeader('Allow', [...allowed].join(', '));
+    res.status(405).json({ error: 'Method not allowed' });
+    return false;
+  }
+  return true;
+}
+
+export function enforceBodySize(req, res, maxBytes = MAX_BODY_BYTES) {
+  const length = Number(req.headers?.['content-length']);
+  if (Number.isFinite(length) && length > maxBytes) {
+    res.status(413).json({ error: 'Request body quá lớn.' });
+    return false;
+  }
+  return true;
+}
+
+export function sameOrigin(req, res) {
+  const configured = String(process.env.APP_ORIGIN || '').trim().replace(/\/$/, '');
+  if (!configured) return true;
+  const origin = String(req.headers?.origin || '').trim().replace(/\/$/, '');
+  const referer = String(req.headers?.referer || '').trim();
+  if (!origin && !referer) return true;
+  const source = origin || (() => { try { return new URL(referer).origin; } catch { return ''; } })();
+  if (source !== configured) {
+    res.status(403).json({ error: 'Origin không được phép.' });
+    return false;
+  }
+  return true;
+}
+
+export function rateLimit(req, res, options = {}) {
+  const windowMs = Number(options.windowMs || DEFAULT_WINDOW_MS);
+  const max = Number(options.max || DEFAULT_MAX);
+  const keyPrefix = String(options.keyPrefix || 'api');
+  const key = `${keyPrefix}:${clientIp(req)}`;
+  const now = Date.now();
+  const current = buckets.get(key);
+  if (!current || now - current.start >= windowMs) {
+    buckets.set(key, { start: now, count: 1 });
+    return true;
+  }
+  current.count += 1;
+  if (current.count > max) {
+    const retry = Math.max(1, Math.ceil((windowMs - (now - current.start)) / 1000));
+    res.setHeader('Retry-After', String(retry));
+    res.status(429).json({ error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' });
+    return false;
+  }
+  return true;
+}
+
+export function safeRequestId() {
+  return crypto.randomBytes(12).toString('hex');
+}

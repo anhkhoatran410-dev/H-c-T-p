@@ -7,7 +7,8 @@
     "api/_ai-gateway.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/_solve-core.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/support-ai.js": { "maxDuration": 60, "supportsCancellation": true },
-    "api/admin-command.js": { "maxDuration": 60, "supportsCancellation": true }
+    "api/admin-command.js": { "maxDuration": 60, "supportsCancellation": true },
+    "api/system-control.js": { "maxDuration": 30, "supportsCancellation": true }
   },
   "headers": [
     {
@@ -31,6 +32,7 @@
     { "source": "/api/admin-delete-exams-bulk", "destination": "/api/admin-tools?route=admin-delete-exams-bulk" },
     { "source": "/api/admin-update-exam", "destination": "/api/admin-tools?route=admin-update-exam" },
     { "source": "/api/client-meta", "destination": "/api/admin-tools?route=client-meta" },
-    { "source": "/api/system-incidents", "destination": "/api/system-control?route=incidents" }
+    { "source": "/api/system-incidents", "destination": "/api/system-control?route=incidents" },
+    { "source": "/api/ai-lockdown", "destination": "/api/system-control?route=lockdown" }
   ]
 }

@@ -1,0 +1,22 @@
+name: STUDY TH Math Benchmark
+
+on:
+  push:
+    paths:
+      - 'benchmarks/**'
+      - '.github/workflows/study-th-benchmark.yml'
+  workflow_dispatch:
+
+jobs:
+  gsm8k:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run GSM8K benchmark
+        run: python3 benchmarks/study_th_gsm8k.py
+      - name: Publish benchmark result
+        uses: actions/upload-artifact@v4
+        with:
+          name: study-th-gsm8k-results
+          path: benchmark-results.json

@@ -9,7 +9,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   audit:
@@ -26,7 +25,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Check for dangerous debugging/config files
+      - name: Check for dangerous secret/config files
         shell: bash
         run: |
           set -euo pipefail
@@ -39,9 +38,7 @@ jobs:
                 ;;
             esac
           done < <(git ls-files -z)
-          if [ "$forbidden" -ne 0 ]; then
-            exit 1
-          fi
+          if [ "$forbidden" -ne 0 ]; then exit 1; fi
 
       - name: Basic JavaScript syntax check
         shell: bash
@@ -52,6 +49,4 @@ jobs:
             found=1
             node --check "$file"
           done < <(find api admin -type f -name '*.js' -print0 2>/dev/null || true)
-          if [ "$found" -eq 0 ]; then
-            echo "No JavaScript files found for syntax check."
-          fi
+          if [ "$found" -eq 0 ]; then echo "No JavaScript files found for syntax check."; fi

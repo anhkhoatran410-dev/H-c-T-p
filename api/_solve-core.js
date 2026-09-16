@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import './_gemini-network-guard.js';
 import solveHandler from './solve.js';
 import { applySecurityHeaders, enforceBodySize, rateLimit, safeRequestId } from './_security.js';
 

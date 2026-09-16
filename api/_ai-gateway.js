@@ -3,6 +3,7 @@ import { internalNonce, internalSignature, internalTimestamp } from './_internal
 import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
 import { enforceCostChallenge } from './_adaptive-defense.js';
 import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
+import { aiLockdownStatus } from './_emergency-lock.js';
 import { guardAiResponse } from './_response-guard.js';
 
 const MAX_AI_BODY = 1_200_000;
@@ -10,7 +11,6 @@ const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 10;
 
 function internalSecret(){ return String(process.env.INTERNAL_GATEWAY_SECRET || '').trim(); }
-function lockdown(){ return /^(1|true|yes|on)$/i.test(String(process.env.SECURITY_LOCKDOWN || '').trim()); }
 function baseUrl(req){
   const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim() || 'https';
   const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
@@ -26,7 +26,8 @@ export default async function handler(req,res){
   const requestId = safeRequestId();
   res.setHeader('X-Request-ID', requestId);
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
-  if(lockdown()) return res.status(503).json({error:'AI service temporarily locked down.',requestId});
+  const lock=await aiLockdownStatus();
+  if(lock.locked) return res.status(503).json({error:'AI service temporarily locked down.',requestId});
   if(!(await shieldGate(req,res))) return;
   if(!(await enforceAgentThreatDefense(req,res))) return;
   if(!(await enforceCostChallenge(req,res))) { await recordAgentSignal(req,'cost-challenge'); return; }
@@ -53,7 +54,7 @@ export default async function handler(req,res){
       method:'POST',
       headers:{'Content-Type':'application/json','X-STUDY-TH-INTERNAL':signature,'X-STUDY-TH-TIMESTAMP':String(timestamp),'X-STUDY-TH-NONCE':nonce,'X-Request-ID':requestId},
       body:JSON.stringify(body),
-      signal:AbortSignal.timeout(90_000)
+      signal:AbortSignal.timeout(60_000)
     });
     const text = await upstream.text();
     const guarded=guardAiResponse(text, upstream.headers.get('content-type') || 'application/json; charset=utf-8');

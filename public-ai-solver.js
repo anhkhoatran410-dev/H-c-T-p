@@ -24,6 +24,9 @@
 
   function addSentImage(messageBubble,img){
     if(!img||!messageBubble)return;
+    const textNodes=[...messageBubble.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());
+    textNodes.forEach(n=>{const span=document.createElement('span');span.className='study-ai-user-text';span.textContent=n.textContent.trim();n.replaceWith(span)});
+    messageBubble.style.background='transparent';messageBubble.style.padding='0';messageBubble.style.boxShadow='none';messageBubble.style.alignItems='flex-end';
     const wrap=document.createElement('div');wrap.className='study-ai-image-in-message';
     const thumb=document.createElement('img');thumb.src=img;thumb.alt='Ảnh đề bài đã gửi';thumb.loading='lazy';
     const hint=document.createElement('span');hint.textContent='Nhấn để xem ảnh';

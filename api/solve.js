@@ -50,7 +50,7 @@ async function openaiFallback({message,subject,history,imageDataUrl,verified}){
   return {answer:data.output_text||'Mình chưa có câu trả lời.',model:'gpt-5'};
 }
 
-export default async function handler(req,res){
+module.exports=async function handler(req,res){
   if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
   try{
     const message=String(req.body?.message||'').trim(); if(!message)return json(res,400,{error:'Thiếu câu hỏi.'});

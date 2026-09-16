@@ -1,12 +1,12 @@
 import crypto from 'node:crypto';
 import { applySecurityHeaders, enforceBodySize, sameOrigin, rateLimit, safeRequestId } from './_security.js';
+import { internalNonce, internalSignature, internalTimestamp } from './_internal-replay.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 10;
 
 function internalSecret(){ return String(process.env.INTERNAL_GATEWAY_SECRET || '').trim(); }
-function internalProof(){ const s = internalSecret(); return s ? crypto.createHmac('sha256', s).update('study-th-ai-gateway').digest('hex') : ''; }
 function baseUrl(req){
   const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim() || 'https';
   const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
@@ -27,16 +27,26 @@ export default async function handler(req,res){
   if(!rateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'})) return;
   const target = String(req.query?.target || '').trim();
   if(target !== 'solve') return res.status(404).json({error:'Gateway route not found',requestId});
-  const proof = internalProof();
+  const secret = internalSecret();
   const url = baseUrl(req);
-  if(!proof || !url) return res.status(503).json({error:'AI gateway chưa được cấu hình đầy đủ.',requestId});
+  if(!secret || !url) return res.status(503).json({error:'AI gateway chưa được cấu hình đầy đủ.',requestId});
   const body = bodyOf(req);
   if(!body.message && !body.imageDataUrl) return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId});
   if(typeof body.message === 'string' && body.message.length > 30_000) return res.status(413).json({error:'Đề bài quá dài.',requestId});
+
+  const timestamp = internalTimestamp();
+  const nonce = internalNonce();
+  const signature = internalSignature(secret,timestamp,nonce);
   try{
     const upstream = await fetch(`${url}/api/_solve-core`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','X-STUDY-TH-INTERNAL':proof,'X-Request-ID':requestId},
+      headers:{
+        'Content-Type':'application/json',
+        'X-STUDY-TH-INTERNAL':signature,
+        'X-STUDY-TH-TIMESTAMP':String(timestamp),
+        'X-STUDY-TH-NONCE':nonce,
+        'X-Request-ID':requestId
+      },
       body:JSON.stringify(body),
       signal:AbortSignal.timeout(90_000)
     });

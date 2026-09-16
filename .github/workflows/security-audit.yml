@@ -1,0 +1,59 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, security-hardening]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+authenticated:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository for high-risk secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for dangerous debugging/config files
+        shell: bash
+        run: |
+          set -euo pipefail
+          forbidden=0
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              *.env|*.env.*|*.pem|*.key|id_rsa|id_ed25519)
+                echo "Potential secret file tracked: $file"
+                forbidden=1
+                ;;
+            esac
+          done < <(git ls-files -z)
+          if [ "$forbidden" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Basic JavaScript syntax check
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=0
+          while IFS= read -r -d '' file; do
+            found=1
+            node --check "$file"
+          done < <(find api admin -type f -name '*.js' -print0 2>/dev/null || true)
+          if [ "$found" -eq 0 ]; then
+            echo "No JavaScript files found for syntax check."
+          fi

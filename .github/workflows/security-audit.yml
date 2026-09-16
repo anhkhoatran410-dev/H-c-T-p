@@ -11,8 +11,6 @@ permissions:
   contents: read
   security-events: write
 
-authenticated:
-
 jobs:
   audit:
     runs-on: ubuntu-latest

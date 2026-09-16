@@ -1,9 +1,8 @@
 import { acquireAiKey, reportAiFailure, reportAiSuccess } from './_ai-resilience.js';
+import { classifyGeminiFailure } from './_gemini-error-policy.js';
 
 const GEMINI_HOST='generativelanguage.googleapis.com';
 const MAX_ATTEMPTS=8;
-const TRANSIENT_CODES=new Set([408,409,425,429]);
-function shouldRotate(status){return TRANSIENT_CODES.has(status)||status===401||status===403||status>=500;}
 function headersWithoutKey(init){const headers=new Headers(init?.headers||{});headers.delete('x-goog-api-key');return headers;}
 const nativeFetch=globalThis.fetch.bind(globalThis);
 
@@ -23,11 +22,14 @@ if(!globalThis.__STUDY_TH_GEMINI_GUARD__){
         const response=await nativeFetch(input,{...init,headers:nextHeaders});
         if(response.ok){await reportAiSuccess('GEMINI',entry.id);return response;}
         const status=Number(response.status||0);
-        if(!shouldRotate(status))return response;
+        const policy=classifyGeminiFailure(status,{message:`HTTP ${status}`});
+        if(!policy.countFailure)return response;
         await reportAiFailure('GEMINI',entry.id,{status});
-        lastError={status};
+        lastError={status,category:policy.category};
       }catch(error){
-        await reportAiFailure('GEMINI',entry.id,{status:Number(error?.status||0),code:error?.code});
+        const status=Number(error?.status||0);
+        const policy=classifyGeminiFailure(status,error);
+        if(policy.countFailure)await reportAiFailure('GEMINI',entry.id,{status,code:error?.code});
         lastError=error;
         if(attempt+1>=MAX_ATTEMPTS)throw error;
       }

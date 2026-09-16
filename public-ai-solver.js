@@ -8,16 +8,29 @@
 
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
-  function restoreSolverAfterCamera(){
-    try{
-      if(sessionStorage.getItem(CAMERA_RESTORE_KEY)!=='1')return;
-      sessionStorage.removeItem(CAMERA_RESTORE_KEY);
-    }catch(_e){}
-    setTimeout(()=>{
-      const modal=document.getElementById('study-ai-support');
-      if(modal)modal.classList.remove('hidden');
-      addComposerTools();
-    },0);
+  function openImageViewer(src,alt='Ảnh đề bài'){
+    if(!src)return;
+    let viewer=document.querySelector('[data-study-image-viewer]');
+    if(!viewer){
+      viewer=document.createElement('div');
+      viewer.dataset.studyImageViewer='1';
+      viewer.innerHTML='<button type="button" aria-label="Đóng ảnh" data-close>×</button><img alt="">';
+      viewer.style.cssText='position:fixed;inset:0;z-index:10020;background:rgba(0,0,0,.84);display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;cursor:zoom-out';
+      viewer.querySelector('img').style.cssText='max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;box-shadow:0 20px 70px rgba(0,0,0,.45)';
+      viewer.querySelector('[data-close]').style.cssText='position:absolute;top:max(14px,env(safe-area-inset-top));right:18px;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;font-size:30px;line-height:1;cursor:pointer;z-index:2';
+      viewer.addEventListener('click',e=>{if(e.target===viewer||e.target.dataset.close!==undefined)viewer.remove()});
+      document.body.appendChild(viewer);
+    }
+    const img=viewer.querySelector('img');img.src=src;img.alt=alt;viewer.style.display='flex';
+  }
+
+  function addSentImage(box,img){
+    if(!img)return;
+    const wrap=document.createElement('div');wrap.className='study-ai-image-in-message';wrap.style.cssText='margin:8px 0 2px;display:flex';
+    const thumb=document.createElement('img');thumb.src=img;thumb.alt='Ảnh đề bài đã gửi';
+    thumb.style.cssText='width:132px;height:96px;object-fit:cover;border-radius:12px;border:1px solid rgba(80,95,130,.22);cursor:zoom-in;display:block';
+    thumb.addEventListener('click',()=>openImageViewer(img,thumb.alt));
+    wrap.appendChild(thumb);box.appendChild(wrap);
   }
 
   function addComposerTools(){
@@ -31,95 +44,33 @@
       tools.style.cssText='display:flex;gap:8px;margin:8px 0 0;align-items:center;flex-wrap:wrap';
       tools.innerHTML='<button type="button" class="theme-chip" data-study-photo>📷 Chụp đề</button><button type="button" class="theme-chip" data-study-file>🖼️ Chọn ảnh</button><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" data-study-deep checked> Suy luận sâu</label><input type="file" data-study-image-input accept="image/*" capture="environment" hidden>';
       form.insertBefore(tools,ta);
-      tools.querySelector('[data-study-photo]').onclick=()=>{
-        try{sessionStorage.setItem(CAMERA_RESTORE_KEY,'1')}catch(_e){}
-        tools.querySelector('[data-study-image-input]').setAttribute('capture','environment');
-        tools.querySelector('[data-study-image-input]').click();
-      };
-      tools.querySelector('[data-study-file]').onclick=()=>{
-        const i=tools.querySelector('[data-study-image-input]');
-        i.removeAttribute('capture');
-        i.click();
-      };
-      tools.querySelector('[data-study-image-input]').addEventListener('click',e=>{
-        e.stopPropagation();
-      });
-      tools.querySelector('[data-study-image-input]').addEventListener('change',e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        const file=e.target.files?.[0];
-        if(file)preview(file,modal);
-        e.target.value='';
-        try{sessionStorage.removeItem(CAMERA_RESTORE_KEY)}catch(_e){}
-        requestAnimationFrame(()=>modal.classList.remove('hidden'));
-      });
+      tools.querySelector('[data-study-photo]').onclick=()=>{try{sessionStorage.setItem(CAMERA_RESTORE_KEY,'1')}catch(_e){};const i=tools.querySelector('[data-study-image-input]');i.setAttribute('capture','environment');i.click()};
+      tools.querySelector('[data-study-file]').onclick=e=>{e.preventDefault();e.stopPropagation();const i=tools.querySelector('[data-study-image-input]');i.removeAttribute('capture');i.click()};
+      tools.querySelector('[data-study-image-input]').addEventListener('click',e=>e.stopPropagation());
+      tools.querySelector('[data-study-image-input]').addEventListener('change',e=>{e.preventDefault();e.stopPropagation();const file=e.target.files?.[0];if(file)preview(file,modal);e.target.value='';try{sessionStorage.removeItem(CAMERA_RESTORE_KEY)}catch(_e){};requestAnimationFrame(()=>modal.classList.remove('hidden'));});
     }
 
     if(!form.dataset.studyBound){
       form.dataset.studyBound='1';
       form.onsubmit=async function(e){
-        e.preventDefault();e.stopImmediatePropagation();
-        if(form.dataset.studyBusy==='1')return;
-
-        const text=ta.value.trim();
-        const img=form.__studyImageData||'';
-        if(!text&&!img)return;
-
-        const box=modal.querySelector('#studyAiMessages');
-        if(!box)return;
-
-        const userText=text||'Giải bài trong ảnh này.';
-        const deep=form.querySelector('[data-study-deep]')?.checked;
-
-        const history=[...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')]
-          .map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim()}))
-          .filter(x=>x.message)
-          .slice(-8);
-
-        box.insertAdjacentHTML('beforeend','<div class="study-ai-msg user">'+esc(userText)+(img?' 📷':'')+'</div><div class="study-ai-msg bot" data-study-thinking>Đang đọc đề và kiểm tra lời giải…</div>');
-        box.scrollTop=box.scrollHeight;
-        ta.value='';
-        form.dataset.studyBusy='1';
-
-        const submit=form.querySelector('[type="submit"]');
-        const oldSubmitText=submit?.textContent||'';
-        if(submit){submit.disabled=true;submit.textContent='Đang giải…'}
-
+        e.preventDefault();e.stopImmediatePropagation();if(form.dataset.studyBusy==='1')return;
+        const text=ta.value.trim();const img=form.__studyImageData||'';if(!text&&!img)return;
+        const box=modal.querySelector('#studyAiMessages');if(!box)return;
+        const userText=text||'Giải bài trong ảnh này.';const deep=form.querySelector('[data-study-deep]')?.checked;
+        const history=[...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')].map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim()})).filter(x=>x.message).slice(-8);
+        const userMsg=document.createElement('div');userMsg.className='study-ai-msg user';userMsg.textContent=userText+(img?' 📷':'');box.appendChild(userMsg);if(img)addSentImage(box,img);
+        const thinking=document.createElement('div');thinking.className='study-ai-msg bot';thinking.dataset.studyThinking='1';thinking.textContent='Đang xử lý đề…';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
+        const submit=form.querySelector('[type="submit]');if(submit){submit.disabled=true;submit.dataset.busy='1';submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Đang giải');}
         try{
-          const subject=(window.state&&window.state.subject)||'';
-          const message=userText+(deep?'\nHãy kiểm tra độc lập ít nhất 2 lần trước khi kết luận.':'');
+          const subject=(window.state&&window.state.subject)||'';const message=userText+(deep?'\nHãy kiểm tra kỹ các bước, nhưng trình bày gọn và đầy đủ; không dừng giữa lời giải.':'');
           const r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,subject,history,imageDataUrl:img})});
-          const d=await r.json().catch(()=>({}));
-          if(!r.ok)throw new Error(d.error||('Solver HTTP '+r.status));
-
-          box.querySelector('[data-study-thinking]')?.remove();
-          const answer=String(d.answer||'Mình chưa có câu trả lời.');
-          const msg=document.createElement('div');
-          msg.className='study-ai-msg bot';
-          msg.style.whiteSpace='pre-wrap';
-          msg.textContent=answer;
-          box.appendChild(msg);
-
-          if(d.tool){
-            const tag=document.createElement('div');
-            tag.style.cssText='font-size:11px;opacity:.65;margin-top:5px';
-            tag.textContent='🔎 Kiểm chứng: '+String(d.tool);
-            msg.appendChild(tag);
-          }
-
-          if(window.MathJax?.typesetPromise){
-            try{await window.MathJax.typesetPromise([msg]);}catch(_e){}
-          }
-
-          box.scrollTop=box.scrollHeight;
-          form.__studyImageData='';
-          const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
-        }catch(err){
-          const t=box.querySelector('[data-study-thinking]');
-          if(t)t.textContent='⚠️ '+String(err.message||err);
-        }finally{
-          form.dataset.studyBusy='0';
-          if(submit){submit.disabled=false;submit.textContent=oldSubmitText}
+          const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Solver HTTP '+r.status));
+          thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.textContent=answer;box.appendChild(msg);
+          if(d.tool){const tag=document.createElement('div');tag.style.cssText='font-size:11px;opacity:.65;margin-top:5px';tag.textContent='🔎 Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
+          if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}
+          box.scrollTop=box.scrollHeight;form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
+        }catch(err){thinking.textContent='⚠️ '+String(err.message||err)}finally{
+          form.dataset.studyBusy='0';if(submit){submit.disabled=false;delete submit.dataset.busy;submit.removeAttribute('aria-busy');submit.setAttribute('aria-label','Gửi');}
         }
       };
     }
@@ -127,65 +78,20 @@
 
   async function compressImage(file){
     if(file.size>MAX_IMAGE_BYTES)throw new Error('Ảnh quá lớn. Hãy chọn ảnh dưới 12 MB.');
-
-    try{
-      const bitmap=await createImageBitmap(file);
-      const scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height));
-      const canvas=document.createElement('canvas');
-      canvas.width=Math.max(1,Math.round(bitmap.width*scale));
-      canvas.height=Math.max(1,Math.round(bitmap.height*scale));
-      const ctx=canvas.getContext('2d');
-      if(!ctx)throw new Error('Không thể xử lý ảnh.');
-      ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
-      bitmap.close?.();
-      return canvas.toDataURL('image/jpeg',0.82);
-    }catch(_e){
-      return await readAsDataURL(file);
-    }
+    try{const bitmap=await createImageBitmap(file);const scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Không thể xử lý ảnh.');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();return canvas.toDataURL('image/jpeg',0.82)}catch(_e){return await readAsDataURL(file)}
   }
-
-  function readAsDataURL(file){
-    return new Promise((resolve,reject)=>{
-      const reader=new FileReader();
-      reader.onload=()=>resolve(String(reader.result||''));
-      reader.onerror=()=>reject(new Error('Không đọc được ảnh.'));
-      reader.readAsDataURL(file);
-    });
-  }
+  function readAsDataURL(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('Không đọc được ảnh.'));reader.readAsDataURL(file)})}
 
   function preview(file,modal){
-    if(!file.type.startsWith('image/'))return;
-    const form=modal.querySelector('#studyAiForm');
-
+    if(!file.type.startsWith('image/'))return;const form=modal.querySelector('#studyAiForm');
     compressImage(file).then(dataUrl=>{
-      form.__studyImageData=dataUrl;
-      let pv=form.querySelector('[data-study-image-preview]');
-      if(!pv){
-        pv=document.createElement('div');
-        pv.dataset.studyImagePreview='1';
-        pv.style.cssText='margin-top:8px;display:flex;align-items:center;gap:8px';
-        pv.innerHTML='<img alt="Ảnh đề bài" style="width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid rgba(100,100,140,.25)"><button type="button" class="theme-chip">Xoá ảnh</button>';
-        form.insertBefore(pv,form.querySelector('textarea'));
-        pv.querySelector('button').onclick=e=>{
-          e.preventDefault();e.stopPropagation();
-          form.__studyImageData='';pv.remove();
-        };
-      }
-      pv.querySelector('img').src=dataUrl;
-      modal.classList.remove('hidden');
-    }).catch(err=>{
-      form.__studyImageData='';
-      let pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
-      modal.classList.remove('hidden');
-      const box=modal.querySelector('#studyAiMessages');
-      if(box){const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent='⚠️ '+String(err.message||err);box.appendChild(msg);box.scrollTop=box.scrollHeight;}
-    });
+      form.__studyImageData=dataUrl;let pv=form.querySelector('[data-study-image-preview]');
+      if(!pv){pv=document.createElement('div');pv.dataset.studyImagePreview='1';pv.style.cssText='margin-top:8px;display:flex;align-items:center;gap:8px';pv.innerHTML='<img alt="Ảnh đề bài" style="width:72px;height:54px;object-fit:cover;border-radius:10px;border:1px solid rgba(100,100,140,.25);cursor:zoom-in"><button type="button" class="theme-chip">Xoá ảnh</button>';form.insertBefore(pv,form.querySelector('textarea'));pv.querySelector('button').onclick=e=>{e.preventDefault();e.stopPropagation();form.__studyImageData='';pv.remove()};pv.querySelector('img').onclick=()=>openImageViewer(pv.querySelector('img').src,'Ảnh đề bài')}
+      pv.querySelector('img').src=dataUrl;modal.classList.remove('hidden');
+    }).catch(err=>{form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();modal.classList.remove('hidden');const box=modal.querySelector('#studyAiMessages');if(box){const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent='⚠️ '+String(err.message||err);box.appendChild(msg);box.scrollTop=box.scrollHeight}})
   }
 
-  const obs=new MutationObserver(()=>setTimeout(addComposerTools,0));
-  obs.observe(document.documentElement,{childList:true,subtree:true});
-  window.addEventListener('pageshow',restoreSolverAfterCamera);
-  window.addEventListener('focus',restoreSolverAfterCamera);
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{addComposerTools();restoreSolverAfterCamera();},100));
-  else setTimeout(()=>{addComposerTools();restoreSolverAfterCamera();},100);
+  const obs=new MutationObserver(()=>setTimeout(addComposerTools,0));obs.observe(document.documentElement,{childList:true,subtree:true});
+  window.addEventListener('pageshow',restoreSolverAfterCamera);window.addEventListener('focus',restoreSolverAfterCamera);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{addComposerTools();restoreSolverAfterCamera()},100));else setTimeout(()=>{addComposerTools();restoreSolverAfterCamera()},100);
 })();

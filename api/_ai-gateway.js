@@ -2,6 +2,7 @@ import { applySecurityHeaders, distributedRateLimit, enforceBodySize, sameOrigin
 import { internalNonce, internalSignature, internalTimestamp } from './_internal-replay.js';
 import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
 import { enforceCostChallenge } from './_adaptive-defense.js';
+import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -24,21 +25,23 @@ export default async function handler(req,res){
   res.setHeader('X-Request-ID', requestId);
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
   if(!(await shieldGate(req,res))) return;
-  if(!(await enforceCostChallenge(req,res))) return;
-  if(!enforceBodySize(req,res,MAX_AI_BODY)) { await recordShieldViolation(req,'oversized-body'); return; }
-  if(!sameOrigin(req,res)) { await recordShieldViolation(req,'bad-origin'); return; }
+  if(!(await enforceAgentThreatDefense(req,res))) return;
+  if(!(await enforceCostChallenge(req,res))) { await recordAgentSignal(req,'cost-challenge'); return; }
+  if(!enforceBodySize(req,res,MAX_AI_BODY)) { await recordShieldViolation(req,'oversized-body'); await recordAgentSignal(req,'oversized-body'); return; }
+  if(!sameOrigin(req,res)) { await recordShieldViolation(req,'bad-origin'); await recordAgentSignal(req,'bad-origin'); return; }
   if(!(await distributedRateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'}))) {
     await recordShieldViolation(req,'rate-limit');
+    await recordAgentSignal(req,'rate-limit');
     return;
   }
   const target = String(req.query?.target || '').trim();
-  if(target !== 'solve') { await recordShieldViolation(req,'unexpected-route'); return res.status(404).json({error:'Gateway route not found',requestId}); }
+  if(target !== 'solve') { await recordShieldViolation(req,'unexpected-route'); await recordAgentSignal(req,'unexpected-route'); return res.status(404).json({error:'Gateway route not found',requestId}); }
   const secret = internalSecret();
   const url = baseUrl(req);
   if(!secret || !url) return res.status(503).json({error:'AI gateway chưa được cấu hình đầy đủ.',requestId});
   const body = bodyOf(req);
-  if(!body.message && !body.imageDataUrl) { await recordShieldViolation(req,'empty-ai-request'); return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId}); }
-  if(typeof body.message === 'string' && body.message.length > 30_000) { await recordShieldViolation(req,'oversized-message'); return res.status(413).json({error:'Đề bài quá dài.',requestId}); }
+  if(!body.message && !body.imageDataUrl) { await recordShieldViolation(req,'empty-ai-request'); await recordAgentSignal(req,'empty-ai-request'); return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId}); }
+  if(typeof body.message === 'string' && body.message.length > 30_000) { await recordShieldViolation(req,'oversized-message'); await recordAgentSignal(req,'oversized-message'); return res.status(413).json({error:'Đề bài quá dài.',requestId}); }
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);

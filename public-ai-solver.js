@@ -3,10 +3,10 @@
   if(window.__studyStudentSolverInstalled)return;window.__studyStudentSolverInstalled=true;
 
   const MAX_IMAGE_BYTES=12*1024*1024;
-  const MAX_IMAGE_EDGE=1600;
+  const MAX_IMAGE_EDGE=1400;
   const CAMERA_RESTORE_KEY='study_ai_restore_after_camera';
 
-  function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function esc(v){return String(v??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]))}
 
   function openImageViewer(src,alt='Ảnh đề bài'){
     if(!src)return;
@@ -14,11 +14,14 @@
     if(!viewer){
       viewer=document.createElement('div');
       viewer.dataset.studyImageViewer='1';
-      viewer.innerHTML='<button type="button" aria-label="Đóng ảnh" data-close>×</button><img alt="">';
-      viewer.style.cssText='position:fixed;inset:0;z-index:10020;background:rgba(0,0,0,.84);display:flex;align-items:center;justify-content:center;padding:22px;box-sizing:border-box;cursor:zoom-out';
-      viewer.querySelector('img').style.cssText='max-width:100%;max-height:100%;object-fit:contain;border-radius:14px;box-shadow:0 20px 70px rgba(0,0,0,.45)';
-      viewer.querySelector('[data-close]').style.cssText='position:absolute;top:max(14px,env(safe-area-inset-top));right:18px;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;font-size:30px;line-height:1;cursor:pointer;z-index:2';
-      viewer.addEventListener('click',e=>{if(e.target===viewer||e.target.dataset.close!==undefined)viewer.remove()});
+      viewer.innerHTML='<button type="button" aria-label="Đóng ảnh" data-close>×</button><div data-image-wrap><img alt=""></div>';
+      viewer.style.cssText='position:fixed;inset:0;z-index:10020;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;cursor:zoom-out';
+      const wrap=viewer.querySelector('[data-image-wrap]');
+      wrap.style.cssText='max-width:100%;max-height:100%;display:flex;align-items:center;justify-content:center;cursor:default';
+      const img=viewer.querySelector('img');
+      img.style.cssText='max-width:100%;max-height:calc(100dvh - 56px);object-fit:contain;border-radius:14px;box-shadow:0 20px 70px rgba(0,0,0,.5)';
+      viewer.querySelector('[data-close]').style.cssText='position:absolute;top:max(12px,env(safe-area-inset-top));right:14px;width:44px;height:44px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;font-size:30px;line-height:1;cursor:pointer;z-index:2';
+      viewer.addEventListener('click',e=>{if(e.target===viewer||e.target.closest('[data-close]'))viewer.remove()});
       document.body.appendChild(viewer);
     }
     const img=viewer.querySelector('img');img.src=src;img.alt=alt;viewer.style.display='flex';
@@ -26,11 +29,16 @@
 
   function addSentImage(box,img){
     if(!img)return;
-    const wrap=document.createElement('div');wrap.className='study-ai-image-in-message';wrap.style.cssText='margin:8px 0 2px;display:flex';
-    const thumb=document.createElement('img');thumb.src=img;thumb.alt='Ảnh đề bài đã gửi';
-    thumb.style.cssText='width:132px;height:96px;object-fit:cover;border-radius:12px;border:1px solid rgba(80,95,130,.22);cursor:zoom-in;display:block';
+    const wrap=document.createElement('div');
+    wrap.className='study-ai-image-in-message';
+    wrap.style.cssText='margin:8px 0 3px;display:inline-flex;flex-direction:column;align-items:flex-start;gap:5px;max-width:88%';
+    const thumb=document.createElement('img');
+    thumb.src=img;thumb.alt='Ảnh đề bài đã gửi';
+    thumb.loading='lazy';
+    thumb.style.cssText='width:min(220px,68vw);height:auto;max-height:170px;object-fit:cover;border-radius:14px;border:1px solid rgba(80,95,130,.22);cursor:zoom-in;display:block;background:#eef2f8';
+    const hint=document.createElement('span');hint.textContent='Nhấn để xem ảnh';hint.style.cssText='font-size:11px;opacity:.62;padding-left:2px';
     thumb.addEventListener('click',()=>openImageViewer(img,thumb.alt));
-    wrap.appendChild(thumb);box.appendChild(wrap);
+    wrap.appendChild(thumb);wrap.appendChild(hint);box.appendChild(wrap);
   }
 
   function addComposerTools(){
@@ -47,7 +55,7 @@
       tools.querySelector('[data-study-photo]').onclick=()=>{try{sessionStorage.setItem(CAMERA_RESTORE_KEY,'1')}catch(_e){};const i=tools.querySelector('[data-study-image-input]');i.setAttribute('capture','environment');i.click()};
       tools.querySelector('[data-study-file]').onclick=e=>{e.preventDefault();e.stopPropagation();const i=tools.querySelector('[data-study-image-input]');i.removeAttribute('capture');i.click()};
       tools.querySelector('[data-study-image-input]').addEventListener('click',e=>e.stopPropagation());
-      tools.querySelector('[data-study-image-input]').addEventListener('change',e=>{e.preventDefault();e.stopPropagation();const file=e.target.files?.[0];if(file)preview(file,modal);e.target.value='';try{sessionStorage.removeItem(CAMERA_RESTORE_KEY)}catch(_e){};requestAnimationFrame(()=>modal.classList.remove('hidden'));});
+      tools.querySelector('[data-study-image-input]').addEventListener('change',e=>{e.preventDefault();e.stopPropagation();const file=e.target.files?.[0];if(file)preview(file,modal);e.target.value='';try{sessionStorage.removeItem(CAMERA_RESTORE_KEY)}catch(_e){};requestAnimationFrame(()=>modal.classList.remove('hidden'))});
     }
 
     if(!form.dataset.studyBound){
@@ -59,18 +67,23 @@
         const userText=text||'Giải bài trong ảnh này.';const deep=form.querySelector('[data-study-deep]')?.checked;
         const history=[...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')].map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim()})).filter(x=>x.message).slice(-8);
         const userMsg=document.createElement('div');userMsg.className='study-ai-msg user';userMsg.textContent=userText+(img?' 📷':'');box.appendChild(userMsg);if(img)addSentImage(box,img);
-        const thinking=document.createElement('div');thinking.className='study-ai-msg bot';thinking.dataset.studyThinking='1';thinking.textContent='Đang xử lý đề…';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
-        const submit=form.querySelector('[type="submit]');if(submit){submit.disabled=true;submit.dataset.busy='1';submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Đang giải');}
+        const thinking=document.createElement('div');thinking.className='study-ai-msg bot study-ai-thinking';thinking.dataset.studyThinking='1';thinking.setAttribute('aria-label','Đang xử lý');thinking.innerHTML='<span></span><span></span><span></span>';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
+        const submit=form.querySelector('[type="submit"]');
+        if(submit){submit.disabled=true;submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Gửi');submit.textContent='➤';}
         try{
-          const subject=(window.state&&window.state.subject)||'';const message=userText+(deep?'\nHãy kiểm tra kỹ các bước, nhưng trình bày gọn và đầy đủ; không dừng giữa lời giải.':'');
+          const subject=(window.state&&window.state.subject)||'';const message=userText+(deep?'\nHãy tự kiểm tra kỹ các bước và kết quả, nhưng trình bày gọn, đầy đủ; không dừng giữa lời giải.':'');
           const r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,subject,history,imageDataUrl:img})});
           const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Solver HTTP '+r.status));
-          thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.textContent=answer;box.appendChild(msg);
+          thinking.remove();
+          const answer=String(d.answer||'Mình chưa có câu trả lời.');
+          const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.textContent=answer;box.appendChild(msg);
           if(d.tool){const tag=document.createElement('div');tag.style.cssText='font-size:11px;opacity:.65;margin-top:5px';tag.textContent='🔎 Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
           if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}
           box.scrollTop=box.scrollHeight;form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
-        }catch(err){thinking.textContent='⚠️ '+String(err.message||err)}finally{
-          form.dataset.studyBusy='0';if(submit){submit.disabled=false;delete submit.dataset.busy;submit.removeAttribute('aria-busy');submit.setAttribute('aria-label','Gửi');}
+        }catch(err){thinking.textContent='⚠️ '+String(err.message||err);thinking.classList.remove('study-ai-thinking');
+        }finally{
+          form.dataset.studyBusy='0';
+          if(submit){submit.disabled=false;submit.removeAttribute('aria-busy');submit.setAttribute('aria-label','Gửi');submit.textContent='➤';}
         }
       };
     }
@@ -78,7 +91,7 @@
 
   async function compressImage(file){
     if(file.size>MAX_IMAGE_BYTES)throw new Error('Ảnh quá lớn. Hãy chọn ảnh dưới 12 MB.');
-    try{const bitmap=await createImageBitmap(file);const scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Không thể xử lý ảnh.');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();return canvas.toDataURL('image/jpeg',0.82)}catch(_e){return await readAsDataURL(file)}
+    try{const bitmap=await createImageBitmap(file);const scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height));const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Không thể xử lý ảnh.');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();return canvas.toDataURL('image/jpeg',0.78)}catch(_e){return await readAsDataURL(file)}
   }
   function readAsDataURL(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('Không đọc được ảnh.'));reader.readAsDataURL(file)})}
 
@@ -89,6 +102,11 @@
       if(!pv){pv=document.createElement('div');pv.dataset.studyImagePreview='1';pv.style.cssText='margin-top:8px;display:flex;align-items:center;gap:8px';pv.innerHTML='<img alt="Ảnh đề bài" style="width:72px;height:54px;object-fit:cover;border-radius:10px;border:1px solid rgba(100,100,140,.25);cursor:zoom-in"><button type="button" class="theme-chip">Xoá ảnh</button>';form.insertBefore(pv,form.querySelector('textarea'));pv.querySelector('button').onclick=e=>{e.preventDefault();e.stopPropagation();form.__studyImageData='';pv.remove()};pv.querySelector('img').onclick=()=>openImageViewer(pv.querySelector('img').src,'Ảnh đề bài')}
       pv.querySelector('img').src=dataUrl;modal.classList.remove('hidden');
     }).catch(err=>{form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();modal.classList.remove('hidden');const box=modal.querySelector('#studyAiMessages');if(box){const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent='⚠️ '+String(err.message||err);box.appendChild(msg);box.scrollTop=box.scrollHeight}})
+  }
+
+  function restoreSolverAfterCamera(){
+    try{if(sessionStorage.getItem(CAMERA_RESTORE_KEY)!=='1')return;sessionStorage.removeItem(CAMERA_RESTORE_KEY)}catch(_e){}
+    setTimeout(()=>{const modal=document.getElementById('study-ai-support');if(modal)modal.classList.remove('hidden');addComposerTools()},0);
   }
 
   const obs=new MutationObserver(()=>setTimeout(addComposerTools,0));obs.observe(document.documentElement,{childList:true,subtree:true});

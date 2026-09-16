@@ -1,5 +1,4 @@
-import crypto from 'node:crypto';
-import { applySecurityHeaders, enforceBodySize, sameOrigin, rateLimit, safeRequestId } from './_security.js';
+import { applySecurityHeaders, distributedRateLimit, enforceBodySize, sameOrigin, safeRequestId } from './_security.js';
 import { internalNonce, internalSignature, internalTimestamp } from './_internal-replay.js';
 
 const MAX_AI_BODY = 1_200_000;
@@ -24,7 +23,7 @@ export default async function handler(req,res){
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
   if(!enforceBodySize(req,res,MAX_AI_BODY)) return;
   if(!sameOrigin(req,res)) return;
-  if(!rateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'})) return;
+  if(!(await distributedRateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'}))) return;
   const target = String(req.query?.target || '').trim();
   if(target !== 'solve') return res.status(404).json({error:'Gateway route not found',requestId});
   const secret = internalSecret();
@@ -33,20 +32,13 @@ export default async function handler(req,res){
   const body = bodyOf(req);
   if(!body.message && !body.imageDataUrl) return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId});
   if(typeof body.message === 'string' && body.message.length > 30_000) return res.status(413).json({error:'Đề bài quá dài.',requestId});
-
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);
   try{
     const upstream = await fetch(`${url}/api/_solve-core`,{
       method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'X-STUDY-TH-INTERNAL':signature,
-        'X-STUDY-TH-TIMESTAMP':String(timestamp),
-        'X-STUDY-TH-NONCE':nonce,
-        'X-Request-ID':requestId
-      },
+      headers:{'Content-Type':'application/json','X-STUDY-TH-INTERNAL':signature,'X-STUDY-TH-TIMESTAMP':String(timestamp),'X-STUDY-TH-NONCE':nonce,'X-Request-ID':requestId},
       body:JSON.stringify(body),
       signal:AbortSignal.timeout(90_000)
     });

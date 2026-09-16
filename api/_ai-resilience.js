@@ -35,29 +35,34 @@ function getState(id) {
   return s;
 }
 
-function availableKey(entry, now) {
-  const s = getState(entry.id);
-  if (s.openedUntil > now) return false;
-  if (s.openedUntil && !s.probing) s.probing = true;
-  return !s.probing || s.openedUntil <= now;
-}
-
 export function getAiKeyPool(prefix = 'GEMINI') {
   return envKeys(prefix).map(entry => ({ ...entry, fingerprint: fingerprint(entry.key) }));
 }
 
-export function acquireAiKey(prefix = 'GEMINI') {
-  const pool = getAiKeyPool(prefix);
+export function acquireAiKey(prefix = 'GEMINI', excludedIds = []) {
+  const excluded = new Set(excludedIds.map(String));
+  const pool = getAiKeyPool(prefix).filter(k => !excluded.has(k.id));
   if (!pool.length) return null;
+
   const now = Date.now();
-  const healthy = pool.filter(k => availableKey(k, now));
-  const candidates = healthy.length ? healthy : pool.filter(k => getState(k.id).openedUntil <= now);
+  const healthy = pool.filter(k => {
+    const s = getState(k.id);
+    if (s.openedUntil > now) return false;
+    if (s.openedUntil && s.openedUntil <= now) s.probing = true;
+    return !s.probing || s.openedUntil <= now;
+  });
+
+  const candidates = healthy.length
+    ? healthy
+    : pool.filter(k => getState(k.id).openedUntil <= now);
   if (!candidates.length) return null;
+
   candidates.sort((a, b) => {
     const sa = getState(a.id);
     const sb = getState(b.id);
     return (sa.failures - sb.failures) || (sa.lastFailure - sb.lastFailure) || (sa.successes - sb.successes);
   });
+
   const selected = candidates[0];
   const s = getState(selected.id);
   if (s.openedUntil > 0 && s.openedUntil <= now) s.probing = true;
@@ -72,15 +77,24 @@ export function reportAiSuccess(prefix, id) {
   s.successes += 1;
 }
 
-export function reportAiFailure(prefix, id, error) {
+export function reportAiFailure(prefix, id, error = {}) {
   const s = getState(id);
   s.failures += 1;
   s.lastFailure = Date.now();
-  if (s.failures >= FAILURE_THRESHOLD) {
+
+  const status = Number(error?.status);
+  const permanentKeyFailure = status === 401 || status === 403;
+  const shouldOpen = permanentKeyFailure || s.failures >= FAILURE_THRESHOLD;
+  if (shouldOpen) {
     s.openedUntil = Date.now() + COOLDOWN_MS;
     s.probing = false;
   }
-  return { opened: s.openedUntil > Date.now(), failures: s.failures, retryAt: s.openedUntil || null };
+
+  return {
+    opened: s.openedUntil > Date.now(),
+    failures: s.failures,
+    retryAt: s.openedUntil || null
+  };
 }
 
 export function aiPoolSnapshot(prefix = 'GEMINI') {

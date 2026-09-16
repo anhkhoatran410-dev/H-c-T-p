@@ -5,11 +5,40 @@ const DEFAULT_WINDOW_MS = 60_000;
 const DEFAULT_MAX = 30;
 const MAX_BODY_BYTES = 1_500_000;
 const MAX_BUCKETS = 10_000;
+const REDIS_TIMEOUT_MS = 1_500;
 
 function clientIp(req) {
   const real = String(req.headers?.['x-real-ip'] || '').split(',')[0].trim();
   const forwarded = String(req.headers?.['x-forwarded-for'] || '').split(',')[0].trim();
   return real || forwarded || String(req.socket?.remoteAddress || 'unknown');
+}
+
+function redisConfig() {
+  const url = String(process.env.UPSTASH_REDIS_REST_URL || '').trim().replace(/\/$/, '');
+  const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim();
+  return url && token ? { url, token } : null;
+}
+
+async function redisEval(script, keys, args) {
+  const cfg = redisConfig();
+  if (!cfg) return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REDIS_TIMEOUT_MS);
+  try {
+    const r = await fetch(`${cfg.url}/pipeline`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify([[ 'EVAL', script, String(keys.length), ...keys, ...args.map(String) ]]),
+      signal: controller.signal,
+    });
+    if (!r.ok) return null;
+    const data = await r.json().catch(() => null);
+    return Array.isArray(data) ? data[0]?.result ?? null : null;
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function applySecurityHeaders(res) {
@@ -55,7 +84,7 @@ export function sameOrigin(req, res) {
   return true;
 }
 
-export function rateLimit(req, res, options = {}) {
+function localRateLimit(req, res, options) {
   const windowMs = Math.max(1_000, Number(options.windowMs || DEFAULT_WINDOW_MS));
   const max = Math.max(1, Number(options.max || DEFAULT_MAX));
   const keyPrefix = String(options.keyPrefix || 'api');
@@ -75,6 +104,34 @@ export function rateLimit(req, res, options = {}) {
   current.count += 1;
   if (current.count > max) {
     const retry = Math.max(1, Math.ceil((windowMs - (now - current.start)) / 1000));
+    res.setHeader('Retry-After', String(retry));
+    res.status(429).json({ error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' });
+    return false;
+  }
+  return true;
+}
+
+export function rateLimit(req, res, options = {}) {
+  return localRateLimit(req, res, options);
+}
+
+const RATE_LIMIT_LUA = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then redis.call('PEXPIRE', KEYS[1], ARGV[1]) end
+return current
+`;
+
+export async function distributedRateLimit(req, res, options = {}) {
+  const windowMs = Math.max(1_000, Number(options.windowMs || DEFAULT_WINDOW_MS));
+  const max = Math.max(1, Number(options.max || DEFAULT_MAX));
+  const prefix = String(options.keyPrefix || 'api');
+  const cfg = redisConfig();
+  if (!cfg) return localRateLimit(req, res, options);
+  const key = `study-th:rate:${prefix}:${clientIp(req)}`;
+  const count = Number(await redisEval(RATE_LIMIT_LUA, [key], [windowMs]) || 0);
+  if (!count) return localRateLimit(req, res, options);
+  if (count > max) {
+    const retry = Math.max(1, Math.ceil(windowMs / 1000));
     res.setHeader('Retry-After', String(retry));
     res.status(429).json({ error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau.' });
     return false;

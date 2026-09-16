@@ -55,10 +55,7 @@ async function gemini({ message, subject, history, image, cas, model, deep = tru
   const img = imagePart(image); if (img) parts.push(img);
   const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': api },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts }],
-      generationConfig: { maxOutputTokens, ...(model === 'gemini-3.8-flash' ? { thinkingConfig: { thinkingLevel: deep ? 'high' : 'medium' } } : {}) }
-    }),
+    body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens, ...(model === 'gemini-3.8-flash' ? { thinkingConfig: { thinkingLevel: deep ? 'high' : 'medium' } } : {}) } }),
     signal: AbortSignal.timeout(timeout)
   });
   const raw = await r.text(); let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
@@ -114,9 +111,9 @@ async function verify({ message, image, cas, candidate }) {
 
 async function repair({ message, subject, image, cas, candidate, audit, attempt }) {
   if (!candidate) return null;
-  return gemini({
+  return solveWithFallback({
     message: `REPAIR ENGINE. Lời giải dưới đây đã FAIL kiểm định. Giải lại TOÀN BỘ từ đầu, không vá một dòng. Sửa tất cả lỗi được nêu trong kiểm định, đặc biệt các lỗi về diễn giải phần trăm, đơn vị, miền điều kiện, mất/thêm nghiệm và thế ngược. Sau đó tự kiểm tra lại. Vòng sửa ${attempt}.\n\nĐỀ GỐC:\n${message}\n\nLỜI GIẢI CŨ:\n${candidate.answer}\n\nKIỂM ĐỊNH:\n${JSON.stringify(audit)}`,
-    subject, history: [], image, cas, model: 'gemini-3.8-flash', deep: true, timeout: 26000
+    subject, history: [], image, cas, deep: true
   });
 }
 

@@ -1,7 +1,13 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "framework": null,
   "outputDirectory": ".",
+  "functions": {
+    "api/solve.js": {
+      "maxDuration": 300
+    }
+  },
   "rewrites": [
     { "source": "/api/admin-health", "destination": "/api/admin-tools?route=admin-health" },
     { "source": "/api/admin-delete-exam", "destination": "/api/admin-tools?route=admin-delete-exam" },

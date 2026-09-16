@@ -2,7 +2,8 @@ import crypto from 'node:crypto';
 
 const FAILURE_THRESHOLD = 3;
 const COOLDOWN_MS = 60_000;
-const MAX_KEYS = 20;
+const HALF_OPEN_PROBE_MS = 15_000;
+const MAX_KEYS = 50;
 const state = new Map();
 
 function envKeys(prefix) {
@@ -29,10 +30,26 @@ function fingerprint(key) {
 function getState(id) {
   let s = state.get(id);
   if (!s) {
-    s = { failures: 0, openedUntil: 0, probing: false, successes: 0, lastFailure: 0 };
+    s = {
+      failures: 0,
+      successes: 0,
+      uses: 0,
+      openedUntil: 0,
+      probeUntil: 0,
+      lastFailure: 0,
+      lastUsed: 0,
+    };
     state.set(id, s);
   }
   return s;
+}
+
+function isOpen(s, now) {
+  return s.openedUntil > now;
+}
+
+function isProbeLocked(s, now) {
+  return s.probeUntil > now;
 }
 
 export function getAiKeyPool(prefix = 'GEMINI') {
@@ -40,32 +57,37 @@ export function getAiKeyPool(prefix = 'GEMINI') {
 }
 
 export function acquireAiKey(prefix = 'GEMINI', excludedIds = []) {
-  const excluded = new Set(excludedIds.map(String));
+  const excluded = new Set((Array.isArray(excludedIds) ? excludedIds : []).map(String));
   const pool = getAiKeyPool(prefix).filter(k => !excluded.has(k.id));
   if (!pool.length) return null;
 
   const now = Date.now();
   const healthy = pool.filter(k => {
     const s = getState(k.id);
-    if (s.openedUntil > now) return false;
-    if (s.openedUntil && s.openedUntil <= now) s.probing = true;
-    return !s.probing || s.openedUntil <= now;
+    return !isOpen(s, now) && !isProbeLocked(s, now);
   });
 
-  const candidates = healthy.length
-    ? healthy
-    : pool.filter(k => getState(k.id).openedUntil <= now);
+  let candidates = healthy;
+  if (!candidates.length) {
+    // Half-open recovery: allow one probe to a cooled-down key.
+    candidates = pool.filter(k => {
+      const s = getState(k.id);
+      return s.openedUntil > 0 && s.openedUntil <= now && !isProbeLocked(s, now);
+    });
+  }
   if (!candidates.length) return null;
 
   candidates.sort((a, b) => {
     const sa = getState(a.id);
     const sb = getState(b.id);
-    return (sa.failures - sb.failures) || (sa.lastFailure - sb.lastFailure) || (sa.successes - sb.successes);
+    return (sa.failures - sb.failures) || (sa.lastUsed - sb.lastUsed) || (sa.uses - sb.uses);
   });
 
   const selected = candidates[0];
   const s = getState(selected.id);
-  if (s.openedUntil > 0 && s.openedUntil <= now) s.probing = true;
+  s.lastUsed = now;
+  s.uses += 1;
+  if (s.openedUntil > 0 && s.openedUntil <= now) s.probeUntil = now + HALF_OPEN_PROBE_MS;
   return selected;
 }
 
@@ -73,7 +95,7 @@ export function reportAiSuccess(prefix, id) {
   const s = getState(id);
   s.failures = 0;
   s.openedUntil = 0;
-  s.probing = false;
+  s.probeUntil = 0;
   s.successes += 1;
 }
 
@@ -81,32 +103,34 @@ export function reportAiFailure(prefix, id, error = {}) {
   const s = getState(id);
   s.failures += 1;
   s.lastFailure = Date.now();
-
-  const status = Number(error?.status);
-  const permanentKeyFailure = status === 401 || status === 403;
-  const shouldOpen = permanentKeyFailure || s.failures >= FAILURE_THRESHOLD;
-  if (shouldOpen) {
+  const status = Number(error?.status || 0);
+  const permanentKeyFailure = status === 400 || status === 401 || status === 403 || status === 404;
+  if (permanentKeyFailure || s.failures >= FAILURE_THRESHOLD) {
     s.openedUntil = Date.now() + COOLDOWN_MS;
-    s.probing = false;
+    s.probeUntil = 0;
   }
-
   return {
     opened: s.openedUntil > Date.now(),
     failures: s.failures,
-    retryAt: s.openedUntil || null
+    retryAt: s.openedUntil || null,
   };
 }
 
 export function aiPoolSnapshot(prefix = 'GEMINI') {
+  const now = Date.now();
   return getAiKeyPool(prefix).map(k => {
     const s = getState(k.id);
+    const circuit = isOpen(s, now) ? 'open' : (isProbeLocked(s, now) ? 'half-open' : 'closed');
     return {
       id: k.id,
       fingerprint: k.fingerprint,
       failures: s.failures,
       successes: s.successes,
-      circuit: s.openedUntil > Date.now() ? 'open' : 'closed',
-      retryAt: s.openedUntil || null
+      uses: s.uses,
+      circuit,
+      retryAt: s.openedUntil || null,
+      lastFailure: s.lastFailure || null,
+      lastUsed: s.lastUsed || null,
     };
   });
 }

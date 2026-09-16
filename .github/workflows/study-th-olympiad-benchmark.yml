@@ -3,6 +3,7 @@ name: STUDY TH Olympiad Ceiling Benchmark
 on:
   push:
     paths:
+      - 'api/solve.js'
       - 'benchmarks/study_th_olympiad_benchmark.py'
       - '.github/workflows/study-th-olympiad-benchmark.yml'
   workflow_dispatch:

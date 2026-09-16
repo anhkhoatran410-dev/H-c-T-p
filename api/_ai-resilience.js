@@ -1,61 +1,18 @@
 import crypto from 'node:crypto';
-
-const FAILURE_THRESHOLD = 3;
-const COOLDOWN_MS = 60_000;
-const HALF_OPEN_PROBE_MS = 15_000;
-const MAX_KEYS = 50;
-const state = new Map();
-
-function envKeys(prefix) {
-  const out = [];
-  const base = String(process.env[`${prefix}_API_KEY`] || '').trim();
-  if (base) out.push({ id: `${prefix}_API_KEY`, key: base });
-  for (let i = 2; i <= MAX_KEYS; i += 1) {
-    const value = String(process.env[`${prefix}_API_KEY_${i}`] || '').trim();
-    if (value) out.push({ id: `${prefix}_API_KEY_${i}`, key: value });
-  }
-  const packed = String(process.env[`${prefix}_API_KEYS`] || '').trim();
-  if (packed) {
-    for (const [index, value] of packed.split(',').map(v => v.trim()).filter(Boolean).entries()) out.push({ id: `${prefix}_API_KEYS_${index + 1}`, key: value });
-  }
-  return out;
-}
-function fingerprint(key) { return crypto.createHash('sha256').update(key).digest('hex').slice(0, 16); }
-function getState(id) {
-  let s = state.get(id);
-  if (!s) { s = { failures: 0, successes: 0, uses: 0, openedUntil: 0, probeUntil: 0, lastFailure: 0, lastUsed: 0 }; state.set(id, s); }
-  return s;
-}
-function isOpen(s, now) { return s.openedUntil > now; }
-function isProbeLocked(s, now) { return s.probeUntil > now; }
-export function getAiKeyPool(prefix = 'GEMINI') { return envKeys(prefix).map(entry => ({ ...entry, fingerprint: fingerprint(entry.key) })); }
-export function acquireAiKey(prefix = 'GEMINI', excludedIds = []) {
-  const excluded = new Set((Array.isArray(excludedIds) ? excludedIds : []).map(String));
-  const pool = getAiKeyPool(prefix).filter(k => !excluded.has(k.id));
-  if (!pool.length) return null;
-  const now = Date.now();
-  const healthy = pool.filter(k => { const s = getState(k.id); return !isOpen(s, now) && !isProbeLocked(s, now); });
-  let candidates = healthy;
-  if (!candidates.length) candidates = pool.filter(k => { const s = getState(k.id); return s.openedUntil > 0 && s.openedUntil <= now && !isProbeLocked(s, now); });
-  if (!candidates.length) return null;
-  candidates.sort((a, b) => { const sa = getState(a.id); const sb = getState(b.id); return (sa.failures - sb.failures) || (sa.lastUsed - sb.lastUsed) || (sa.uses - sb.uses); });
-  const selected = candidates[0];
-  const s = getState(selected.id); s.lastUsed = now; s.uses += 1;
-  if (s.openedUntil > 0 && s.openedUntil <= now) s.probeUntil = now + HALF_OPEN_PROBE_MS;
-  return selected;
-}
-export function reportAiSuccess(prefix, id) { const s = getState(id); s.failures = 0; s.openedUntil = 0; s.probeUntil = 0; s.successes += 1; }
-export function reportAiFailure(prefix, id, error = {}) {
-  const s = getState(id); const status = Number(error?.status || 0); s.lastFailure = Date.now();
-  // Only key-specific auth failures immediately open the circuit. 429/5xx/timeouts use the threshold.
-  if (status === 401 || status === 403) { s.failures = FAILURE_THRESHOLD; s.openedUntil = Date.now() + COOLDOWN_MS; s.probeUntil = 0; }
-  else if (status === 429 || status >= 500 || error?.code === 'ETIMEDOUT' || error?.code === 'ECONNRESET' || error?.code === 'EAI_AGAIN') {
-    s.failures += 1;
-    if (s.failures >= FAILURE_THRESHOLD) { s.openedUntil = Date.now() + COOLDOWN_MS; s.probeUntil = 0; }
-  }
-  return { opened: s.openedUntil > Date.now(), failures: s.failures, retryAt: s.openedUntil || null };
-}
-export function aiPoolSnapshot(prefix = 'GEMINI') {
-  const now = Date.now();
-  return getAiKeyPool(prefix).map(k => { const s = getState(k.id); const circuit = isOpen(s, now) ? 'open' : (isProbeLocked(s, now) ? 'half-open' : 'closed'); return { id: k.id, fingerprint: k.fingerprint, failures: s.failures, successes: s.successes, uses: s.uses, circuit, retryAt: s.openedUntil || null, lastFailure: s.lastFailure || null, lastUsed: s.lastUsed || null }; });
-}
+const FAILURE_THRESHOLD=3, COOLDOWN_MS=60000, PROBE_MS=15000, REDIS_TIMEOUT=1500, MAX_KEYS=50;
+const local=new Map();
+function envKeys(prefix){const out=[];const base=String(process.env[`${prefix}_API_KEY`]||'').trim();if(base)out.push({id:`${prefix}_API_KEY`,key:base});for(let i=2;i<=MAX_KEYS;i++){const v=String(process.env[`${prefix}_API_KEY_${i}`]||'').trim();if(v)out.push({id:`${prefix}_API_KEY_${i}`,key:v});}const packed=String(process.env[`${prefix}_API_KEYS`]||'').trim();if(packed)for(const [i,v] of packed.split(',').map(x=>x.trim()).filter(Boolean).entries())out.push({id:`${prefix}_API_KEYS_${i+1}`,key:v});return out;}
+function fp(key){return crypto.createHash('sha256').update(key).digest('hex').slice(0,16);}
+function st(id){if(!local.has(id))local.set(id,{failures:0,successes:0,uses:0,openedUntil:0,probeUntil:0,lastFailure:0,lastUsed:0});return local.get(id);}
+function cfg(){const url=String(process.env.UPSTASH_REDIS_REST_URL||'').trim().replace(/\/$/,'');const token=String(process.env.UPSTASH_REDIS_REST_TOKEN||'').trim();return url&&token?{url,token}:null;}
+async function redis(command,endpoint='',timeout=REDIS_TIMEOUT){const c=cfg();if(!c)return null;const ac=new AbortController();const t=setTimeout(()=>ac.abort(),timeout);try{const r=await fetch(c.url+endpoint,{method:'POST',headers:{Authorization:`Bearer ${c.token}`,'Content-Type':'application/json'},body:JSON.stringify(command),signal:ac.signal});if(!r.ok)return null;const d=await r.json().catch(()=>null);return d&&d.error===undefined?d.result:null;}catch{return null;}finally{clearTimeout(t);}}
+function key(prefix,id){return `study-th:ai-circuit:${prefix}:${encodeURIComponent(id)}`;}
+function probeKey(prefix,id){return `study-th:ai-probe:${prefix}:${encodeURIComponent(id)}`;}
+function obj(v){if(!v)return{};if(!Array.isArray(v))return v;const o={};for(let i=0;i<v.length;i+=2)o[String(v[i])]=v[i+1];return o;}
+async function load(prefix,pool){if(!cfg())return null;const rows=await redis(pool.map(k=>['HGETALL',key(prefix,k.id)]),'/pipeline');return Array.isArray(rows)?rows.map(x=>obj(x?.result??x)):null;}
+async function save(prefix,id,s){await redis(['HSET',key(prefix,id),'failures',s.failures,'successes',s.successes,'uses',s.uses,'openedUntil',s.openedUntil,'probeUntil',s.probeUntil,'lastFailure',s.lastFailure,'lastUsed',s.lastUsed]);}
+export function getAiKeyPool(prefix='GEMINI'){return envKeys(prefix).map(e=>({...e,fingerprint:fp(e.key)}));}
+export async function acquireAiKey(prefix='GEMINI',excludedIds=[]){const ex=new Set((Array.isArray(excludedIds)?excludedIds:[]).map(String));const pool=getAiKeyPool(prefix).filter(k=>!ex.has(k.id));if(!pool.length)return null;const now=Date.now();const remote=await load(prefix,pool);pool.forEach((k,i)=>{const r=remote?.[i];if(!r)return;const s=st(k.id);for(const f of ['failures','successes','uses','openedUntil','probeUntil','lastFailure','lastUsed'])if(r[f]!==undefined)s[f]=Number(r[f])||0;});let candidates=pool.filter(k=>{const s=st(k.id);return s.openedUntil<=now&&s.probeUntil<=now;});if(!candidates.length)return null;candidates.sort((a,b)=>{const x=st(a.id),y=st(b.id);return(x.failures-y.failures)||(x.lastUsed-y.lastUsed)||(x.uses-y.uses);});for(const selected of candidates){const s=st(selected.id);if(s.openedUntil>0&&s.openedUntil<=now&&cfg()){const ok=await redis(['SET',probeKey(prefix,selected.id),String(now),'NX','PX',PROBE_MS]);if(ok!=='OK')continue;s.probeUntil=now+PROBE_MS;}s.lastUsed=now;s.uses+=1;await save(prefix,selected.id,s);return selected;}return null;}
+export async function reportAiSuccess(prefix,id){const s=st(id);s.failures=0;s.openedUntil=0;s.probeUntil=0;s.successes+=1;await save(prefix,id,s);}
+export async function reportAiFailure(prefix,id,error={}){const s=st(id);const status=Number(error?.status||0);s.lastFailure=Date.now();if(status===401||status===403){s.failures=FAILURE_THRESHOLD;s.openedUntil=Date.now()+COOLDOWN_MS;s.probeUntil=0;}else if(status===429||status>=500||['ETIMEDOUT','ECONNRESET','EAI_AGAIN'].includes(error?.code)){s.failures+=1;if(s.failures>=FAILURE_THRESHOLD){s.openedUntil=Date.now()+COOLDOWN_MS;s.probeUntil=0;}}await save(prefix,id,s);return{opened:s.openedUntil>Date.now(),failures:s.failures,retryAt:s.openedUntil||null};}
+export async function aiPoolSnapshot(prefix='GEMINI'){const pool=getAiKeyPool(prefix),now=Date.now(),remote=await load(prefix,pool);return pool.map((k,i)=>{const s=st(k.id),r=remote?.[i];if(r)for(const f of ['failures','successes','uses','openedUntil','probeUntil','lastFailure','lastUsed'])if(r[f]!==undefined)s[f]=Number(r[f])||0;return{id:k.id,fingerprint:k.fingerprint,failures:s.failures,successes:s.successes,uses:s.uses,circuit:s.openedUntil>now?'open':(s.probeUntil>now?'half-open':'closed'),retryAt:s.openedUntil||null,lastFailure:s.lastFailure||null,lastUsed:s.lastUsed||null};});}

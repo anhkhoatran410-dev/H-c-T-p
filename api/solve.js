@@ -12,7 +12,7 @@ function getBody(req) {
 }
 function subjectMode(subject, text) {
   const s = (String(subject || '') + ' ' + String(text || '')).toLowerCase();
-  if (/toán|math|algebra|calculus|đạo hàm|tích phân|hình học|phương trình|bất đẳng thức|xác suất/.test(s)) return 'math';
+  if (/toán|math|algebra|calculus|đạo hàm|tích phân|hình học|phương trình|bất đẳng thức|xác suất|aime|olymp|number theory|combinatorics|geometry/.test(s)) return 'math';
   if (/vật lý|physics|cơ học|điện|quang|dao động|sóng|nhiệt/.test(s)) return 'physics';
   if (/hóa|chemistry|phản ứng|mol|acid|base|oxi hóa|hữu cơ/.test(s)) return 'chemistry';
   return 'general';
@@ -52,12 +52,15 @@ function solverPrompt(subject, mode, cas, message, history) {
   const mathGuard = mode === 'math' ? `
 MATH ACCURACY GATE:
 - Trước khi tính, xác định rõ loại bài, ẩn, miền xác định và các đại lượng bất biến.
-- Lập kế hoạch giải ngắn trước khi biến đổi; không đoán đáp án rồi hợp thức hóa.
+- Với bài Olympic/AIME, trước tiên phải nhận diện cấu trúc: đại số, số học, tổ hợp, hình học, bất đẳng thức, xác suất hoặc bài dựng/chứng minh.
+- Lập kế hoạch giải trước khi biến đổi; không đoán đáp án rồi hợp thức hóa.
+- Nếu bài có nhiều hướng, cân nhắc ít nhất hai hướng ở mức ý tưởng và chọn hướng có thể kiểm tra chặt nhất.
 - Mọi kết quả số quan trọng phải được tính lại theo một cách độc lập (biến đổi khác, thế ngược, ước lượng hoặc CAS khi phù hợp).
 - Không làm tròn trung gian nếu chưa được phép; giữ phân số/exact form càng lâu càng tốt.
 - Sau khi ra đáp án, quay lại đề gốc và kiểm tra trực tiếp đáp án trong điều kiện của đề.
 - Nếu phát hiện mâu thuẫn, không ép kết quả; giải lại từ bước đầu tiên đáng ngờ.
-- Với bài Olympic/HARD: ưu tiên lập luận cấu trúc, bất biến, đối xứng, phản chứng, quy nạp, cực trị hoặc chia trường hợp phù hợp trước khi brute-force.
+- Với bài Olympic/HARD: ưu tiên lập luận cấu trúc, bất biến, đối xứng, phản chứng, quy nạp, cực trị, đánh giá chặn hoặc chia trường hợp phù hợp trước khi brute-force.
+- Không coi một chuỗi biến đổi dài là bằng chứng đúng; mỗi bước then chốt phải có lý do hợp lệ.
 ` : '';
   return `Bạn là STUDY TH — bộ giải học tập chuyên sâu.\nMôn: ${subject || 'chưa chọn'}\nDạng: ${mode}\n${mathGuard}\nBẮT BUỘC:\n1. Đọc toàn bộ đề/ảnh trước khi giải.\n2. Nếu có nhiều câu, giải hết tất cả câu nhìn thấy.\n3. Giải tận gốc: Dữ kiện → Cần tìm → Ý tưởng → biến đổi/chứng minh từng bước → điều kiện → kiểm tra → kết luận.\n4. Không nhảy bước quan trọng và không chỉ đưa đáp án.\n5. Kiểm tra phép biến đổi có thể làm mất/thêm nghiệm.\n6. Với phương trình/hàm/hệ/bất đẳng thức, thế ngược vào đề gốc và xét trường hợp đặc biệt phù hợp.\n7. Với bài phần trăm, tốc độ, năng suất, tiền lương, vật thể hao hụt hoặc tăng trưởng, phải xác định rõ phần trăm áp dụng trên đại lượng nào và theo từng bước thời gian; không tự giả định phần trăm tính trên giá trị ban đầu nếu đề không nói vậy.\n8. Nếu có cách hiểu cạnh tranh, nêu các cách hiểu ngắn gọn và chọn cách phù hợp nhất với câu chữ/dữ kiện của đề, rồi kiểm tra lại kết quả.\n9. Không bịa dữ kiện ảnh mờ.\n10. Công thức dùng LaTeX.\n${cas ? '\nCAS/Wolfram tham khảo:\n' + cas : ''}\nLịch sử:\n${Array.isArray(history) ? history.slice(-4).map(x => (x.role || 'user') + ': ' + String(x.message || '')).join('\n') : ''}\n\nĐề/Yêu cầu:\n${message}`;
 }
@@ -123,23 +126,30 @@ function parseJson(text) {
   return null;
 }
 
-async function verify({ message, image, cas, candidate }) {
+async function verify({ message, subject, image, cas, candidate }) {
   const api = cleanKey(process.env.GEMINI_API_KEY); if (!api || !candidate) return null;
-  const prompt = `Bạn là VERIFICATION ENGINE của STUDY TH. Kiểm tra lời giải sau từ đầu đến cuối.\n\nPHẢI KIỂM TRA:\nA. Đọc lại đề/ảnh và miền điều kiện.\nB. Kiểm tra từng biến đổi quan trọng.\nC. Thế ngược vào đề gốc.\nD. Thử giá trị mẫu, biên, trường hợp đặc biệt và cố tìm phản ví dụ khi phù hợp.\nE. Kiểm tra mất/thêm nghiệm.\nF. Với bài phần trăm/tăng giảm/hao hụt, kiểm tra phần trăm áp dụng trên giá trị ban đầu hay giá trị hiện tại theo đúng câu chữ.\nG. Với bài toán số, tính lại các phép toán quan trọng bằng ít nhất một cách độc lập khi có thể.\nH. Nếu có một lỗi toán học chắc chắn, verdict=FAIL. Nếu bằng chứng kiểm tra chưa đủ, verdict=UNCERTAIN. Không dùng UNCERTAIN chỉ vì bài khó.\n\nTrả JSON duy nhất:\n{"verdict":"PASS|FAIL|UNCERTAIN","issues":["..."],"tests":[{"test":"...","result":"PASS|FAIL|NOT_APPLICABLE","note":"..."}],"repair_hint":"..."}\n\nĐỀ:\n${message}\n\nCAS/WOLFRAM:\n${cas || 'Không có'}\n\nLỜI GIẢI:\n${candidate.answer}`;
+  const verifyModel = cleanKey(candidate.model) || GEMINI_MODELS[0];
+  const prompt = `Bạn là VERIFICATION + INDEPENDENT SOLVER ENGINE của STUDY TH. Không được chỉ đọc lời giải rồi phán đoán. Hãy giải bài từ đề gốc một cách ĐỘC LẬP trước, sau đó mới đối chiếu với lời giải ứng viên.\n\nQUY TRÌNH BẮT BUỘC:\n1. Đọc lại toàn bộ đề/ảnh và xác định chính xác yêu cầu, điều kiện và dữ kiện.\n2. Tự tìm đáp án/kết luận độc lập, không lấy đáp án ứng viên làm mốc.\n3. Kiểm tra các bước then chốt của ứng viên: biến đổi, suy luận, điều kiện, mất/thêm nghiệm và tính toán.\n4. Thế ngược/kiểm tra trực tiếp kết quả khi bài cho phép. Với bài số, tính lại các phép toán quan trọng độc lập.\n5. Với bài Olympic/AIME, nếu ứng viên và cách giải độc lập khác nhau thì tìm đúng điểm phân kỳ; không chấp nhận câu trả lời chỉ vì nó có vẻ hợp lý.\n6. Nếu có phản ví dụ, mâu thuẫn, sai số tính toán hoặc suy luận không hợp lệ dẫn đến kết luận sai: verdict=FAIL.\n7. Nếu hai cách độc lập khớp và các điều kiện quan trọng đều được kiểm tra: verdict=PASS.\n8. Chỉ dùng UNCERTAIN khi dữ liệu/ảnh thực sự không đủ hoặc phép kiểm chứng khách quan không thể thực hiện; không dùng UNCERTAIN chỉ vì bài khó.\n9. Nếu verdict=FAIL, repair_hint phải chỉ ra nguyên nhân và hướng giải đúng đủ cụ thể để một solver khác có thể giải lại.\n\nTrả JSON duy nhất:\n{"verdict":"PASS|FAIL|UNCERTAIN","expected_answer":"...","issues":["..."],"tests":[{"test":"...","result":"PASS|FAIL|NOT_APPLICABLE","note":"..."}],"repair_hint":"..."}\n\nMÔN: ${subject || 'Toán'}\n\nĐỀ:\n${message}\n\nCAS/WOLFRAM:\n${cas || 'Không có'}\n\nLỜI GIẢI ỨNG VIÊN:\n${candidate.answer}`;
   const parts = [{ text: prompt }]; const img = imagePart(image); if (img) parts.push(img);
   for (let attempt = 0; attempt < VERIFY_RETRIES; attempt++) {
     try {
-      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent', {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(verifyModel) + ':generateContent', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': api },
-        body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens: 3200, responseMimeType: 'application/json' } }),
-        signal: AbortSignal.timeout(12000)
+        body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: { maxOutputTokens: 4200, responseMimeType: 'application/json' } }),
+        signal: AbortSignal.timeout(18000)
       });
       const raw = await r.text();
-      if (!r.ok) { if (transient(r.status, '', { status: r.status }) && attempt < VERIFY_RETRIES - 1) { await sleep(1200); continue; } return null; }
+      if (!r.ok) {
+        if (transient(r.status, '', { status: r.status }) && attempt < VERIFY_RETRIES - 1) { await sleep(1200); continue; }
+        return null;
+      }
       let d = {}; try { d = raw ? JSON.parse(raw) : {}; } catch (_) {}
       const txt = d?.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('').trim();
       const parsed = parseJson(txt);
-      if (parsed) return parsed;
+      if (parsed && ['PASS', 'FAIL', 'UNCERTAIN'].includes(String(parsed.verdict || '').toUpperCase())) {
+        parsed.verdict = String(parsed.verdict).toUpperCase();
+        return parsed;
+      }
     } catch (e) {
       if (transient(e?.status, e?.message, e) && attempt < VERIFY_RETRIES - 1) { await sleep(1200); continue; }
       return null;
@@ -151,7 +161,7 @@ async function verify({ message, image, cas, candidate }) {
 async function repair({ message, subject, image, cas, candidate, audit, attempt }) {
   if (!candidate) return null;
   return solveWithFallback({
-    message: `REPAIR ENGINE. Lời giải dưới đây đã FAIL kiểm định. Không được vá một dòng riêng lẻ. GIẢI LẠI TOÀN BỘ từ đề gốc, sau đó tự kiểm tra. Sửa tất cả lỗi trong kiểm định, đặc biệt lỗi tính toán, đơn vị, miền điều kiện, mất/thêm nghiệm, diễn giải phần trăm và suy luận thiếu. Nếu lời giải cũ đúng ở phần nào thì vẫn phải tái dựng phần đó thay vì sao chép mù quáng. Vòng sửa ${attempt}.\n\nĐỀ GỐC:\n${message}\n\nLỜI GIẢI CŨ:\n${candidate.answer}\n\nKIỂM ĐỊNH:\n${JSON.stringify(audit)}`,
+    message: `REPAIR ENGINE. Lời giải dưới đây đã FAIL kiểm định độc lập. Không được vá một dòng riêng lẻ. GIẢI LẠI TOÀN BỘ từ đề gốc, không tin đáp án cũ. Dùng kiểm định làm manh mối nhưng phải tự dựng lại lập luận. Sửa tất cả lỗi trong kiểm định, đặc biệt lỗi tính toán, đơn vị, miền điều kiện, mất/thêm nghiệm, diễn giải phần trăm và suy luận thiếu. Nếu lời giải cũ đúng ở phần nào thì vẫn phải kiểm tra lại phần đó. Vòng sửa ${attempt}.\n\nĐỀ GỐC:\n${message}\n\nLỜI GIẢI CŨ:\n${candidate.answer}\n\nKIỂM ĐỊNH ĐỘC LẬP:\n${JSON.stringify(audit)}`,
     subject, history: [], image, cas, deep: true
   });
 }
@@ -161,7 +171,7 @@ async function openaiFallback({ message, subject, image, cas }) {
   const model = cleanKey(process.env.OPENAI_SOLVER_MODEL || 'gpt-5');
   const content = [{ type: 'input_text', text: `Giải toàn bộ bài từ gốc, trình bày từng bước, kiểm tra điều kiện, thế ngược và trường hợp đặc biệt. Với phần trăm/tăng giảm/hao hụt, xác định rõ phần trăm áp dụng trên đại lượng nào ở từng bước. Với toán khó, lập kế hoạch trước khi tính và kiểm tra độc lập kết quả số. ${cas ? 'Đối chiếu CAS/Wolfram: ' + cas : ''}\n\n${message}` }];
   const img = imagePart(image); if (img) content.push({ type: 'input_image', image_url: image, detail: 'high' });
-  let last = null;
+  let last = null; const started = Date.now();
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const r = await fetch('https://api.openai.com/v1/responses', {
@@ -175,7 +185,7 @@ async function openaiFallback({ message, subject, image, cas }) {
         return null;
       }
       const answer = String(d?.output_text || d?.output?.flatMap(x => x.content || []).map(x => x.text || '').join('') || '').trim();
-      return answer ? { answer, model, providerLatencyMs: Date.now() - (Date.now() - 1) } : null;
+      return answer ? { answer, model, providerLatencyMs: Date.now() - started } : null;
     } catch (e) {
       last = e; if (transient(e?.status, e?.message, e) && attempt === 0) { await sleep(1500); continue; } return null;
     }
@@ -205,14 +215,13 @@ async function run() {
   }
   if (!candidate) return json(res, 502, { error: 'Không thể tạo lời giải lúc này.' });
 
-  // MATH: verification-first. Repair is actually reachable whenever a verifier proves FAIL.
   if (subjectMode(subject, message) === 'math' || deep) {
-    audit = await verify({ message, image, cas, candidate });
+    audit = await verify({ message, subject, image, cas, candidate });
     for (let i = 1; i <= VERIFY_RETRIES && audit?.verdict === 'FAIL'; i++) {
       const repaired = await repair({ message, subject, image, cas, candidate, audit, attempt: i });
       if (!repaired) break;
       candidate = repaired; repairCount++;
-      const reAudit = await verify({ message, image, cas, candidate });
+      const reAudit = await verify({ message, subject, image, cas, candidate });
       audit = reAudit || audit;
       if (audit?.verdict !== 'FAIL') break;
     }

@@ -18,6 +18,7 @@
   ],
   "rewrites": [
     { "source": "/api/solve", "destination": "/api/_ai-gateway?target=solve" },
+    { "source": "/api/ai-security-health", "destination": "/api/ai-security-health" },
     { "source": "/api/admin-health", "destination": "/api/admin-tools?route=admin-health" },
     { "source": "/api/admin-delete-exam", "destination": "/api/admin-tools?route=admin-delete-exam" },
     { "source": "/api/admin-delete-exams-bulk", "destination": "/api/admin-tools?route=admin-delete-exams-bulk" },

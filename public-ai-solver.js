@@ -4,8 +4,21 @@
 
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1600;
+  const CAMERA_RESTORE_KEY='study_ai_restore_after_camera';
 
   function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+  function restoreSolverAfterCamera(){
+    try{
+      if(sessionStorage.getItem(CAMERA_RESTORE_KEY)!=='1')return;
+      sessionStorage.removeItem(CAMERA_RESTORE_KEY);
+    }catch(_e){}
+    setTimeout(()=>{
+      const modal=document.getElementById('study-ai-support');
+      if(modal)modal.classList.remove('hidden');
+      addComposerTools();
+    },0);
+  }
 
   function addComposerTools(){
     const modal=document.getElementById('study-ai-support');if(!modal)return;
@@ -18,9 +31,28 @@
       tools.style.cssText='display:flex;gap:8px;margin:8px 0 0;align-items:center;flex-wrap:wrap';
       tools.innerHTML='<button type="button" class="theme-chip" data-study-photo>📷 Chụp đề</button><button type="button" class="theme-chip" data-study-file>🖼️ Chọn ảnh</button><label style="display:flex;gap:6px;align-items:center;font-size:12px"><input type="checkbox" data-study-deep checked> Suy luận sâu</label><input type="file" data-study-image-input accept="image/*" capture="environment" hidden>';
       form.insertBefore(tools,ta);
-      tools.querySelector('[data-study-photo]').onclick=()=>tools.querySelector('[data-study-image-input]').click();
-      tools.querySelector('[data-study-file]').onclick=()=>{const i=tools.querySelector('[data-study-image-input]');i.removeAttribute('capture');i.click()};
-      tools.querySelector('[data-study-image-input]').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)preview(file,modal);e.target.value='';});
+      tools.querySelector('[data-study-photo]').onclick=()=>{
+        try{sessionStorage.setItem(CAMERA_RESTORE_KEY,'1')}catch(_e){}
+        tools.querySelector('[data-study-image-input]').setAttribute('capture','environment');
+        tools.querySelector('[data-study-image-input]').click();
+      };
+      tools.querySelector('[data-study-file]').onclick=()=>{
+        const i=tools.querySelector('[data-study-image-input]');
+        i.removeAttribute('capture');
+        i.click();
+      };
+      tools.querySelector('[data-study-image-input]').addEventListener('click',e=>{
+        e.stopPropagation();
+      });
+      tools.querySelector('[data-study-image-input]').addEventListener('change',e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        const file=e.target.files?.[0];
+        if(file)preview(file,modal);
+        e.target.value='';
+        try{sessionStorage.removeItem(CAMERA_RESTORE_KEY)}catch(_e){}
+        requestAnimationFrame(()=>modal.classList.remove('hidden'));
+      });
     }
 
     if(!form.dataset.studyBound){
@@ -134,12 +166,17 @@
         pv.style.cssText='margin-top:8px;display:flex;align-items:center;gap:8px';
         pv.innerHTML='<img alt="Ảnh đề bài" style="width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid rgba(100,100,140,.25)"><button type="button" class="theme-chip">Xoá ảnh</button>';
         form.insertBefore(pv,form.querySelector('textarea'));
-        pv.querySelector('button').onclick=()=>{form.__studyImageData='';pv.remove()};
+        pv.querySelector('button').onclick=e=>{
+          e.preventDefault();e.stopPropagation();
+          form.__studyImageData='';pv.remove();
+        };
       }
       pv.querySelector('img').src=dataUrl;
+      modal.classList.remove('hidden');
     }).catch(err=>{
       form.__studyImageData='';
       let pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
+      modal.classList.remove('hidden');
       const box=modal.querySelector('#studyAiMessages');
       if(box){const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent='⚠️ '+String(err.message||err);box.appendChild(msg);box.scrollTop=box.scrollHeight;}
     });
@@ -147,6 +184,8 @@
 
   const obs=new MutationObserver(()=>setTimeout(addComposerTools,0));
   obs.observe(document.documentElement,{childList:true,subtree:true});
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(addComposerTools,100));
-  else setTimeout(addComposerTools,100);
+  window.addEventListener('pageshow',restoreSolverAfterCamera);
+  window.addEventListener('focus',restoreSolverAfterCamera);
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{addComposerTools();restoreSolverAfterCamera();},100));
+  else setTimeout(()=>{addComposerTools();restoreSolverAfterCamera();},100);
 })();

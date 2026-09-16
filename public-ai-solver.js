@@ -59,8 +59,21 @@
         const submit=form.querySelector('[type="submit"]');if(submit){submit.disabled=true;submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}
         try{
           const subject=(window.state&&window.state.subject)||'',message=userText+(deep?'\nHãy tự kiểm tra kỹ các bước và kết quả, tìm cách giải từ bản chất, và trình bày đầy đủ đến kết luận; không bỏ qua phần chứng minh quan trọng.':'\nHãy giải nhanh nhưng đủ bước cần thiết, tập trung vào dữ kiện, cách làm và kết quả; tránh lan man.');
-          const r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message,subject,history,imageDataUrl:img,deep})});
-          const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||('Solver HTTP '+r.status));
+          const payload=JSON.stringify({message,subject,history,imageDataUrl:img,deep});
+          let r=null,d={},lastError='';
+          for(let attempt=0;attempt<4;attempt++){
+            try{
+              r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:payload});
+              d=await r.json().catch(()=>({}));
+              if(r.ok)break;
+              lastError=String(d.error||('Solver HTTP '+r.status));
+              if(![408,409,425,429,500,502,503,504].includes(r.status)||attempt===3)throw new Error(lastError);
+            }catch(err){
+              lastError=String(err.message||err);
+              if(attempt===3)throw new Error(lastError);
+            }
+            await new Promise(resolve=>setTimeout(resolve,1200*(attempt+1)));
+          }
           thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.textContent=answer;box.appendChild(msg);
           if(d.tool){const tag=document.createElement('div');tag.className='study-ai-tool-tag';tag.textContent='Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
           if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}

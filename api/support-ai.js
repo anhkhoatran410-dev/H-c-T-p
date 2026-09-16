@@ -1,4 +1,4 @@
-const MODELS=['gemini-3.6-flash','gemini-3.5-flash-lite','gemini-2.5-flash'];
+const MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash-lite'];
 export default async function handler(req,res){
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   const message=String(req.body?.message||'').trim();

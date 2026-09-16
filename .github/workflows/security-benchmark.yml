@@ -1,0 +1,33 @@
+name: Security Benchmark
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'api/**'
+      - 'benchmarks/security_benchmark.py'
+      - '.github/workflows/security-benchmark.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run non-destructive security benchmark
+        env:
+          BASE_URL: https://hoc-va-choi.vercel.app
+        run: python3 benchmarks/security_benchmark.py
+
+      - name: Upload security report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-benchmark-results
+          path: security-benchmark-results.json
+          if-no-files-found: ignore

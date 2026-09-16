@@ -1,4 +1,4 @@
-const GEMINI_MODELS=['gemini-3.1-pro-preview','gemini-3.6-flash','gemini-2.5-flash'];
+const GEMINI_MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash'];
 
 function cleanKey(value){return String(value||'').replace(/^['"`]+|['"`]+$/g,'').trim()}
 function json(res,status,payload){res.status(status).setHeader('Content-Type','application/json; charset=utf-8');return res.end(JSON.stringify(payload))}
@@ -32,7 +32,7 @@ async function gemini({message,subject,history,imageDataUrl,verified}){
   }
   let last='';
   for(const model of GEMINI_MODELS){
-    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0.15,maxOutputTokens:5000}})});
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:5000}})});
     const raw=await r.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
     if(r.ok){const answer=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim();if(answer)return {answer,model}}
     last=data?.error?.message||('Gemini HTTP '+r.status);

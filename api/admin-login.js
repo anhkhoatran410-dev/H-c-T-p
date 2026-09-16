@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
+import { applySecurityHeaders, enforceBodySize, sameOrigin } from "./_security.js";
 
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 8;
 const attempts = new Map();
+const SESSION_MS = 2 * 60 * 60 * 1000;
 
 function configuredSecret(name){
   return String(process.env[name] || "").trim();
@@ -10,13 +12,12 @@ function configuredSecret(name){
 
 function secret(){
   const sessionSecret = configuredSecret("ADMIN_SESSION_SECRET");
-  const password = configuredSecret("ADMIN_PASSWORD");
-  if(!sessionSecret && !password) throw new Error("ADMIN_SESSION_SECRET hoặc ADMIN_PASSWORD chưa được cấu hình trên Vercel.");
-  return sessionSecret || password;
+  if (!sessionSecret) throw new Error("ADMIN_SESSION_SECRET chưa được cấu hình trên Vercel.");
+  return sessionSecret;
 }
 
 function digest(value){
-  return crypto.createHash("sha256").update(String(value)).digest("hex");
+  return crypto.createHash("sha256").update(String(value)).digest();
 }
 
 function sign(payload){
@@ -24,8 +25,9 @@ function sign(payload){
 }
 
 function makeToken(){
-  const exp = Date.now() + 8 * 60 * 60 * 1000;
-  const payload = `admin:${exp}`;
+  const exp = Date.now() + SESSION_MS;
+  const nonce = crypto.randomBytes(18).toString("base64url");
+  const payload = `admin:${exp}:${nonce}`;
   return `${Buffer.from(payload).toString("base64url")}.${sign(payload)}`;
 }
 
@@ -34,13 +36,13 @@ function validToken(token){
     const [raw, sig] = String(token || "").split(".");
     if(!raw || !sig) return false;
     const payload = Buffer.from(raw,"base64url").toString("utf8");
-    const [kind, expRaw] = payload.split(":");
-    if(kind !== "admin" || Number(expRaw) < Date.now()) return false;
+    const [kind, expRaw, nonce] = payload.split(":");
+    if(kind !== "admin" || !nonce || Number(expRaw) < Date.now()) return false;
     const expected = sign(payload);
     const a = Buffer.from(sig);
     const b = Buffer.from(expected);
     return a.length === b.length && crypto.timingSafeEqual(a,b);
-  }catch{return false}
+  }catch{return false;}
 }
 
 export function isAdminRequest(req){
@@ -56,9 +58,11 @@ function readBody(req){
 }
 
 export default async function handler(req,res){
-  res.setHeader("Cache-Control","no-store");
+  applySecurityHeaders(res);
   res.setHeader("Content-Type","application/json; charset=utf-8");
   if(req.method !== "POST") return res.status(405).json({error:"Method not allowed"});
+  if(!enforceBodySize(req,res,16_000)) return;
+  if(!sameOrigin(req,res)) return;
 
   const ip = String(req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
   const now = Date.now();
@@ -76,13 +80,13 @@ export default async function handler(req,res){
   const configured = configuredSecret("ADMIN_PASSWORD");
   if(!configured) return res.status(500).json({error:"ADMIN_PASSWORD chưa được cấu hình trên Vercel."});
 
-  const ok = digest(password) === digest(configured);
+  const ok = crypto.timingSafeEqual(digest(password), digest(configured));
   if(!ok) return res.status(401).json({error:"Mật khẩu Admin không đúng."});
 
   attempts.delete(ip);
   try{
     const token = makeToken();
-    return res.status(200).json({ok:true,token,expiresIn:8*60*60});
+    return res.status(200).json({ok:true,token,expiresIn:SESSION_MS/1000});
   }catch(e){
     return res.status(500).json({error:e.message || "Không tạo được phiên Admin."});
   }

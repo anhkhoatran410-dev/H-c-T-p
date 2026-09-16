@@ -1,98 +1,24 @@
 const GEMINI_MODELS=['gemini-3.8-flash','gemini-3.6-flash'];
-const MAX_OUTPUT_TOKENS=9000;
+const MAX_OUTPUT_TOKENS=12000;
 
 function cleanKey(value){return String(value||'').replace(/^['"`]+|['"`]+$/g,'').trim()}
 function json(res,status,payload){res.status(status).setHeader('Content-Type','application/json; charset=utf-8');return res.end(JSON.stringify(payload))}
-function subjectMode(subject,text){
-  const s=(String(subject||'')+' '+String(text||'')).toLowerCase();
-  if(/toán|math|algebra|calculus|đạo hàm|tích phân|hình học|phương trình|bất đẳng thức|xác suất/.test(s))return 'math';
-  if(/vật lý|physics|cơ học|điện|quang|dao động|sóng|nhiệt/.test(s))return 'physics';
-  if(/hóa|chemistry|phản ứng|mol|acid|base|oxi hóa|hữu cơ/.test(s))return 'chemistry';
-  return 'general';
-}
-function friendlyProviderError(status,message){
-  const m=String(message||'').toLowerCase();
-  if(status===429||m.includes('high demand')||m.includes('rate limit')||m.includes('resource exhausted'))return 'AI chính đang bận, hệ thống sẽ thử bộ giải dự phòng.';
-  if(status===401||status===403)return 'API AI chưa được cấp quyền hoặc khóa API không hợp lệ.';
-  return 'AI chính không phản hồi, hệ thống sẽ thử bộ giải dự phòng.';
-}
-async function wolfram(query){
-  const appid=cleanKey(process.env.WOLFRAM_APP_ID);
-  if(!appid||!query)return {available:false};
-  try{
-    const url='https://api.wolframalpha.com/v1/result?appid='+encodeURIComponent(appid)+'&i='+encodeURIComponent(query)+'&units=metric';
-    const r=await fetch(url,{signal:AbortSignal.timeout(7000)});
-    const text=await r.text();
-    if(!r.ok)return {available:false,error:text||('Wolfram HTTP '+r.status)};
-    return {available:true,result:text.trim()};
-  }catch(e){return {available:false,error:e?.message||String(e)}}
-}
-async function gemini({message,subject,history,imageDataUrl,verified}){
-  const key=cleanKey(process.env.GEMINI_API_KEY);
-  if(!key)throw new Error('GEMINI_API_KEY chưa được cấu hình.');
-  const mode=subjectMode(subject,message);
-  const system=`Bạn là STUDY TH — trợ lý giải bài học tập chính xác và nhanh.\n\nMôn: ${subject||'chưa chọn'}\nChế độ: ${mode}\n\nQUY TẮC:\n1) Nếu có ảnh, đọc toàn bộ phần đề nhìn thấy trước khi giải.\n2) Nếu có nhiều câu, giải từ câu đầu đến câu cuối; không dừng giữa chừng.\n3) Không bịa phần ảnh mờ hoặc dữ kiện không có.\n4) Tự kiểm tra lại phép tính, dấu, điều kiện, đơn vị và đáp án cuối trước khi trả lời.\n5) Trình bày đủ để học sinh hiểu nhưng tránh lan man.\n6) Công thức toán dùng LaTeX \\( ... \\) hoặc \\[ ... \\].\n${verified?'\nKẾT QUẢ KIỂM CHỨNG ĐỘC LẬP:\n'+verified+'\nHãy đối chiếu kết quả này với lời giải và sửa nếu cần.':''}`;
-  const historyText=Array.isArray(history)?history.slice(-8).map(x=>(x.role||'user')+': '+String(x.message||'')).join('\n'):'';
-  const parts=[{text:system+'\n\nLịch sử gần đây:\n'+historyText+'\n\nYêu cầu:\n'+message}];
-  if(imageDataUrl && /^data:image\//i.test(imageDataUrl)){
-    const m=imageDataUrl.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);
-    if(m)parts.push({inlineData:{mimeType:m[1],data:m[2]}});
-  }
-  let last='';
-  for(const model of GEMINI_MODELS){
-    try{
-      const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:MAX_OUTPUT_TOKENS}}),signal:AbortSignal.timeout(25000)});
-      const raw=await r.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
-      if(r.ok){
-        const candidate=data?.candidates?.[0];
-        const answer=candidate?.content?.parts?.map(p=>p.text||'').join('').trim();
-        if(answer){
-          if(candidate?.finishReason==='MAX_TOKENS' && !/[.!?。！？]\s*$/.test(answer))return {answer:answer+'\n\n⚠️ Lời giải bị giới hạn độ dài. Hãy gửi "tiếp tục" để hoàn tất.',model};
-          return {answer,model};
-        }
-      }
-      last=data?.error?.message||('Gemini HTTP '+r.status);
-    }catch(e){last=e?.message||String(e)}
-  }
-  throw new Error(friendlyProviderError(429,last)+' '+String(last||''));
-}
-async function openaiFallback({message,subject,history,imageDataUrl,verified}){
-  const key=cleanKey(process.env.OPENAI_API_KEY);if(!key)return null;
-  const model=cleanKey(process.env.OPENAI_SOLVER_MODEL||'gpt-5');
-  const prompt=`Bạn là trợ lý học tập của STUDY TH. Hãy giải toàn bộ bài/các câu trong ảnh, không dừng giữa chừng. Môn: ${subject||'chưa chọn'}. Kiểm tra lại kết quả trước khi kết luận.\n\n${verified?'Kiểm chứng độc lập:\n'+verified+'\n\n':''}Câu hỏi:\n${message}`;
-  const content=[{type:'input_text',text:prompt}];
-  if(imageDataUrl && /^data:image\//i.test(imageDataUrl))content.push({type:'input_image',image_url:imageDataUrl,detail:'high'});
-  const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,reasoning:{effort:'high'},input:[{role:'user',content}],max_output_tokens:MAX_OUTPUT_TOKENS}),signal:AbortSignal.timeout(35000)});
-  const raw=await r.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
-  if(!r.ok)throw new Error(data?.error?.message||('OpenAI HTTP '+r.status));
-  return {answer:data.output_text||'Mình chưa có câu trả lời.',model};
-}
-module.exports=async function handler(req,res){
-  if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
-  try{
-    const message=String(req.body?.message||'').trim();if(!message)return json(res,400,{error:'Thiếu câu hỏi.'});
-    const subject=String(req.body?.subject||'');
-    const history=Array.isArray(req.body?.history)?req.body.history:[];
-    const imageDataUrl=String(req.body?.imageDataUrl||'');
-    const mode=subjectMode(subject,message);
-
-    // Start independent math/physics/chemistry verification immediately so it can overlap with model work.
+function subjectMode(subject,text){const s=(String(subject||'')+' '+String(text||'')).toLowerCase();if(/toán|math|algebra|calculus|đạo hàm|tích phân|hình học|phương trình|bất đẳng thức|xác suất/.test(s))return 'math';if(/vật lý|physics|cơ học|điện|quang|dao động|sóng|nhiệt/.test(s))return 'physics';if(/hóa|chemistry|phản ứng|mol|acid|base|oxi hóa|hữu cơ/.test(s))return 'chemistry';return 'general'}
+function busy(status,message){const m=String(message||'').toLowerCase();return status===429||status===408||status>=500||m.includes('high demand')||m.includes('resource exhausted')||m.includes('rate limit')}
+function providerError(status,message){if(status===401||status===403)return 'API AI chưa được cấp quyền hoặc khóa API không hợp lệ.';if(busy(status,message))return 'AI chính đang bận; hệ thống đang chuyển sang bộ giải dự phòng.';return 'Bộ giải AI không phản hồi hợp lệ.'}
+async function wolfram(query){const appid=cleanKey(process.env.WOLFRAM_APP_ID);if(!appid||!query)return {available:false};try{const r=await fetch('https://api.wolframalpha.com/v1/result?appid='+encodeURIComponent(appid)+'&i='+encodeURIComponent(query)+'&units=metric',{signal:AbortSignal.timeout(7000)});const t=await r.text();return r.ok?{available:true,result:t.trim()}:{available:false}}catch{return {available:false}}}
+function solverPrompt(subject,mode,verified,message,history){return `Bạn là STUDY TH — trợ lý giải bài học tập chuyên sâu.\nMôn: ${subject||'chưa chọn'}\nChế độ: ${mode}\n\nYÊU CẦU BẮT BUỘC:\n- Nếu có ảnh, đọc toàn bộ đề trước khi giải và liệt kê chính xác các câu/phần nhìn thấy.\n- Giải TẬN GỐC, không chỉ đáp số: Dữ kiện → Cần tìm → Ý tưởng cốt lõi → Lập luận/biến đổi từng bước → chứng minh/biện luận → kiểm tra độc lập → kết luận.\n- Với hàm số, phương trình, hệ, bất đẳng thức, hình học hoặc bài chứng minh: giải thích vì sao từng bước đúng, điều kiện xác định và trường hợp đặc biệt.\n- Không bỏ bước quan trọng và không tự kết thúc khi mới làm xong một phần.\n- Nếu có nhiều cách, chọn cách chắc chắn và ghi ngắn gọn vì sao.\n- Cuối lời giải phải tự kiểm tra bằng thế ngược, biến đổi ngược, đơn vị, dấu hoặc lập luận tương ứng.\n- Không bịa phần ảnh mờ hoặc dữ kiện thiếu.\n- Công thức toán dùng LaTeX.\n${verified?'\nKẾT QUẢ KIỂM CHỨNG TỪ WOLFRAM ALPHA:\n'+verified+'\nChỉ dùng kết quả này khi thật sự liên quan; nếu có mâu thuẫn phải tự kiểm tra lại.':''}\n\nLỊCH SỬ GẦN ĐÂY:\n${Array.isArray(history)?history.slice(-6).map(x=>(x.role||'user')+': '+String(x.message||'')).join('\n'):''}\n\nĐỀ BÀI/YÊU CẦU:\n${message}`}
+async function geminiOnce({message,subject,history,imageDataUrl,verified,model,maxOutputTokens=MAX_OUTPUT_TOKENS,timeout=25000}){const key=cleanKey(process.env.GEMINI_API_KEY);if(!key)throw new Error('GEMINI_API_KEY chưa được cấu hình.');const mode=subjectMode(subject,message);const parts=[{text:solverPrompt(subject,mode,verified,message,history)}];if(imageDataUrl&&/^data:image\//i.test(imageDataUrl)){const m=imageDataUrl.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);if(m)parts.push({inlineData:{mimeType:m[1],data:m[2]}})}const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens}}),signal:AbortSignal.timeout(timeout)});const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch{}if(!r.ok)throw Object.assign(new Error(providerError(r.status,d?.error?.message)),{status:r.status,providerMessage:d?.error?.message});const answer=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim();if(!answer)throw new Error('Gemini trả về rỗng.');return {answer,model,finishReason:d?.candidates?.[0]?.finishReason||null}}
+async function primarySolve(args){let last=null;for(const model of GEMINI_MODELS){try{return await geminiOnce({...args,model})}catch(e){last=e;if(!busy(e?.status,e?.providerMessage||e?.message))break}}throw last||new Error('Gemini không phản hồi.')}
+async function auditMath({message,subject,imageDataUrl,solution,verified}){const key=cleanKey(process.env.GEMINI_API_KEY);if(!key)return null;const model='gemini-3.6-flash';const prompt=`Bạn là bộ kiểm định độc lập. Kiểm tra TOÀN BỘ lời giải toán dưới đây từ đầu đến cuối. Đối chiếu với đề/ảnh và kết quả kiểm chứng nếu có. Nếu sai ở bất kỳ bước nào, sửa lại và trả về MỘT lời giải hoàn chỉnh từ gốc. Nếu đúng, vẫn phải trình bày lại đầy đủ và giữ nguyên các chứng minh quan trọng. Không chỉ nhận xét.\n\nĐỀ:\n${message}\n\nLỜI GIẢI CẦN KIỂM:\n${solution}\n\nWOLFRAM:\n${verified||'Không có'}`;const parts=[{text:prompt}];if(imageDataUrl&&/^data:image\//i.test(imageDataUrl)){const m=imageDataUrl.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);if(m)parts.push({inlineData:{mimeType:m[1],data:m[2]}})}try{const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:8000}}),signal:AbortSignal.timeout(16000)});const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch{}if(!r.ok)return null;const answer=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim();return answer?{answer,model}:null}catch{return null}}
+async function openaiFallback({message,subject,imageDataUrl,verified}){const key=cleanKey(process.env.OPENAI_API_KEY);if(!key)return null;const model=cleanKey(process.env.OPENAI_SOLVER_MODEL||'gpt-5');const prompt=`Giải toàn bộ bài học tập từ gốc, không chỉ kết luận. Môn: ${subject||'chưa chọn'}. Trình bày Dữ kiện → Cần tìm → Phương pháp → từng bước → kiểm tra → kết luận. Nếu có ảnh phải đọc toàn bộ phần nhìn thấy. ${verified?'Đối chiếu thêm với kết quả kiểm chứng: '+verified:''}\n\n${message}`;const content=[{type:'input_text',text:prompt}];if(imageDataUrl&&/^data:image\//i.test(imageDataUrl))content.push({type:'input_image',image_url:imageDataUrl,detail:'high'});const r=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},body:JSON.stringify({model,reasoning:{effort:'high'},input:[{role:'user',content}],max_output_tokens:MAX_OUTPUT_TOKENS}),signal:AbortSignal.timeout(45000)});const raw=await r.text();let d={};try{d=raw?JSON.parse(raw):{}}catch{}if(!r.ok)throw new Error(d?.error?.message||('OpenAI HTTP '+r.status));return {answer:d.output_text||'Mình chưa có câu trả lời.',model}}
+module.exports=async function handler(req,res){if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});try{const message=String(req.body?.message||'').trim();if(!message)return json(res,400,{error:'Thiếu câu hỏi.'});const subject=String(req.body?.subject||'');const history=Array.isArray(req.body?.history)?req.body.history:[];const imageDataUrl=String(req.body?.imageDataUrl||'');const deep=req.body?.deep!==false;const mode=subjectMode(subject,message);let verified=null;
+    // Start CAS verification immediately. It can finish while the first AI is solving, keeping normal latency low.
     const verificationPromise=(mode==='math'||mode==='physics'||mode==='chemistry')?wolfram(message):Promise.resolve({available:false});
-    let verified=null;
-    try{
-      const early=await Promise.race([verificationPromise,new Promise(resolve=>setTimeout(()=>resolve(null),650))]);
-      if(early?.available)verified=early.result;
-    }catch{}
-
-    try{
-      const g=await gemini({message,subject,history,imageDataUrl,verified});
-      return json(res,200,{...g,tool:verified?'WolframAlpha + Gemini':'Gemini'});
-    }catch(primary){
-      // If verification finishes while the fallback starts, include it without making the primary path wait.
-      if(!verified)try{const late=await Promise.race([verificationPromise,new Promise(resolve=>setTimeout(()=>resolve(null),400))]);if(late?.available)verified=late.result}catch{}
-      const fallback=await openaiFallback({message,subject,history,imageDataUrl,verified}).catch(()=>null);
-      if(fallback)return json(res,200,{...fallback,tool:verified?'WolframAlpha + OpenAI':'OpenAI fallback'});
-      return json(res,503,{error:String(primary?.message||'Các bộ giải AI hiện chưa phản hồi. Vui lòng thử lại sau ít phút.')});
-    }
-  }catch(e){return json(res,500,{error:e.message||'Không thể xử lý yêu cầu.'})}
-}
+    let primary;
+    try{primary=await primarySolve({message,subject,history,imageDataUrl,verified:null})}catch(primaryError){const w=await verificationPromise;verified=w.available?w.result:null;const fallback=await openaiFallback({message,subject,imageDataUrl,verified}).catch(()=>null);if(fallback)return json(res,200,{...fallback,tool:verified?'WolframAlpha + OpenAI':'OpenAI fallback'});return json(res,503,{error:String(primaryError?.message||'Các bộ giải AI hiện chưa phản hồi.')})}
+    const w=await verificationPromise;verified=w.available?w.result:null;
+    let finalAnswer=primary.answer;let auditModel=null;
+    if(deep&&(mode==='math'||mode==='physics'||mode==='chemistry')){const audit=await auditMath({message,subject,imageDataUrl,solution:primary.answer,verified});if(audit?.answer){finalAnswer=audit.answer;auditModel=audit.model}}
+    return json(res,200,{answer:finalAnswer,model:primary.model,auditModel,tool:verified?(auditModel?'WolframAlpha + AI Audit':'WolframAlpha'):auditModel?'AI Audit':'Gemini',verified:!!verified});
+  }catch(e){return json(res,500,{error:e.message||'Không thể xử lý yêu cầu.'})}}

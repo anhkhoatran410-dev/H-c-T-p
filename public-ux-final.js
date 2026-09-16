@@ -15,9 +15,13 @@
     var tools=composer.querySelector('.support-tools');
     if(!tools){
       tools=document.createElement('div');tools.className='support-tools';
-      tools.innerHTML='<button type="button" class="support-tool" data-support-action="emoji" title="Emoji">😊</button><button type="button" class="support-tool" data-support-action="sticker" title="Sticker">✨</button><button type="button" class="support-tool" data-support-action="gif" title="GIF">GIF</button><button type="button" class="support-tool" data-support-action="file" title="Ảnh / file">📎</button>';
+      tools.innerHTML='<button type="button" class="support-tool" data-support-action="emoji" title="Biểu tượng">Biểu tượng</button><button type="button" class="support-tool" data-support-action="sticker" title="Sticker">Sticker</button><button type="button" class="support-tool" data-support-action="gif" title="GIF">GIF</button><button type="button" class="support-tool" data-support-action="file" title="Tệp">Tệp</button>';
       composer.insertBefore(tools,input);
     }
+    composer.querySelector('[data-support-action="emoji"]')?.replaceChildren(document.createTextNode('Biểu tượng'));
+    composer.querySelector('[data-support-action="sticker"]')?.replaceChildren(document.createTextNode('Sticker'));
+    composer.querySelector('[data-support-action="gif"]')?.replaceChildren(document.createTextNode('GIF'));
+    composer.querySelector('[data-support-action="file"]')?.replaceChildren(document.createTextNode('Tệp'));
     var fileInput=composer.querySelector('#supportMediaInput');
     if(!fileInput){
       fileInput=document.createElement('input');fileInput.type='file';fileInput.id='supportMediaInput';fileInput.accept='image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip';fileInput.hidden=true;composer.appendChild(fileInput);
@@ -43,9 +47,9 @@
       if(up.error)throw up.error;
       var pub=db.storage.from('support-media').getPublicUrl(path);var url=pub&&pub.data&&pub.data.publicUrl;
       if(!url)throw new Error('Không lấy được URL file.');
-      await window.sendSupportMessage({message:file.type&&file.type.indexOf('image/')===0?'📷 Hình ảnh':'📎 '+file.name,attachment_url:url,attachment_type:file.type||'application/octet-stream',attachment_name:file.name});
+      await window.sendSupportMessage({message:file.type&&file.type.indexOf('image/')===0?'Hình ảnh':'Tệp '+file.name,attachment_url:url,attachment_type:file.type||'application/octet-stream',attachment_name:file.name});
       if(typeof window.refreshPublicChat==='function')await window.refreshPublicChat();
-      if(status)status.textContent='Đã gửi ✓';
+      if(status)status.textContent='Đã gửi';
     }catch(e){console.error('support media upload',e);if(status)status.textContent='Lỗi: '+(e.message||e);alert('Không gửi được file: '+(e.message||e))}
     setTimeout(function(){if(status)status.textContent=''},2500)
   }
@@ -64,7 +68,7 @@
   }
 
   function quickEmoji(v){var input=document.getElementById('supportInput');if(!input)return;input.value+=(input.value?' ':'')+v;input.focus();closeMenus()}
-  async function quickSticker(v){closeMenus();try{if(typeof window.sendSupportMessage!=='function')throw new Error('Hỗ trợ chưa sẵn sàng.');await window.sendSupportMessage({sticker:v,message:'✨ '+v});if(typeof window.refreshPublicChat==='function')await window.refreshPublicChat()}catch(e){alert('Không gửi được sticker: '+(e.message||e))}}
+  async function quickSticker(v){closeMenus();try{if(typeof window.sendSupportMessage!=='function')throw new Error('Hỗ trợ chưa sẵn sàng.');await window.sendSupportMessage({sticker:v,message:'Sticker '+v});if(typeof window.refreshPublicChat==='function')await window.refreshPublicChat()}catch(e){alert('Không gửi được sticker: '+(e.message||e))}}
   function openGif(){
     closeMenus();
     var url=window.prompt('Dán URL GIF (ví dụ link .gif):');

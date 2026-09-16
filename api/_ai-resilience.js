@@ -16,23 +16,14 @@ function envKeys(prefix) {
   }
   const packed = String(process.env[`${prefix}_API_KEYS`] || '').trim();
   if (packed) {
-    for (const [index, value] of packed.split(',').map(v => v.trim()).filter(Boolean).entries()) {
-      out.push({ id: `${prefix}_API_KEYS_${index + 1}`, key: value });
-    }
+    for (const [index, value] of packed.split(',').map(v => v.trim()).filter(Boolean).entries()) out.push({ id: `${prefix}_API_KEYS_${index + 1}`, key: value });
   }
   return out;
 }
-
-function fingerprint(key) {
-  return crypto.createHash('sha256').update(key).digest('hex').slice(0, 16);
-}
-
+function fingerprint(key) { return crypto.createHash('sha256').update(key).digest('hex').slice(0, 16); }
 function getState(id) {
   let s = state.get(id);
-  if (!s) {
-    s = { failures: 0, successes: 0, uses: 0, openedUntil: 0, probeUntil: 0, lastFailure: 0, lastUsed: 0 };
-    state.set(id, s);
-  }
+  if (!s) { s = { failures: 0, successes: 0, uses: 0, openedUntil: 0, probeUntil: 0, lastFailure: 0, lastUsed: 0 }; state.set(id, s); }
   return s;
 }
 function isOpen(s, now) { return s.openedUntil > now; }
@@ -55,10 +46,13 @@ export function acquireAiKey(prefix = 'GEMINI', excludedIds = []) {
 }
 export function reportAiSuccess(prefix, id) { const s = getState(id); s.failures = 0; s.openedUntil = 0; s.probeUntil = 0; s.successes += 1; }
 export function reportAiFailure(prefix, id, error = {}) {
-  const s = getState(id); s.failures += 1; s.lastFailure = Date.now();
-  const status = Number(error?.status || 0);
-  const permanentKeyFailure = status === 400 || status === 401 || status === 403 || status === 404;
-  if (permanentKeyFailure || s.failures >= FAILURE_THRESHOLD) { s.openedUntil = Date.now() + COOLDOWN_MS; s.probeUntil = 0; }
+  const s = getState(id); const status = Number(error?.status || 0); s.lastFailure = Date.now();
+  // Only key-specific auth failures immediately open the circuit. 429/5xx/timeouts use the threshold.
+  if (status === 401 || status === 403) { s.failures = FAILURE_THRESHOLD; s.openedUntil = Date.now() + COOLDOWN_MS; s.probeUntil = 0; }
+  else if (status === 429 || status >= 500 || error?.code === 'ETIMEDOUT' || error?.code === 'ECONNRESET' || error?.code === 'EAI_AGAIN') {
+    s.failures += 1;
+    if (s.failures >= FAILURE_THRESHOLD) { s.openedUntil = Date.now() + COOLDOWN_MS; s.probeUntil = 0; }
+  }
   return { opened: s.openedUntil > Date.now(), failures: s.failures, retryAt: s.openedUntil || null };
 }
 export function aiPoolSnapshot(prefix = 'GEMINI') {

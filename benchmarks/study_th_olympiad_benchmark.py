@@ -20,13 +20,15 @@ import json
 import random
 import re
 import time
+import urllib.error
 import urllib.request
 from fractions import Fraction
 
 ENDPOINT = "https://hoc-va-choi.vercel.app/api/solve"
-TIMEOUT = 90
-OUTER_RETRIES = 2
+TIMEOUT = 120
+OUTER_RETRIES = 3
 SEED = 20260916
+RETRYABLE_HTTP_STATUS = {408, 409, 425, 429, 502, 503, 504}
 
 DATA_URLS = {
     "GSM8K": "https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/test.jsonl",
@@ -148,6 +150,17 @@ def choose_rows(name, rows):
     return chosen[:n]
 
 
+def retry_delay(attempt, retry_after=None):
+    if retry_after is not None:
+        try:
+            value = float(retry_after)
+            if value >= 0:
+                return min(15.0, value)
+        except (TypeError, ValueError):
+            pass
+    return min(12.0, (2 ** attempt) + random.uniform(0.0, 1.0))
+
+
 def call_solver(item):
     prompt = (
         "Bạn đang tham gia bài kiểm tra năng lực Toán nâng cao của STUDY TH.\n"
@@ -161,6 +174,8 @@ def call_solver(item):
                           "imageDataUrl": "", "deep": True}).encode("utf-8")
     started = time.time()
     last_error = None
+    last_status_code = None
+
     for attempt in range(OUTER_RETRIES + 1):
         req_started = time.time()
         req = urllib.request.Request(ENDPOINT, data=payload,
@@ -177,17 +192,34 @@ def call_solver(item):
                     "audit": data.get("auditVerdict"), "tool": data.get("tool"),
                     "verified": data.get("verified"), "latency_sec": round(time.time() - req_started, 3),
                     "total_latency_sec": round(time.time() - started, 3), "attempts": attempt + 1,
-                    "error": None,
+                    "http_status_code": getattr(response, "status", 200), "error": None,
                 }
+        except urllib.error.HTTPError as exc:
+            last_status_code = exc.code
+            body = ""
+            try:
+                body = exc.read(1200).decode("utf-8", errors="replace").strip()
+            except Exception:
+                pass
+            last_error = f"HTTP {exc.code}: {body}" if body else f"HTTP {exc.code}: {exc.reason}"
+            if exc.code not in RETRYABLE_HTTP_STATUS or attempt >= OUTER_RETRIES:
+                break
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            time.sleep(retry_delay(attempt, retry_after))
+        except (urllib.error.URLError, TimeoutError) as exc:
+            last_error = repr(exc)
+            if attempt >= OUTER_RETRIES:
+                break
+            time.sleep(retry_delay(attempt))
         except Exception as exc:
             last_error = repr(exc)
-            if attempt < OUTER_RETRIES:
-                time.sleep(1.5 * (attempt + 1))
+            break
+
     return {"ok": False, "status": "HTTP_ERROR", "pred": None, "gold": item["gold"],
             "model": None, "audit": None, "tool": None, "verified": False,
             "latency_sec": round(time.time() - started, 3),
             "total_latency_sec": round(time.time() - started, 3),
-            "attempts": OUTER_RETRIES + 1, "error": last_error}
+            "attempts": attempt + 1, "http_status_code": last_status_code, "error": last_error}
 
 
 def summarize(rows):
@@ -205,6 +237,9 @@ def summarize(rows):
         "http_ok": http_ok, "http_ok_percent": round(100 * http_ok / total, 2) if total else 0,
         "no_answer": sum(r["status"] == "NO_ANSWER" for r in rows),
         "http_errors": sum(r["status"] == "HTTP_ERROR" for r in rows),
+        "http_502": sum(r.get("http_status_code") == 502 for r in rows),
+        "http_503": sum(r.get("http_status_code") == 503 for r in rows),
+        "http_504": sum(r.get("http_status_code") == 504 for r in rows),
         "audited": len(audits),
         "audit_pass": sum(r.get("audit") == "PASS" for r in rows),
         "audit_fail": sum(r.get("audit") == "FAIL" for r in rows),
@@ -226,18 +261,19 @@ def main():
             result = call_solver(item)
             result.update({"id": item["id"], "tier": name, "subject": item.get("subject")})
             all_results.append(result)
-            print(f"[{len(all_results)}] {name} {result['status']} pred={result.get('pred')} gold={result.get('gold')} {result.get('total_latency_sec', 0):.1f}s model={result.get('model')}")
+            print(f"[{len(all_results)}] {name} {result['status']} pred={result.get('pred')} gold={result.get('gold')} {result.get('total_latency_sec', 0):.1f}s model={result.get('model')} http={result.get('http_status_code')}")
 
     by_tier = {tier: summarize([r for r in all_results if r["tier"] == tier]) for tier in TARGETS}
     summary = {"benchmark": "STUDY TH Olympiad Ceiling v1", "endpoint": ENDPOINT,
                "seed": SEED, "timeout_sec": TIMEOUT, "outer_retries": OUTER_RETRIES,
+               "retryable_http_status": sorted(RETRYABLE_HTTP_STATUS),
                "selection": selected_counts, "overall": summarize(all_results),
                "by_tier": by_tier, "results": all_results}
 
     with open("benchmark-olympiad-results.json", "w", encoding="utf-8") as f:
         json.dump(summary, f, ensure_ascii=False, indent=2)
     with open("benchmark-olympiad-results.csv", "w", encoding="utf-8", newline="") as f:
-        fields = ["id", "tier", "subject", "status", "pred", "gold", "model", "audit", "tool", "verified", "total_latency_sec", "attempts", "error"]
+        fields = ["id", "tier", "subject", "status", "pred", "gold", "model", "audit", "tool", "verified", "http_status_code", "total_latency_sec", "attempts", "error"]
         w = csv.DictWriter(f, fieldnames=fields)
         w.writeheader()
         for row in all_results:

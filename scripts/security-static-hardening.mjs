@@ -3,6 +3,10 @@ import path from 'node:path';
 
 const root = process.cwd();
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
+const order = (text, needles) => {
+  const positions = needles.map((needle) => text.indexOf(needle));
+  return positions.every((position) => position >= 0) && positions.every((position, i) => i === 0 || position > positions[i - 1]);
+};
 const checks = [
   ['common security headers', read('api/_security.js'), ['X-DNS-Prefetch-Control', 'X-Permitted-Cross-Domain-Policies', 'X-Robots-Tag']],
   ['JSON content-type guard', read('api/_security.js'), ['function enforceJsonContentType']],
@@ -34,5 +38,12 @@ for (const [name, text, needles] of checks) {
   }
   if (process.exitCode) break;
   console.log(`PASS: ${name}`);
+}
+const gateway = read('api/_ai-gateway.js');
+if (!order(gateway, ['const timestamp = internalTimestamp();', 'const guarded = sanitizeAiBody(rawBody);', 'const ingress = sanitizeAiIngress(guarded.body.message || \'\', guarded.body.history || []);', "fetch(`${url}/api/_solve-core`"])) {
+  console.error('FAIL: AI gateway request order: internal proof must precede expensive input guards and upstream call');
+  process.exitCode = 1;
+} else {
+  console.log('PASS: AI gateway request order: internal proof precedes input guards/upstream');
 }
 if (!process.exitCode) console.log('All static security hardening assertions passed.');

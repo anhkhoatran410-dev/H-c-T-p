@@ -22,7 +22,7 @@ class Finding:
 
 def request(path: str, method: str = "GET", payload: Any = None, headers: dict[str, str] | None = None):
     body = None
-    h = {"User-Agent": "study-th-security-benchmark/2.2", "Accept": "application/json, text/plain;q=0.8"}
+    h = {"User-Agent": "study-th-security-benchmark/2.3", "Accept": "application/json, text/plain;q=0.8"}
     if headers: h.update(headers)
     if payload is not None:
         body = payload if isinstance(payload, (bytes, bytearray)) else json.dumps(payload, ensure_ascii=False).encode()
@@ -74,9 +74,9 @@ def input_tests():
         elif ep == "/api/support-ai":
             payload, expected = {"message":"A" * 1_050_000,"subject":"","history":[]}, {400,413,422,429}
         elif ep == "/api/generate-exam":
-            payload, expected = {"documentText":"A" * 500_000,"types":["mcq"]}, {400,413,422,429}
+            payload, expected = {"documentText":"A" * 1_000_000,"types":["mcq"]}, {400,413,422,429}
         else:
-            payload, expected = {"documentText":"A" * 500_000,"sourceFiles":["test.txt"],"sourceUrls":["https://example.invalid/test.txt"]}, {400,413,422,429}
+            payload, expected = {"documentText":"A" * 1_000_000,"sourceFiles":["test.txt"],"sourceUrls":["https://example.invalid/test.txt"]}, {400,413,422,429}
         s, _, t, ms, *_ = request(ep, "POST", payload)
         add(out, "large-input-handling", ep, "clean bounded response", str(s), ms, s in expected and not SENSITIVE.search(t), t[:240])
     return out

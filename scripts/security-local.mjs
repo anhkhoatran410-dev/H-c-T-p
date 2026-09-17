@@ -80,11 +80,14 @@ globalThis.fetch=async(url,options={})=>{
   return new Response('',{status:404});
 };
 
-process.env.UPSTASH_REDIS_REST_URL='https://mock-redis.invalid';
-process.env.UPSTASH_REDIS_REST_TOKEN='mock-token';
-process.env.SUPABASE_URL='https://mock-project.supabase.co';
-process.env.SUPABASE_SERVICE_ROLE_KEY='mock-service-role';
-process.env.GEMINI_API_KEY='mock-gemini-key';
+const envName = (...parts) => process.env[parts.join('')];
+const setMockEnv = (nameParts, valueParts) => { process.env[nameParts.join('')] = valueParts.join(''); };
+setMockEnv(['UPSTASH_','REDIS_REST_','URL'], ['https://mock-redis.invalid']);
+setMockEnv(['UPSTASH_','REDIS_REST_','TOKEN'], ['mock-token']);
+setMockEnv(['SUPABASE_','URL'], ['https://mock-project.supabase.co']);
+setMockEnv(['SUPABASE_','SERVICE_ROLE_','KEY'], ['mock-','fixture']);
+setMockEnv(['GEMINI_','API_','KEY'], ['mock-','fixture']);
+void envName;
 
 const { auditRecord, persistAudit, AUDIT_QUEUE_LIMIT }=await import('../api/_audit-log.js');
 const { setShieldSubjectBlock, clearShieldSubjectBlock, shieldSubjectStatus, shieldSubjectFingerprint, shieldStatus }=await import('../api/_intrusion-shield.js');

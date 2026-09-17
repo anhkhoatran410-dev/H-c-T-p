@@ -4,6 +4,8 @@ import solveHandler from './solve.js';
 import { applySecurityHeaders, enforceBodySize, rateLimit, safeRequestId } from './_security.js';
 import { consumeNonce, internalSignature, timingSafeHexEqual, verifyTimestamp } from './_internal-replay.js';
 import { recordThreat } from './_adaptive-defense.js';
+import { sanitizeAiBody } from './_prompt-security.js';
+import { sanitizeAiIngress } from './_ai-input-guard.js';
 
 function secret(){ return String(process.env.INTERNAL_GATEWAY_SECRET || '').trim(); }
 
@@ -26,5 +28,15 @@ export default async function handler(req,res){
 
   if(!enforceBodySize(req,res,1_200_000)) return;
   if(!rateLimit(req,res,{windowMs:60_000,max:12,keyPrefix:'ai-core'})) return;
+
+  const rawBody = req?.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? req.body
+    : {};
+  const guarded = sanitizeAiBody(rawBody);
+  if(!guarded.ok){ await recordThreat(req,guarded.code); return res.status(guarded.status).json({error:'Invalid AI request.',code:guarded.code,requestId}); }
+  const ingress = sanitizeAiIngress(guarded.body.message || '', guarded.body.history || []);
+  if(!ingress.ok){ await recordThreat(req,ingress.code); return res.status(ingress.status).json({error:'Invalid AI request.',code:ingress.code,requestId}); }
+  req.body = { ...guarded.body, message: ingress.message, history: ingress.history };
+
   return solveHandler(req,res);
 }

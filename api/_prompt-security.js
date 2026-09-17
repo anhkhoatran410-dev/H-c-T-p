@@ -1,5 +1,6 @@
 const MAX_PROMPT_CHARS = 30_000;
 const MAX_REPEATED_LINES = 24;
+const MAX_HISTORY_ITEMS = 80;
 
 // High-confidence prompt-abuse indicators only. This is a defensive pre-filter,
 // not an attempt to classify every malicious prompt or identify agents perfectly.
@@ -67,14 +68,24 @@ export function sanitizeAiBody(body) {
     out.message = checked.text;
   }
   if (Array.isArray(out.history)) {
-    if (out.history.length > 80) return { ok: false, code: 'history-too-large', status: 413, body: {} };
-    out.history = out.history.map(item => {
-      if (!item || typeof item !== 'object') return item;
-      if (typeof item.content !== 'string') return item;
+    if (out.history.length > MAX_HISTORY_ITEMS) {
+      return { ok: false, code: 'history-too-large', status: 413, body: {} };
+    }
+    const sanitizedHistory = [];
+    for (const item of out.history) {
+      if (!item || typeof item !== 'object') {
+        sanitizedHistory.push(item);
+        continue;
+      }
+      if (typeof item.content !== 'string') {
+        sanitizedHistory.push(item);
+        continue;
+      }
       const checked = inspectAiPrompt(item.content);
-      if (!checked.ok) throw Object.assign(new Error(checked.code), checked);
-      return { ...item, content: checked.text };
-    });
+      if (!checked.ok) return { ...checked, body: {} };
+      sanitizedHistory.push({ ...item, content: checked.text });
+    }
+    out.history = sanitizedHistory;
   }
   return { ok: true, body: out };
 }

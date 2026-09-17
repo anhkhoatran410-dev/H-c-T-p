@@ -1,6 +1,6 @@
 import { isAdminRequest } from './admin-login.js';
 import './_gemini-network-guard.js';
-import { applySecurityHeaders, enforceBodySize, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
 import adminAssistantHandler from '../lib/admin-assistant.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
@@ -12,6 +12,7 @@ async function guard(req, res) {
   res.setHeader('X-Request-ID', safeRequestId());
   if (!enforceMethod(req, res, ['POST'])) return false;
   if (!enforceBodySize(req, res, 256 * 1024)) return false;
+  if (!enforceJsonContentType(req, res)) return false;
   if (!sameOrigin(req, res)) return false;
   if (!rateLimit(req, res, { max: 20, windowMs: 60_000, keyPrefix: 'admin-tools' })) return false;
   if (!isAdminRequest(req)) {
@@ -23,6 +24,25 @@ async function guard(req, res) {
     return false;
   }
   return true;
+}
+
+async function sb(path, options = {}) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+    ...options,
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+      ...(options.headers || {}),
+    },
+    signal: options.signal || AbortSignal.timeout(8000),
+  });
+  const text = await r.text();
+  let data = [];
+  try { data = text ? JSON.parse(text) : []; } catch { data = []; }
+  if (!r.ok) throw new Error('Supabase request failed.');
+  return data;
 }
 
 async function health(req, res) {
@@ -65,6 +85,61 @@ async function health(req, res) {
   } catch {}
 
   return res.status(200).json({ checks, details });
+}
+
+async function adminListAccounts(req, res) {
+  if (!await guard(req, res)) return;
+  try {
+    const rows = await sb('support_accounts?select=id,name,handle,avatar,description,bot_enabled,is_active,created_at,updated_at&order=created_at.asc&limit=100');
+    return res.status(200).json({ ok: true, accounts: Array.isArray(rows) ? rows : [] });
+  } catch { return res.status(502).json({ error: 'Không tải được tài khoản hỗ trợ.' }); }
+}
+
+async function adminCreateAccount(req, res) {
+  if (!await guard(req, res)) return;
+  const name = String(req.body?.name || '').trim();
+  const handle = String(req.body?.handle || '').trim();
+  const avatar = String(req.body?.avatar || '💬').trim();
+  const description = String(req.body?.description || '').trim();
+  const botEnabled = req.body?.bot_enabled !== false;
+  if (!name || name.length > 200 || handle.length > 100 || avatar.length > 20 || description.length > 1000) {
+    return res.status(400).json({ error: 'Dữ liệu tài khoản hỗ trợ không hợp lệ.' });
+  }
+  try {
+    const rows = await sb('support_accounts', {
+      method: 'POST',
+      body: JSON.stringify({ name, handle: handle || null, avatar: avatar || '💬', description: description || null, bot_enabled: botEnabled, is_active: true, updated_at: new Date().toISOString() }),
+    });
+    return res.status(200).json({ ok: true, account: rows?.[0] || null });
+  } catch { return res.status(502).json({ error: 'Không tạo được tài khoản hỗ trợ.' }); }
+}
+
+async function adminListBotRules(req, res) {
+  if (!await guard(req, res)) return;
+  try {
+    const rows = await sb('support_bot_rules?select=*,support_accounts(name,handle,avatar)&order=priority.desc&limit=200');
+    return res.status(200).json({ ok: true, rules: Array.isArray(rows) ? rows : [] });
+  } catch { return res.status(502).json({ error: 'Không tải được quy tắc bot.' }); }
+}
+
+async function adminCreateBotRule(req, res) {
+  if (!await guard(req, res)) return;
+  const accountId = String(req.body?.account_id || '').trim();
+  const keywords = Array.isArray(req.body?.keywords)
+    ? req.body.keywords.map(x => String(x || '').trim()).filter(Boolean).slice(0, 30)
+    : [];
+  const reply = String(req.body?.reply || '').trim();
+  const priority = Number(req.body?.priority ?? 10);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(accountId) || !keywords.length || keywords.some(x => x.length > 100) || !reply || reply.length > 10_000 || !Number.isFinite(priority) || priority < -1000 || priority > 1000) {
+    return res.status(400).json({ error: 'Dữ liệu quy tắc bot không hợp lệ.' });
+  }
+  try {
+    const rows = await sb('support_bot_rules', {
+      method: 'POST',
+      body: JSON.stringify({ account_id: accountId, keywords, reply, priority: Math.trunc(priority), enabled: true, updated_at: new Date().toISOString() }),
+    });
+    return res.status(200).json({ ok: true, rule: rows?.[0] || null });
+  } catch { return res.status(502).json({ error: 'Không lưu được quy tắc bot.' }); }
 }
 
 async function singleDelete(req, res) {
@@ -148,6 +223,10 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const path = String(req.query?.route || '').replace(/^\/+|\/+$/g, '');
   if (path === 'admin-health') return health(req, res);
+  if (path === 'admin-accounts') return adminListAccounts(req, res);
+  if (path === 'admin-create-account') return adminCreateAccount(req, res);
+  if (path === 'admin-bot-rules') return adminListBotRules(req, res);
+  if (path === 'admin-create-bot-rule') return adminCreateBotRule(req, res);
   if (path === 'admin-delete-exam') return singleDelete(req, res);
   if (path === 'admin-delete-exams-bulk') return bulkDelete(req, res);
   if (path === 'admin-update-exam') return updateExam(req, res);

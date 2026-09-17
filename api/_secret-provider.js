@@ -46,11 +46,13 @@ async function vaultFetch(prefix){
     const data=payload?.data?.data&&typeof payload.data.data==='object'?payload.data.data:payload?.data&&typeof payload.data==='object'?payload.data:null;
     if(!data||typeof data!=='object')return null;
     const entries=[];
-    for(const [id,value] of Object.entries(data)){
+    for(const [rawId,value] of Object.entries(data)){
       if(entries.length>=MAX_KEYS)break;
       if(typeof value!=='string'||!value.trim())continue;
-      if(!/^(?:[A-Z0-9_]+_API_KEY(?:_\d+)?|API_KEY(?:_\d+)?)$/i.test(id))continue;
-      entries.push({id:`${prefix}_${id.replace(/^API_KEY/i,'API_KEY')}`,key:value.trim(),fingerprint:fingerprint(value.trim())});
+      const id=String(rawId).trim();
+      if(!/^(?:(?:API_KEY(?:_\d+)?)|(?:[A-Z0-9]+_API_KEY(?:_\d+)?))$/i.test(id))continue;
+      const canonical=id.toUpperCase().startsWith(`${prefix.toUpperCase()}_`)?id.toUpperCase():`${prefix}_${id.toUpperCase()}`;
+      entries.push({id:canonical,key:value.trim(),fingerprint:fingerprint(value.trim())});
     }
     return entries.length?entries:null;
   }catch{return null;}finally{clearTimeout(timer);}

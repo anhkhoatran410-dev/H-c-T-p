@@ -56,6 +56,9 @@ jobs:
           done < <(find api admin scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 2>/dev/null || true)
           if [ "$found" -eq 0 ]; then echo "No JavaScript files found for syntax check."; fi
 
+      - name: Local security architecture test
+        run: node scripts/security-local.mjs
+
       - name: Security regression tests
         run: node scripts/security-regression.mjs
 

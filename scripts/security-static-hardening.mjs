@@ -14,6 +14,9 @@ const checks = [
   ['AI DLP extensions', read('api/_ai-input-guard.js'), ['aws-access-key', 'private-key', 'safeRole', 'forget\\s+']],
   ['server-side admin config routes', read('api/admin-tools.js'), ['admin-accounts', 'admin-create-account', 'admin-bot-rules', 'admin-create-bot-rule']],
   ['DB admin-config lockdown migration', read('supabase/migrations/20260917_security_admin_config.sql'), ['revoke insert, update, delete', 'support_accounts_write', 'support_bot_rules_write']],
+  ['AI gateway JSON boundary', read('api/_ai-gateway.js'), ['enforceJsonContentType(req,res)']],
+  ['AI core JSON boundary', read('api/_solve-core.js'), ['enforceJsonContentType(req,res)']],
+  ['support AI JSON boundary', read('api/support-ai.js'), ['enforceJsonContentType(req,res)']],
 ];
 for (const [name, text, needles] of checks) {
   for (const needle of needles) {

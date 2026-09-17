@@ -1,4 +1,4 @@
-import { distributedRateLimit, enforceBodySize, applySecurityHeaders, sameOrigin, safeRequestId } from './_security.js';
+import { distributedRateLimit, enforceBodySize, enforceJsonContentType, applySecurityHeaders, sameOrigin, safeRequestId } from './_security.js';
 import { internalNonce, internalSignature, internalTimestamp } from './_internal-replay.js';
 import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
 import { enforceCostChallenge } from './_adaptive-defense.js';
@@ -28,6 +28,7 @@ export default async function handler(req,res){
   const requestId = safeRequestId();
   res.setHeader('X-Request-ID', requestId);
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
+  if(!enforceJsonContentType(req,res)) return;
   const lock=await aiLockdownStatus();
   if(lock.locked) return res.status(503).json({error:'AI service temporarily locked down.',requestId});
   if(!(await shieldGate(req,res))) return;

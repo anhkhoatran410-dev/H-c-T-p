@@ -1,5 +1,5 @@
 import { acquireAiKey, reportAiFailure, reportAiSuccess } from './_ai-resilience.js';
-import { enforceBodySize, sameOrigin, distributedRateLimit, applySecurityHeaders, safeRequestId } from './_security.js';
+import { enforceBodySize, enforceJsonContentType, sameOrigin, distributedRateLimit, applySecurityHeaders, safeRequestId } from './_security.js';
 import { enforceCostChallenge } from './_adaptive-defense.js';
 import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
 import { sanitizeAiIngress } from './_ai-input-guard.js';
@@ -12,6 +12,7 @@ export default async function handler(req,res){
   applySecurityHeaders(res);
   res.setHeader('X-Request-ID',safeRequestId());
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  if(!enforceJsonContentType(req,res))return;
   if(!(await enforceAgentThreatDefense(req,res)))return;
   if(!(await enforceCostChallenge(req,res))){await recordAgentSignal(req,'cost-challenge');return;}
   if(!enforceBodySize(req,res,1_000_000)){await recordAgentSignal(req,'oversized-body');return;}

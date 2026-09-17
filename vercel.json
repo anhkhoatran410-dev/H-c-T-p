@@ -29,6 +29,9 @@
       ]
     }
   ],
+  "redirects": [
+    { "source": "/api/solve.js", "destination": "/api/solve", "statusCode": 307 }
+  ],
   "rewrites": [
     { "source": "/api/solve", "destination": "/api/_ai-gateway?target=solve" },
     { "source": "/api/solve.js", "destination": "/api/_ai-gateway?target=solve" },

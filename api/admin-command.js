@@ -1,6 +1,7 @@
 import { isAdminRequest } from "./admin-login.js";
 import './_gemini-network-guard.js';
-import { applySecurityHeaders, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
+import { applySecurityHeaders, enforceBodySize, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
+import { safeClientError } from './_response-guard.js';
 const SUPABASE_URL=String(process.env.SUPABASE_URL||"https://mlqaeginqsgqacdqdzbm.supabase.co");
 const SERVICE_KEY=String(process.env.SUPABASE_SERVICE_ROLE_KEY||"").trim();
 const GEMINI_KEY=String(process.env.GEMINI_API_KEY||"").trim();
@@ -11,14 +12,16 @@ async function askGemini(message,history){if(!GEMINI_KEY)throw new Error("GEMINI
 function first(v){return Array.isArray(v)?v[0]:v}function answer(title,lines){return `(1) ${title}\n${lines.map(x=>`- ${x}`).join("\n")}`}function isUuid(v){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)}
 async function findThread(target){const q=String(target||"").trim();if(!q)return null;if(isUuid(q)){const rows=await sb(`support_threads?id=eq.${q}&select=id,student_name,account_id&limit=1`);if(rows.length)return rows[0]}const rows=await sb(`support_threads?student_name=ilike.*${encodeURIComponent(q)}*&select=id,student_name,account_id&order=updated_at.desc&limit=5`);return first(rows)}
 export default async function handler(req,res){
-  applySecurityHeaders(res);res.setHeader('X-Request-ID',safeRequestId());
+  const requestId=safeRequestId();
+  applySecurityHeaders(res);res.setHeader('X-Request-ID',requestId);res.setHeader('Cache-Control','no-store');
   if(!enforceMethod(req,res,['POST']))return;
+  if(!enforceBodySize(req,res,96_000))return;
   if(!sameOrigin(req,res))return;
   if(!rateLimit(req,res,{max:12,windowMs:60_000,keyPrefix:'admin-command'}))return;
-  if(!isAdminRequest(req))return res.status(401).json({error:"Admin session required"});
+  if(!isAdminRequest(req))return res.status(401).json({error:"Admin session required",requestId});
   const message=String(req.body?.message||"").trim();
   const history=Array.isArray(req.body?.history)?req.body.history.slice(-14):[];
-  if(!message)return res.status(400).json({error:"Thiếu nội dung"});
+  if(!message)return res.status(400).json({error:"Thiếu nội dung",requestId});
   try{
     const plan=await askGemini(message,history);
     const action=String(plan.action||"none");
@@ -32,5 +35,5 @@ if(action==="reply_support"){const target=String(plan.target||"").trim(),reply=S
 if(action==="archive_thread"){const target=String(plan.target||"").trim();if(!target)throw new Error("Thiếu cuộc chat cần lưu trữ.");const thread=await findThread(target);if(!thread)throw new Error(`Không tìm thấy cuộc chat “${target}”.`);await sb(`support_threads?id=eq.${thread.id}`,{method:"PATCH",body:JSON.stringify({archived:true,updated_at:new Date().toISOString()})});return res.json({action,actionLabel:"Đã lưu trữ cuộc chat",answer:answer("Đã lưu trữ",[`Cuộc chat: ${thread.student_name||target}`])})}
 if(action==="rename_exam"){const target=String(plan.target||"").trim(),value=String(plan.value||"").trim();if(!target||!value)throw new Error("Thiếu tên đề cũ hoặc tên mới.");const rows=await sb(`exams?title=ilike.*${encodeURIComponent(target)}*&select=id,title&order=created_at.desc&limit=5`);const exam=first(rows);if(!exam)throw new Error(`Không tìm thấy đề “${target}”.`);await sb(`exams?id=eq.${exam.id}`,{method:"PATCH",body:JSON.stringify({title:value})});return res.json({action,actionLabel:"Đã đổi tên đề",answer:answer("Đã cập nhật bài kiểm tra",[`Tên cũ: ${exam.title}`,`Tên mới: ${value}`])})}
 return res.json({action:"none",actionLabel:"Không có thao tác hệ thống",answer:answer("Phân tích",["Mình đã phân tích yêu cầu nhưng không tự ý thay đổi dữ liệu."])})
-  }catch(e){return res.status(500).json({error:e.message||"Admin Copilot không thực hiện được yêu cầu."})}
+  }catch(e){return res.status(500).json({error:safeClientError(e,"Admin Copilot không thực hiện được yêu cầu."),requestId})}
 }

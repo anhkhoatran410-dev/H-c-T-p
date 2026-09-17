@@ -38,7 +38,10 @@ if (!live) {
       try { commands = JSON.parse(String(options.body || '[]')); } catch {}
       const arr = Array.isArray(commands?.[0]) ? commands : [commands];
       const resultsLocal = arr.map(redisResult);
-      return new Response(JSON.stringify(resultsLocal.map(result => ({ result }))), { status: 200, headers: { 'content-type': 'application/json' } });
+      const payload = target.endsWith('/pipeline')
+        ? resultsLocal.map(result => ({ result }))
+        : { result: resultsLocal[0] };
+      return new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } });
     }
     if (/supabase/i.test(target) && /\/rest\/v1\/ai_request_audit/.test(target)) {
       try { supabaseRows.push(JSON.parse(String(options.body || '{}'))); } catch {}

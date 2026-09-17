@@ -31,6 +31,9 @@ USER / EXTERNAL AI
    [6] GATEWAY
         |
         v
+ [6A] AI INPUT GUARD
+        |
+        v
  [7] AI RESILIENCE <----- result from external AI / model provider
         |
         +-------------------------------> [9] DATA
@@ -46,7 +49,7 @@ USER / EXTERNAL AI
 
 ### 1. Request path
 
-The normal request path is:
+The normal AI request path is:
 
 ```text
 User / External AI
@@ -55,8 +58,11 @@ User / External AI
   -> Challenge
   -> Auth
   -> Gateway
+  -> AI Input Guard
   -> AI Resilience
 ```
+
+The AI Input Guard is a bounded input-policy layer. It normalizes text, enforces prompt/history limits, blocks only high-confidence system-prompt/secret-extraction/instruction-override patterns, and detects simple repeated-input abuse. It is not a claim of perfect prompt-injection or agent detection.
 
 Admin is **not** a mandatory step. It is a privileged branch activated only when the authenticated request has the required admin scope.
 
@@ -139,6 +145,7 @@ This makes the auto-response destinations explicit without implying that Monitor
 ## Final rules for diagrams
 
 - Admin is a conditional privileged branch, never the default request path.
+- AI Input Guard is between the public Gateway and AI Resilience; it does not replace Threat, Auth, Gateway, or Resilience.
 - Response begins from the AI processing/result point and returns through Response Guard -> Gateway -> requester.
 - Data and Response Guard are parallel outcomes from AI Resilience.
 - Redis is shared state, not a mandatory sequential request hop.

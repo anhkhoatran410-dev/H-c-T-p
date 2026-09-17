@@ -9,6 +9,13 @@ function configuredSecrets(){
   return [...new Set(names)];
 }
 
+export function safeClientError(error, fallback='Yêu cầu không thể xử lý.'){
+  const safeFallback=String(fallback||'Yêu cầu không thể xử lý.');
+  // Client responses should never expose provider text, stack traces, env names,
+  // internal URLs, or infrastructure details. Keep this intentionally generic.
+  return safeFallback;
+}
+
 export function guardAiResponse(text, contentType='application/json; charset=utf-8'){
   const source=String(text||'');
   const byteLength=Buffer.byteLength(source,'utf8');

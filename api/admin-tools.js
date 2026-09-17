@@ -1,5 +1,7 @@
 import { isAdminRequest } from './admin-login.js';
+import './_gemini-network-guard.js';
 import { applySecurityHeaders, enforceBodySize, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
+import adminAssistantHandler from '../lib/admin-assistant.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
 const SERVICE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -150,5 +152,6 @@ export default async function handler(req, res) {
   if (path === 'admin-delete-exams-bulk') return bulkDelete(req, res);
   if (path === 'admin-update-exam') return updateExam(req, res);
   if (path === 'client-meta') return clientMeta(req, res);
+  if (path === 'admin-assistant') return adminAssistantHandler(req, res);
   return res.status(404).json({ error: 'Admin utility route not found' });
 }

@@ -1,11 +1,12 @@
 /* STUDY TH — stable flashcard transport. Large files are staged in Supabase Storage first. */
 (function(){
   'use strict';
-  if(window.__studyExamVisionBridgeV4)return;
-  window.__studyExamVisionBridgeV4=true;
+  if(window.__studyExamVisionBridgeV5)return;
+  window.__studyExamVisionBridgeV5=true;
 
   const SUPABASE_URL='https://mlqaeginqsgqacdqdzbm.supabase.co';
   const SUPABASE_KEY='sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi';
+  const FLASHCARD_ENDPOINT='/api/generate-flashcards';
   const originalFetch=window.fetch.bind(window);
 
   function loadSupabase(){
@@ -30,7 +31,7 @@
   async function stageFiles(files){
     const sb=await loadSupabase();
     const client=sb.createClient(SUPABASE_URL,SUPABASE_KEY);
-    const urls=[];const names=[];
+    const urls=[];const names=[];const mimeTypes=[];
     for(const file of files){
       const safe=(file.name||'document').replace(/[^a-zA-Z0-9._-]/g,'_');
       const random=globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
@@ -39,9 +40,9 @@
       if(up.error)throw new Error(`Upload ${file.name||'tài liệu'} thất bại: ${up.error.message||up.error}`);
       const url=client.storage.from('support-media').getPublicUrl(path)?.data?.publicUrl;
       if(!url)throw new Error(`Không tạo được URL cho ${file.name||'tài liệu'}.`);
-      urls.push(url);names.push(file.name||'tài liệu');
+      urls.push(url);names.push(file.name||'tài liệu');mimeTypes.push(file.type||'application/octet-stream');
     }
-    return {urls,names};
+    return {urls,names,mimeTypes};
   }
 
   window.fetch=async function(input,init){
@@ -59,12 +60,13 @@
         body.sourceUrls=staged.urls;
         body.sourceFiles=staged.names;
         body.fileNames=staged.names;
+        body.mimeTypes=staged.mimeTypes;
       }
       delete body.media;delete body.attachments;
-      return originalFetch('/api/generate-flashcards-v3',{...init,body:JSON.stringify(body)});
+      return originalFetch(FLASHCARD_ENDPOINT,{...init,headers:{'Content-Type':'application/json','Accept':'application/json',...(init.headers||{})},body:JSON.stringify(body)});
     }catch(e){
       console.error('[STUDY flashcard transport]',e);
-      return new Response(JSON.stringify({error:e instanceof Error?e.message:String(e)}),{status:502,headers:{'Content-Type':'application/json; charset=utf-8'}});
+      return new Response(JSON.stringify({error:'Không thể chuẩn bị tài liệu cho Flashcard. Vui lòng thử lại.'}),{status:502,headers:{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'}});
     }
   };
 })();

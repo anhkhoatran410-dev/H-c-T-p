@@ -5,6 +5,7 @@ const SCORE_TTL = 10 * 60;
 const BLOCK_TTL = 15 * 60;
 const SCORE_THRESHOLD = 5;
 const SUBJECT_BLOCK_TTL = 24 * 60 * 60;
+const WHITELIST_TTL = 30 * 24 * 60 * 60;
 
 function redisConfig(){
   const url=String(process.env.UPSTASH_REDIS_REST_URL||'').trim().replace(/\/$/,'');
@@ -30,10 +31,13 @@ async function redis(command, endpoint=''){
   }catch{return null;}finally{clearTimeout(timer);}
 }
 
+function clientIp(req){
+  return String(req?.headers?.['x-forwarded-for']||req?.headers?.['x-real-ip']||req?.socket?.remoteAddress||'unknown').split(',')[0].trim();
+}
+
 function clientIdentity(req){
-  const ip=String(req?.headers?.['x-forwarded-for']||req?.headers?.['x-real-ip']||req?.socket?.remoteAddress||'unknown').split(',')[0].trim();
   const ua=String(req?.headers?.['user-agent']||'').slice(0,180);
-  return `${ip}|${ua}`;
+  return `${clientIp(req)}|${ua}`;
 }
 
 function idHash(req){
@@ -43,6 +47,11 @@ function idHash(req){
 function subjectHash(value){
   const raw=String(value||'').trim();
   return raw?crypto.createHash('sha256').update(raw).digest('hex').slice(0,32):'';
+}
+
+function ipHash(value){
+  const raw=String(value||'').trim();
+  return raw?crypto.createHash('sha256').update(`ip:${raw}`).digest('hex').slice(0,32):'';
 }
 
 function requestSubject(req){
@@ -58,6 +67,10 @@ function requestSubject(req){
 function scoreKey(id){return `study-th:shield:score:${id}`;}
 function blockKey(id){return `study-th:shield:block:${id}`;}
 function subjectBlockKey(value){return `study-th:shield:subject:block:${subjectHash(value)}`;}
+function whitelistKey(type,value){
+  const hash=type==='ip'?ipHash(value):subjectHash(value);
+  return `study-th:shield:whitelist:${type}:${hash}`;
+}
 
 const local=new Map();
 function localState(id){
@@ -78,13 +91,30 @@ async function subjectBlockedRemote(value){
   return Number(valueRemote||0)>Date.now();
 }
 
+async function whitelistRemote(type,value){
+  const raw=String(value||'').trim();
+  if(!raw)return false;
+  const until=Number(await redis(['GET',whitelistKey(type,raw)])||0);
+  return until>Date.now();
+}
+
+export async function isShieldWhitelisted(req){
+  const subject=requestSubject(req);
+  const [ipAllowed,subjectAllowed]=await Promise.all([
+    whitelistRemote('ip',clientIp(req)),
+    whitelistRemote('subject',subject),
+  ]);
+  return ipAllowed||subjectAllowed;
+}
+
 export async function shieldStatus(req){
   const id=idHash(req);
+  const whitelisted=await isShieldWhitelisted(req);
   const localBlock=localState(id).blockedUntil;
   const remoteBlock=await blockedRemote(id);
   const subject=requestSubject(req);
   const subjectBlock=await subjectBlockedRemote(subject);
-  return {id,subjectHash:subject?subjectHash(subject):null,blocked:remoteBlock||localBlock>Date.now()||subjectBlock};
+  return {id,subjectHash:subject?subjectHash(subject):null,whitelisted,blocked:!whitelisted&&(remoteBlock||localBlock>Date.now()||subjectBlock)};
 }
 
 export async function shieldGate(req,res){
@@ -99,6 +129,7 @@ export async function shieldGate(req,res){
 }
 
 export async function recordShieldViolation(req, reason='policy'){
+  if(await isShieldWhitelisted(req)) return {reason,score:0,quarantined:false,whitelisted:true};
   const id=idHash(req);
   const now=Date.now();
   const s=localState(id);
@@ -112,7 +143,7 @@ export async function recordShieldViolation(req, reason='policy'){
     await redis(['INCR',scoreKey(id)]);
     await redis(['EXPIRE',scoreKey(id),SCORE_TTL]);
   }
-  return {reason,score:s.score,quarantined:s.score>=SCORE_THRESHOLD};
+  return {reason,score:s.score,quarantined:s.score>=SCORE_THRESHOLD,whitelisted:false};
 }
 
 export async function setShieldSubjectBlock(subject, seconds=SUBJECT_BLOCK_TTL){
@@ -136,6 +167,33 @@ export async function shieldSubjectStatus(subject){
   if(!raw)return {blocked:false,subjectHash:null};
   const until=Number(await redis(['GET',subjectBlockKey(raw)])||0);
   return {blocked:until>Date.now(),until:until||0,subjectHash:subjectHash(raw)};
+}
+
+export async function setShieldWhitelist(type,value,seconds=WHITELIST_TTL){
+  const kind=String(type||'').trim().toLowerCase();
+  const raw=String(value||'').trim();
+  if(!['ip','subject'].includes(kind)||!raw||raw.length>180) throw new Error('Invalid whitelist entry.');
+  if(kind==='ip'&&!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(raw)) throw new Error('Invalid IP whitelist entry.');
+  const ttl=Math.max(60,Math.min(WHITELIST_TTL,Number(seconds)||WHITELIST_TTL));
+  const until=Date.now()+ttl*1000;
+  if(redisConfig()) await redis(['SET',whitelistKey(kind,raw),String(until),'EX',ttl]);
+  return {type:kind,fingerprint:kind==='ip'?ipHash(raw):subjectHash(raw),until,ttlSeconds:ttl,stored:Boolean(redisConfig())};
+}
+
+export async function clearShieldWhitelist(type,value){
+  const kind=String(type||'').trim().toLowerCase();
+  const raw=String(value||'').trim();
+  if(!['ip','subject'].includes(kind)||!raw||raw.length>180) throw new Error('Invalid whitelist entry.');
+  if(redisConfig()) await redis(['DEL',whitelistKey(kind,raw)]);
+  return {type:kind,fingerprint:kind==='ip'?ipHash(raw):subjectHash(raw),stored:Boolean(redisConfig())};
+}
+
+export async function shieldWhitelistStatus(type,value){
+  const kind=String(type||'').trim().toLowerCase();
+  const raw=String(value||'').trim();
+  if(!['ip','subject'].includes(kind)||!raw)return {allowed:false,fingerprint:null,type:kind||null};
+  const until=Number(await redis(['GET',whitelistKey(kind,raw)])||0);
+  return {allowed:until>Date.now(),until:until||0,fingerprint:kind==='ip'?ipHash(raw):subjectHash(raw),type:kind};
 }
 
 export function shieldFingerprint(req){return idHash(req);}

@@ -78,6 +78,10 @@ export default async function handler(req,res){
   if(!enforceBodySize(req,res,16_000)) return;
   if(!sameOrigin(req,res)) return;
 
+  if(String(req.query?.check || "") === "1"){
+    if(!isAdminRequest(req)) return res.status(401).json({ok:false,requestId});
+    return res.status(200).json({ok:true,expiresIn:SESSION_MS/1000,requestId});
+  }
   if(String(req.query?.logout || "") === "1"){
     clearSessionCookie(res);
     return res.status(200).json({ok:true,requestId});

@@ -3,7 +3,8 @@
   if(window.__studyStudentSolverInstalled)return;window.__studyStudentSolverInstalled=true;
 
   const MAX_IMAGE_BYTES=12*1024*1024;
-  const MAX_IMAGE_EDGE=1400;
+  const MAX_IMAGE_EDGE=1100;
+  const MAX_IMAGE_DATA_CHARS=900000;
   const SOLVER_TIMEOUT_MS=25000;
   const CAMERA_RESTORE_KEY='study_ai_restore_after_camera';
 
@@ -79,6 +80,7 @@
               if(attempt===1)throw new Error(lastError);
             }finally{clearTimeout(timer)}
           }
+          if(!r?.ok)throw new Error(lastError||'AI chưa phản hồi.');
           thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.textContent=answer;box.appendChild(msg);
           if(d.tool){const tag=document.createElement('div');tag.className='study-ai-tool-tag';tag.textContent='Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
           if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}
@@ -91,7 +93,32 @@
 
   async function compressImage(file){
     if(file.size>MAX_IMAGE_BYTES)throw new Error('Ảnh quá lớn. Hãy chọn ảnh dưới 12 MB.');
-    try{const bitmap=await createImageBitmap(file),scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height)),canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(bitmap.width*scale));canvas.height=Math.max(1,Math.round(bitmap.height*scale));const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Không thể xử lý ảnh.');ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();return canvas.toDataURL('image/jpeg',0.78)}catch(_e){return await readAsDataURL(file)}
+    try{
+      const bitmap=await createImageBitmap(file);
+      let scale=Math.min(1,MAX_IMAGE_EDGE/Math.max(bitmap.width,bitmap.height));
+      const canvas=document.createElement('canvas');
+      const ctx=canvas.getContext('2d');
+      if(!ctx)throw new Error('Không thể xử lý ảnh.');
+      let data='';
+      for(let round=0;round<4;round++){
+        canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+        canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(bitmap,0,0,canvas.width,canvas.height);
+        const quality=[0.72,0.62,0.52,0.44][round];
+        data=canvas.toDataURL('image/jpeg',quality);
+        if(data.length<=MAX_IMAGE_DATA_CHARS)break;
+        scale*=0.82;
+      }
+      bitmap.close?.();
+      if(data.length>MAX_IMAGE_DATA_CHARS)throw new Error('Ảnh sau khi nén vẫn quá lớn. Hãy chụp gần hơn hoặc chọn ảnh rõ, gọn hơn.');
+      return data;
+    }catch(_e){
+      if(_e?.message?.includes('quá lớn'))throw _e;
+      const raw=await readAsDataURL(file);
+      if(raw.length>MAX_IMAGE_DATA_CHARS)throw new Error('Không thể nén ảnh đủ nhỏ cho AI. Hãy chọn ảnh dưới 8 MB hoặc chụp lại gần hơn.');
+      return raw;
+    }
   }
   function readAsDataURL(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('Không đọc được ảnh.'));reader.readAsDataURL(file)})}
   function preview(file,modal){

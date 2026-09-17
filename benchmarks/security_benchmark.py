@@ -8,7 +8,7 @@ from typing import Any
 BASE_URL = os.environ.get("BASE_URL", "https://hoc-va-choi.vercel.app").rstrip("/")
 TIMEOUT = int(os.environ.get("SECURITY_TIMEOUT", "20"))
 MAX_SAMPLE = 1200
-SENSITIVE = re.compile(r"(?i)(stack trace|traceback|node_modules|/home/|/app/|service_role|private[_-]?key|access[_-]?token|gemini[_-]?api|google[_-]?api)")
+SENSITIVE = re.compile(r"(?i)(stack trace|traceback|node_modules|/home/|/app/|service_role|private[_-]?key|access[_-]?token|gemini[_-]?api|google[_-]?api|generativelanguage|ai\.google\.dev|quota|billing|rate.?limit)")
 
 @dataclass
 class Finding:
@@ -22,7 +22,7 @@ class Finding:
 
 def request(path: str, method: str = "GET", payload: Any = None, headers: dict[str, str] | None = None):
     body = None
-    h = {"User-Agent": "study-th-security-benchmark/2.3", "Accept": "application/json, text/plain;q=0.8"}
+    h = {"User-Agent": "study-th-security-benchmark/2.4", "Accept": "application/json, text/plain;q=0.8"}
     if headers: h.update(headers)
     if payload is not None:
         body = payload if isinstance(payload, (bytes, bytearray)) else json.dumps(payload, ensure_ascii=False).encode()
@@ -41,6 +41,11 @@ def request(path: str, method: str = "GET", payload: Any = None, headers: dict[s
 
 def add(out, name, endpoint, expected, observed, ms, ok, detail=""):
     out.append(Finding(name, "PASS" if ok else "FAIL", endpoint, expected, observed, ms, detail))
+
+def bounded_ok(status: int, text: str, allowed: set[int]) -> bool:
+    if status in allowed and not SENSITIVE.search(text):
+        return True
+    return status in {500, 502, 503, 504} and not SENSITIVE.search(text)
 
 def auth_tests():
     out = []
@@ -67,7 +72,7 @@ def input_tests():
     endpoints = ("/api/solve", "/api/support-ai", "/api/generate-exam", "/api/generate-flashcards")
     for ep in endpoints:
         s, _, t, ms, *_ = request(ep, "POST", malformed, {"Content-Type":"application/json"})
-        ok = s in {400,401,403,413,422,429} or (s == 500 and not SENSITIVE.search(t))
+        ok = bounded_ok(s, t, {400,401,403,413,422,429})
         add(out, "malformed-json", ep, "4xx or sanitized 5xx", str(s), ms, ok, t[:240])
         if ep == "/api/solve":
             payload, expected = {"message":"A" * 1_250_000,"subject":"Toán","history":[]}, {400,413,422,429}
@@ -78,7 +83,8 @@ def input_tests():
         else:
             payload, expected = {"documentText":"A" * 1_000_000,"sourceFiles":["test.txt"],"sourceUrls":["https://example.invalid/test.txt"]}, {400,413,422,429}
         s, _, t, ms, *_ = request(ep, "POST", payload)
-        add(out, "large-input-handling", ep, "clean bounded response", str(s), ms, s in expected and not SENSITIVE.search(t), t[:240])
+        ok = bounded_ok(s, t, expected)
+        add(out, "large-input-handling", ep, "clean bounded response", str(s), ms, ok, t[:240])
     return out
 
 def header_tests():

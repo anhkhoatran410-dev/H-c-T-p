@@ -38,20 +38,20 @@ export default async function handler(req,res){
   res.setHeader('X-Request-ID', requestId);
   if(String(req.method || '').toUpperCase() !== 'POST') return res.status(405).json({error:'Method not allowed',requestId});
   if(!enforceJsonContentType(req,res)) return;
+  if(!enforceBodySize(req,res,MAX_AI_BODY)) { await recordShieldViolation(req,'oversized-body'); await recordAgentSignal(req,'oversized-body'); return; }
+  if(!sameOrigin(req,res)) { await recordShieldViolation(req,'bad-origin'); await recordAgentSignal(req,'bad-origin'); return; }
+  const target = String(req.query?.target || '').trim();
+  if(target !== 'solve') return res.status(404).json({error:'Gateway route not found',requestId});
   const lock=await aiLockdownStatus();
   if(lock.locked) return res.status(503).json({error:'AI service temporarily locked down.',requestId});
   if(!(await shieldGate(req,res))) return;
   if(!(await enforceAgentThreatDefense(req,res))) return;
   if(!(await enforceCostChallenge(req,res))) { await recordAgentSignal(req,'cost-challenge'); return; }
-  if(!enforceBodySize(req,res,MAX_AI_BODY)) { await recordShieldViolation(req,'oversized-body'); await recordAgentSignal(req,'oversized-body'); return; }
-  if(!sameOrigin(req,res)) { await recordShieldViolation(req,'bad-origin'); await recordAgentSignal(req,'bad-origin'); return; }
   if(!(await distributedRateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'}))) {
     await recordShieldViolation(req,'rate-limit');
     await recordAgentSignal(req,'rate-limit');
     return;
   }
-  const target = String(req.query?.target || '').trim();
-  if(target !== 'solve') { await recordShieldViolation(req,'unexpected-route'); await recordAgentSignal(req,'unexpected-route'); return res.status(404).json({error:'Gateway route not found',requestId}); }
 
   const secret = internalSecret();
   const url = baseUrl(req);
@@ -64,8 +64,6 @@ export default async function handler(req,res){
     return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId});
   }
 
-  // Authenticate the internal gateway -> core channel before the more
-  // expensive prompt/body sanitization work. Clients never supply this proof.
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);

@@ -16,17 +16,17 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Scan repository for high-risk secrets
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -56,7 +56,7 @@ jobs:
           done < <(find api admin scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 2>/dev/null || true)
           if [ "$found" -eq 0 ]; then echo "No JavaScript files found for syntax check."; fi
 
-      - name: Local security architecture test
+      - name: Bounded audit and security-state local test
         run: node scripts/security-local.mjs
 
       - name: Security regression tests

@@ -8,12 +8,16 @@ on:
       - '.github/workflows/study-th-olympiad-benchmark.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   olympiad_ceiling:
     runs-on: ubuntu-latest
     timeout-minutes: 55
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7
       - name: Run Olympiad ceiling benchmark
         run: python3 benchmarks/study_th_olympiad_benchmark.py
       - name: Publish detailed results

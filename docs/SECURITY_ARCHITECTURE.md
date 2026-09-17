@@ -40,8 +40,14 @@ USER / EXTERNAL AI
         |
         +----------------------> [11] RESPONSE GUARD
         |                              |
-        |                              +-------------------> [9] AUDIT DATA
-        |                              |                     (non-blocking)
+        |                              +-------------------> [9] AUDIT QUEUE
+        |                              |                         |
+        |                              |                         v
+        |                              |                     [9A] AUDIT WORKER
+        |                              |                         |
+        |                              |                         v
+        |                              |                     SUPABASE
+        |                              |
         |                              v
         |                          [6] GATEWAY
         |                              |
@@ -67,9 +73,9 @@ User / External AI
 
 AI Input Guard is the bounded pre-filter for prompt size/history limits and high-confidence prompt-abuse patterns.
 
-DLP + Semantic Guardrail is a defense-in-depth ingress layer. DLP conservatively redacts obvious email addresses, Vietnamese phone/ID patterns, JWT-like tokens, common API-key formats, bearer tokens, and additional high-risk secret formats before provider execution. The semantic guardrail evaluates a bounded multi-turn context and blocks only when at least two independent high-confidence instruction-hijacking/exfiltration signals are present. It is heuristic and does not claim perfect semantic jailbreak detection.
+DLP + Semantic Guardrail is a bounded in-process defense-in-depth ingress layer. DLP conservatively redacts obvious email addresses, Vietnamese phone/ID patterns, JWT-like tokens, common API-key formats, bearer tokens, and additional high-risk secret formats before provider execution. The semantic guardrail evaluates bounded multi-turn context and blocks only when at least two independent high-confidence instruction-hijacking/exfiltration signals are present. It is heuristic and does not claim perfect semantic jailbreak detection.
 
-The same ingress layer is used by both the AI solve path and the public support-AI path. The privileged Admin Copilot also applies DLP to the context assembled from Supabase and repository sources before that context is placed in the provider prompt.
+The same ingress layer is used by both the AI solve path and the public support-AI path. The privileged Admin Copilot also applies DLP to context assembled from Supabase and repository sources before that context is placed in the provider prompt.
 
 ### 2. Early internal proof
 
@@ -86,7 +92,7 @@ Internal Proof
 AI processing
 ```
 
-The proof is generated only when the gateway is about to call the internal solve core and is verified by the core before expensive solve processing continues.
+The proof is generated when the gateway is about to call the internal solve core and is verified by the core before expensive solve processing continues. Nonce state has a bounded replay window.
 
 ### 3. Response path
 
@@ -101,9 +107,19 @@ AI / model provider
         v
 [11] RESPONSE GUARD
         |
-        +---------------------> [9] AUDIT DATA
-        |                         hash / metadata only
-        |                         non-blocking
+        +---------------------> [9] BOUNDED AUDIT QUEUE
+        |                              |
+        |                              v
+        |                         [9A] AUDIT WORKER
+        |                              |
+        |                              +---- retry + backoff
+        |                              |
+        |                              v
+        |                         [9B] BOUNDED DLQ
+        |                              |
+        |                              v
+        |                           SUPABASE
+        |
         v
 [6] GATEWAY
         |
@@ -111,9 +127,13 @@ AI / model provider
 User / External AI
 ```
 
-Response Guard protects the outbound payload. Audit persistence is a separate best-effort branch: it stores metadata such as request/actor/device hashes, endpoint, status, model, latency, response length and response hash rather than a copy of the full AI response. Failure of the audit sink must not block delivery to the user.
+Response Guard protects the outbound payload. Audit persistence is a separate best-effort branch. Queue admission is atomic and bounded; when the queue is full, audit events are counted as dropped instead of consuming unbounded memory.
 
-Normal application data remains in the existing domain tables (for example attempts and support messages). `ai_request_audit` is the security/audit trail for the AI request/response path.
+The worker writes batches to `ai_request_audit` after bounded retry/backoff. When Supabase remains unavailable after retries, failed events move to a bounded dead-letter queue instead of being returned to the main queue. This prevents a database outage from creating an unbounded feedback loop.
+
+The audit path may use a dedicated Redis resource through `AUDIT_REDIS_REST_URL` / `AUDIT_REDIS_REST_TOKEN`. Without that optional configuration it falls back to the existing Redis connection, but queue and DLQ limits still apply.
+
+Audit records contain metadata and one-way hashes rather than raw AI responses or credentials.
 
 ### 4. Redis is the shared state bus
 
@@ -127,15 +147,15 @@ Redis is **shared state, not a mandatory sequential request step**:
                     Edge      Resilience    Admin
 ```
 
-It can hold distributed rate-limit state, replay nonces, challenge state, threat scores, quarantine/block state, AI circuit-breaker state, and emergency AI lockdown state.
+The critical security state includes distributed rate-limit state, replay nonces, challenge state, threat scores, quarantine/block state, AI circuit-breaker state, and emergency AI lockdown state.
+
+Audit state is separately bounded. A dedicated audit Redis resource can be used so audit backlog pressure does not compete with critical security state.
 
 Admin actions that quarantine a user/device or enable an AI lockdown write the corresponding state to Redis so subsequent requests see the change immediately.
 
 ### 5. Monitoring / SIEM + Auto-Response
 
-The repository already implements active defensive reactions in the request-path security modules (quarantine after accumulated violations, adaptive challenge, provider circuit state, and emergency AI lockdown). Therefore the diagram uses **Monitoring / SIEM + Auto-Response**, not a vague passive "SOAR" box.
-
-The supervisory relationship is explicitly two-way through Redis:
+The repository implements active defensive reactions in request-path security modules (quarantine after accumulated violations, adaptive challenge, provider circuit state, and emergency AI lockdown). Monitoring is supervisory and does not become a mandatory request hop.
 
 ```text
               [10] MONITORING / SIEM + AUTO-RESPONSE
@@ -147,7 +167,7 @@ The supervisory relationship is explicitly two-way through Redis:
         THREAT         AI RESILIENCE      ADMIN
 ```
 
-Monitoring consumes security state/events and the defensive layers update shared state that Monitoring/Admin can inspect. The request itself still follows the normal sequential path and does not have to pass through Monitoring.
+Monitoring consumes security state/events and the defensive layers update shared state that Monitoring/Admin can inspect.
 
 ### 6. Admin branch
 
@@ -163,7 +183,7 @@ Auth
             +-----> Redis (lockdown / subject quarantine)
 ```
 
-A global AI lockdown is stored in Redis. A targeted subject/device quarantine is also stored in Redis using a one-way fingerprint. Subsequent AI requests check this shared state before entering expensive processing.
+A global AI lockdown is stored in Redis. Targeted subject/device quarantine is also stored in Redis using a one-way fingerprint. Subsequent AI requests check this shared state before entering expensive processing.
 
 ### 7. Data model
 
@@ -176,28 +196,35 @@ A global AI lockdown is stored in Redis. A targeted subject/device quarantine is
    attempts/support          ai_request_audit
           |                        |
        Supabase                 Supabase
+
+                    Audit failure path
+                          |
+                          v
+                    Bounded DLQ
 ```
 
 User-visible domain history and support conversations continue using their existing tables. The security audit table is intentionally separate so security telemetry does not become a critical dependency of ordinary user response delivery.
 
-### 8. Enterprise roadmap boundaries
+### 8. Enterprise boundaries
 
-The following are **not enabled by this repository patch** and must not be described as current production capabilities:
+The following are **not enabled by source code alone** and must not be described as current capabilities without matching provider configuration:
 
+- Redis Cluster / Multi-AZ or a separately provisioned audit Redis resource.
+- Supabase read replicas / database failover.
 - Cloudflare Enterprise WAF / advanced bot management in front of Vercel.
 - Native Android/iOS attestation such as Play Integrity or Apple App Attest.
-- Google Cloud Private Service Connect / VPC-only provider connectivity from the hosting environment.
-
-Those require separate platform/account/network configuration.
+- Private provider connectivity such as VPC-only / Private Service Connect.
+- HSM/KMS-backed key custody for external secret-management infrastructure.
 
 ## Final rules for diagrams
 
 - Monitoring/SIEM + Auto-Response is supervisory; it does not become a mandatory sequential request hop.
 - Monitoring and the defensive layers exchange state through Redis.
 - Admin lockdown and subject/device quarantine write to Redis.
-- Response Guard has a **parallel non-blocking audit branch** to `ai_request_audit`.
+- Response Guard has a **parallel non-blocking audit branch**.
+- Audit queue and DLQ are explicitly bounded.
+- Failed audit batches do **not** loop back into the main queue indefinitely.
 - Audit records should contain hashes/metadata, not raw secrets or unnecessary full AI responses.
-- Normal application/domain data remains in its existing Supabase tables.
 - HMAC + timestamp + nonce protects the internal gateway-to-core channel and is not presented as an end-user credential.
 - Redis is shared state, not a mandatory sequential request hop.
 - Admin is a conditional privileged branch, never the default request path.

@@ -7,12 +7,16 @@ on:
       - '.github/workflows/study-th-hard-benchmark.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   hard_math:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v7
       - name: Run hard benchmark
         run: python3 benchmarks/study_th_hard_benchmark.py
       - name: Publish result

@@ -31,7 +31,7 @@ const checks = [
   ['Redis audit worker retry-safe', read('api/_audit-worker.js'), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
   ['bounded audit queue admission', read('api/_audit-log.js'), ['AUDIT_QUEUE_MAX', 'LLEN', 'AUDIT_DROPPED_KEY', 'return {0,count,d}', 'AUDIT_QUEUE_LIMIT']],
   ['bounded audit DLQ', read('api/_audit-worker.js'), ['DLQ_KEY', 'DLQ_MAX', 'DLQ_LUA', 'moveToDlq', 'dlqDropped']],
-  ['audit no restore loop', read('api/_audit-worker.js'), ['bounded DLQ instead of returning queue']],
+  ['audit no restore loop', read('api/_audit-worker.js'), ['moveToDlq', 'DLQ_KEY', 'DLQ_MAX', 'return res.status(503)', 'event được đưa vào bounded DLQ']],
   ['audit dedicated redis option', read('api/_audit-log.js'), ['AUDIT_REDIS_REST_URL', 'AUDIT_REDIS_REST_TOKEN', 'AUDIT_REDIS_IS_DEDICATED']],
   ['replay nonce bounded TTL', read('api/_internal-replay.js'), ['NONCE_TTL_MS', "'PX', NONCE_TTL_MS", 'verifyTimestamp', 'WINDOW_MS']],
   ['Response Guard fail-safe boundary', read('api/_response-guard.js'), ['OUTPUT_BLOCK_PATTERNS', 'sensitive-secret-detected', 'response-guard-blocked', 'safeClientError']],

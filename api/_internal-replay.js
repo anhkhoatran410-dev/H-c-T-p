@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 const WINDOW_MS = 30_000;
+const NONCE_TTL_MS = WINDOW_MS;
 const REDIS_TIMEOUT = 1_500;
 const localNonces = new Map();
 
@@ -52,7 +53,7 @@ export async function consumeNonce(nonce, now = Date.now()) {
   const cfg = redisConfig();
   if (cfg) {
     const key = `study-th:replay:${nonce}`;
-    const result = await redis(['SET', key, String(now), 'NX', 'PX', WINDOW_MS]);
+    const result = await redis(['SET', key, String(now), 'NX', 'PX', NONCE_TTL_MS]);
     return result === 'OK';
   }
 
@@ -60,7 +61,7 @@ export async function consumeNonce(nonce, now = Date.now()) {
     if (expiresAt <= now) localNonces.delete(key);
   }
   if (localNonces.has(nonce)) return false;
-  localNonces.set(nonce, now + WINDOW_MS);
+  localNonces.set(nonce, now + NONCE_TTL_MS);
   return true;
 }
 

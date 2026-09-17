@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { classifyGeminiFailure } from '../api/_gemini-error-policy.js';
-import { internalSignature, verifyTimestamp } from '../api/_internal-replay.js';
+import { internalSignature, verifyTimestamp, consumeNonce } from '../api/_internal-replay.js';
 import { inspectAiPrompt, sanitizeAiBody } from '../api/_prompt-security.js';
 import { sanitizeAiIngress, inspectSemanticConversation } from '../api/_ai-input-guard.js';
 import { safeClientError, guardAiResponse } from '../api/_response-guard.js';
@@ -67,8 +67,16 @@ assert.equal(safeIngress.message.includes('x^2'), true);
 
 assert.equal(safeClientError(new Error('provider secret/API_KEY/internal stack'), 'Generic error'), 'Generic error');
 const guardedInternal = guardAiResponse(JSON.stringify({error:'X-STUDY-TH-INTERNAL'}));
-assert.equal(guardedInternal.ok, true);
+assert.equal(guardedInternal.ok, false);
+assert.equal(guardedInternal.status, 502);
+assert.equal(guardedInternal.contentType, 'application/json; charset=utf-8');
 assert.equal(guardedInternal.body.includes('X-STUDY-TH-INTERNAL'), false);
+const guardedPem = guardAiResponse('-----BEGIN PRIVATE KEY-----fake-----END PRIVATE KEY-----');
+assert.equal(guardedPem.ok, false);
+assert.equal(guardedPem.status, 502);
+
+// Replay proof uses a tightly bounded Redis TTL when available.
+assert.equal(String((await readFile(new URL('../api/_internal-replay.js', import.meta.url), 'utf8'))).includes('NONCE_TTL_MS'), true);
 
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 assert.equal(vercel.functions?.['api/_ai-gateway.js'], undefined);

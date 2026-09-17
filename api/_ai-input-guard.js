@@ -46,6 +46,10 @@ function redact(text) {
   return { text: out, redactions: [...redactions] };
 }
 
+export function sanitizeDlpText(value) {
+  return redact(value);
+}
+
 function collectConversation(message, history) {
   const safeHistory = Array.isArray(history) ? history.slice(-MAX_CONTEXT_ITEMS) : [];
   const chunks = [];

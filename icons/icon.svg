@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="STUDY TH">
+  <rect width="512" height="512" rx="112" fill="#0b1220"/>
+  <path d="M96 154 256 80l160 74v38L256 266 96 192z" fill="#7dd3fc"/>
+  <path d="M132 211v91c0 44 56 80 124 80s124-36 124-80v-91l-124 57z" fill="#e0f2fe"/>
+  <path d="M194 303c34 18 90 18 124 0v50c-34 18-90 18-124 0z" fill="#38bdf8"/>
+  <circle cx="402" cy="238" r="15" fill="#f8fafc"/>
+  <text x="256" y="434" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="44" font-weight="700" fill="#f8fafc">STUDY TH</text>
+</svg>

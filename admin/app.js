@@ -1,20 +1,18 @@
 const SUPABASE_URL="https://mlqaeginqsgqacdqdzbm.supabase.co";
 const SUPABASE_KEY="sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi";
 let db=null;
-const ADMIN_TOKEN_KEY="study_admin_session_v2";
 const admin={tab:"dashboard",thread:null,threads:[],accounts:[],messages:[],channel:null,poll:null,assistant:[]};
 
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
 function toast(text){const t=$("toast");if(!t)return;t.textContent=text;t.classList.add("show");clearTimeout(window.__toast);window.__toast=setTimeout(()=>t.classList.remove("show"),2600)}
-function token(){return sessionStorage.getItem(ADMIN_TOKEN_KEY)||""}
 async function loadSupabase(){if(db)return db;if(!window.supabase){await new Promise((resolve,reject)=>{const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";s.onload=resolve;s.onerror=()=>reject(new Error("Không tải được Supabase JS"));document.head.appendChild(s)})}db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);return db}
 function themeName(){return localStorage.getItem("study_admin_theme")||"light"}
 function setTheme(mode){document.body.classList.toggle("dark",mode==="dark");localStorage.setItem("study_admin_theme",mode)}
 function toggleTheme(){setTheme(document.body.classList.contains("dark")?"light":"dark")}
 function showApp(){setTheme(themeName());$("adminLogin").classList.add("hidden");$("adminApp").classList.remove("hidden");bootAdmin()}
-async function login(password){const r=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Đăng nhập thất bại");sessionStorage.setItem(ADMIN_TOKEN_KEY,data.token);showApp()}
-function logout(){sessionStorage.removeItem(ADMIN_TOKEN_KEY);location.reload()}
+async function login(password){const r=await fetch("/api/admin-login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({password}),credentials:"same-origin",cache:"no-store"});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Đăng nhập thất bại");showApp()}
+async function logout(){try{await fetch("/api/admin-login?logout=1",{method:"POST",headers:{"Accept":"application/json"},credentials:"same-origin",cache:"no-store"})}catch(_){}location.reload()}
 function openTab(id){admin.tab=id;document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".nav-item[data-tab]").forEach(x=>x.classList.remove("active"));$(id)?.classList.add("active");document.querySelector(`[data-tab="${id}"]`)?.classList.add("active");const titles={dashboard:"Tổng quan",support:"Hỗ trợ",participants:"Người tham gia",history:"Lịch sử làm bài",tests:"Bài kiểm tra",accounts:"Tài khoản hỗ trợ",bot:"Bot tự động",assistant:"Admin Copilot"};$("pageTitle").textContent=titles[id]||"Admin";if(id==="dashboard")loadDashboard();if(id==="support")startSupportLive();if(id==="participants")loadParticipants();if(id==="history")loadHistory();if(id==="tests")renderTests();if(id==="accounts")loadAccounts();if(id==="bot"){loadAccounts();loadBotRules()}if(id==="assistant")loadAssistant()}
 
 async function loadDashboard(){
@@ -51,7 +49,7 @@ function startSupportLive(){loadSupportThreads();if(admin.channel&&db)db.removeC
 
 async function loadAssistant(){const box=$("assistantMessages");if(!box)return;try{await loadSupabase();const {data}=await db.from("admin_assistant_messages").select("*").order("created_at",{ascending:true}).limit(80);admin.assistant=data||[]}catch{admin.assistant=[]}renderAssistant()}
 function renderAssistant(){const box=$("assistantMessages");if(!box)return;box.innerHTML=admin.assistant.map(m=>`<div class="assistant-bubble ${m.role==='user'?'user':'assistant'}">${esc(m.message)}</div>`).join("")||`<div class="empty-chat"><span>✨</span><b>Admin Copilot sẵn sàng</b><small>Hỏi về lỗi, UX, realtime, database, bảo trì...</small></div>`;box.scrollTop=box.scrollHeight}
-async function sendAssistant(){const input=$("assistantInput"),message=input.value.trim();if(!message)return;input.value="";admin.assistant.push({role:"user",message});renderAssistant();const placeholder={role:"assistant",message:"Đang phân tích..."};admin.assistant.push(placeholder);renderAssistant();try{const r=await fetch("/api/admin-assistant",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token()}`},body:JSON.stringify({message,history:admin.assistant.slice(-12)})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Copilot lỗi");placeholder.message=data.answer||"Không có câu trả lời."}catch(e){placeholder.message="❌ "+e.message}renderAssistant()}
+async function sendAssistant(){const input=$("assistantInput"),message=input.value.trim();if(!message)return;input.value="";admin.assistant.push({role:"user",message});renderAssistant();const placeholder={role:"assistant",message:"Đang phân tích..."};admin.assistant.push(placeholder);renderAssistant();try{const r=await fetch("/api/admin-assistant",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",cache:"no-store",body:JSON.stringify({message,history:admin.assistant.slice(-12)})});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||"Copilot lỗi");placeholder.message=data.answer||"Không có câu trả lời."}catch(e){placeholder.message="❌ "+e.message}renderAssistant()}
 
 function bind(){
   $("loginForm").onsubmit=async e=>{e.preventDefault();$("loginMsg").textContent="";try{await login($("adminPassword").value)}catch(err){$("loginMsg").textContent=err.message}};
@@ -65,4 +63,3 @@ function bind(){
   document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.classList.contains("nav-item"))return;const r=document.createElement("span");r.className="ripple";const s=Math.max(b.offsetWidth,b.offsetHeight)*1.8;r.style.width=r.style.height=s+"px";const rect=b.getBoundingClientRect();r.style.left=rect.left+rect.width/2-s/2+"px";r.style.top=rect.top+rect.height/2-s/2+"px";document.body.appendChild(r);setTimeout(()=>r.remove(),600)});
 }
 async function bootAdmin(){bind();await loadDashboard();await loadAccounts();if(admin.tab==="support")startSupportLive()}
-if(token())showApp();else $("adminLogin").classList.remove("hidden");

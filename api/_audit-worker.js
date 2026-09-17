@@ -101,9 +101,10 @@ async function insertBatchOnce(rows) {
 }
 
 async function insertBatchWithRetry(rows) {
-  let last = { ok: false, status: 0, retryable: true, retryAfterMs: null };
+  let last = { ok: false, status: 0, retryable: true, retryAfterMs: null, attempts: 0 };
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     last = await insertBatchOnce(rows);
+    last.attempts = attempt + 1;
     if (last.ok || !last.retryable || attempt === MAX_RETRIES - 1) return last;
     await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt, last.retryAfterMs)));
   }
@@ -126,9 +127,9 @@ export default async function handler(req, res) {
     const result = await insertBatchWithRetry(rows);
     if (!result.ok) {
       const restored = await restore(rows);
-      return res.status(503).json({ error: 'Supabase audit batch thất bại; queue đã được khôi phục.', queued: rows.length, restored });
+      return res.status(503).json({ error: 'Supabase audit batch thất bại; queue đã được khôi phục.', queued: rows.length, restored, attempts: result.attempts });
     }
-    return res.status(200).json({ ok: true, queued: rows.length, synced: rows.length, attempts: MAX_RETRIES });
+    return res.status(200).json({ ok: true, queued: rows.length, synced: rows.length, attempts: result.attempts });
   } catch {
     await restore(rows);
     return res.status(503).json({ error: 'Audit worker gặp lỗi; queue đã được khôi phục.', queued: rows.length });

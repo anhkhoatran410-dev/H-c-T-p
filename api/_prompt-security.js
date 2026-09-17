@@ -14,7 +14,7 @@ const BLOCK_PATTERNS = [
   /what\s+(is|are)\s+(your|the)\s+(system|developer)\s+(prompt|instructions)/i,
   /output\s+(all\s+)?(hidden|secret|internal)\s+(instructions|prompt|rules)/i,
   /reveal\s+(api[_ -]?key|token|secret|credential)/i,
-  /dump\s+(api[_ -]?key|token|secret|credential|environment\s+variables?)/i,
+  /(?:show|print|dump|output)\s+(the\s+)?(api[_ -]?key|token|secret|credential|environment\s+variables?)/i,
   /process\.env\b.*\b(output|print|show|dump|reveal)/i,
   /<\s*system\s*>[\s\S]*<\s*\/\s*system\s*>/i,
   /<\s*developer\s*>[\s\S]*<\s*\/\s*developer\s*>/i,

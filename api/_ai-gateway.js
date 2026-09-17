@@ -7,6 +7,7 @@ import { aiLockdownStatus } from './_emergency-lock.js';
 import { guardAiResponse } from './_response-guard.js';
 import { sanitizeAiBody } from './_prompt-security.js';
 import { sanitizeAiIngress } from './_ai-input-guard.js';
+import { auditRecord, persistAudit } from './_audit-log.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -23,7 +24,15 @@ function bodyOf(req){
   if(typeof req?.body === 'string') { try { const v = JSON.parse(req.body); return v && typeof v === 'object' ? v : {}; } catch {} }
   return {};
 }
+function providerModel(text){
+  try { const data=JSON.parse(String(text||'')); return String(data?.model||'').slice(0,120) || null; } catch { return null; }
+}
+function writeAudit(req, fields){
+  try { void persistAudit(auditRecord(req,{endpoint:'/api/solve',...fields})); } catch {}
+}
+
 export default async function handler(req,res){
+  const started=Date.now();
   applySecurityHeaders(res);
   const requestId = safeRequestId();
   res.setHeader('X-Request-ID', requestId);
@@ -69,7 +78,7 @@ export default async function handler(req,res){
   }
   guarded.body.message = ingress.message;
   guarded.body.history = ingress.history;
-  
+
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);
@@ -82,8 +91,29 @@ export default async function handler(req,res){
     });
     const text = await upstream.text();
     const response=guardAiResponse(text, upstream.headers.get('content-type') || 'application/json; charset=utf-8');
-    res.status(response.ok ? upstream.status : response.status);
+    const delivered=response.ok;
+    writeAudit(req,{
+      request_id:requestId,
+      status_code:upstream.status,
+      outcome:delivered?'response_delivered':'response_guard_blocked',
+      reason:delivered?'':'response-guard',
+      model:providerModel(response.body),
+      response_text:response.body,
+      response_length:String(response.body||'').length,
+      latency_ms:Date.now()-started,
+    });
+    res.status(delivered ? upstream.status : response.status);
     res.setHeader('Content-Type', response.contentType);
     return res.end(response.body);
-  }catch(e){ return res.status(504).json({error:'AI backend timeout hoặc không truy cập được.',requestId}); }
+  }catch(e){
+    writeAudit(req,{
+      request_id:requestId,
+      status_code:504,
+      outcome:'upstream_error',
+      reason:'upstream-timeout-or-unreachable',
+      response_length:0,
+      latency_ms:Date.now()-started,
+    });
+    return res.status(504).json({error:'AI backend timeout hoặc không truy cập được.',requestId});
+  }
 }

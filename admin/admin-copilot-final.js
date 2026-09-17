@@ -15,7 +15,7 @@
     admin.assistant=admin.assistant||[];admin.assistant.push({role:'user',message});var placeholder={role:'assistant',message:'Đang đọc dữ liệu website và phân tích...'};admin.assistant.push(placeholder);render();
     try{
       var context={tab:admin.tab,threadId:admin.thread?.id||null,threadStudent:admin.thread?.student_name||null,threadAccount:admin.thread?.support_accounts?.name||null,threadCount:(admin.threads||[]).length,assistantClient:'admin-copilot-final'};
-      var r=await fetch('/api/admin-assistant',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify({message,history:admin.assistant.slice(-12),context})});
+      var r=await fetch('/api/admin-assistant',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',cache:'no-store',body:JSON.stringify({message,history:admin.assistant.slice(-12),context})});
       var d=await r.json().catch(function(){return {}});if(!r.ok)throw new Error(d.error||'Copilot chưa phản hồi');
       placeholder.message=d.answer||'Copilot trả về rỗng.';
     }catch(e){placeholder.message='❌ '+(e?.message||e)}

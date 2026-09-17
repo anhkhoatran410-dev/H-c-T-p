@@ -6,6 +6,7 @@ import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-de
 import { aiLockdownStatus } from './_emergency-lock.js';
 import { guardAiResponse } from './_response-guard.js';
 import { sanitizeAiBody } from './_prompt-security.js';
+import { sanitizeAiIngress } from './_ai-input-guard.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -59,6 +60,15 @@ export default async function handler(req,res){
     return res.status(guarded.status).json({error:'Yêu cầu AI bị chặn bởi lớp bảo vệ đầu vào.',code:guarded.code,requestId});
   }
 
+  const ingress = sanitizeAiIngress(guarded.body.message || '', guarded.body.history || []);
+  if(!ingress.ok){
+    await recordShieldViolation(req,ingress.code);
+    await recordAgentSignal(req,ingress.code);
+    return res.status(ingress.status).json({error:'Yêu cầu AI bị chặn bởi lớp bảo vệ ngữ nghĩa.',code:ingress.code,requestId});
+  }
+  guarded.body.message = ingress.message;
+  guarded.body.history = ingress.history;
+  
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);

@@ -10,7 +10,11 @@ const DEFAULT_BATCH = 50;
 
 function unauthorized(req) {
   const header = String(req?.headers?.authorization || '').trim();
-  return !CRON_SECRET || !header || !crypto.timingSafeEqual(Buffer.from(header), Buffer.from(`Bearer ${CRON_SECRET}`));
+  const expected = `Bearer ${CRON_SECRET}`;
+  if (!CRON_SECRET || !header) return true;
+  const a = Buffer.from(header);
+  const b = Buffer.from(expected);
+  return a.length !== b.length || !crypto.timingSafeEqual(a, b);
 }
 
 async function redis(command, timeout = 2500) {
@@ -53,6 +57,7 @@ async function restore(rows) {
 
 async function insertBatch(rows) {
   if (!SUPABASE_URL || !SERVICE_KEY || !rows.length) return false;
+  const parsed = rows.map((x) => typeof x === 'string' ? JSON.parse(x) : x);
   const r = await fetch(`${SUPABASE_URL}/rest/v1/ai_request_audit`, {
     method: 'POST',
     headers: {
@@ -61,7 +66,7 @@ async function insertBatch(rows) {
       Authorization: `Bearer ${SERVICE_KEY}`,
       Prefer: 'return=minimal,resolution=ignore-duplicates',
     },
-    body: JSON.stringify(rows.map((x) => typeof x === 'string' ? JSON.parse(x) : x)),
+    body: JSON.stringify(parsed),
     signal: AbortSignal.timeout(5000),
   });
   return r.ok;

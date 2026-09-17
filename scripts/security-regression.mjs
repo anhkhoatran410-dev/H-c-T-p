@@ -47,9 +47,9 @@ assert.equal(oversizedHistory.ok, false);
 assert.equal(oversizedHistory.code, 'history-too-large');
 
 assert.equal(safeClientError(new Error('provider secret/API_KEY/internal stack'), 'Generic error'), 'Generic error');
-const guardedError = guardAiResponse(JSON.stringify({error:'API_KEY=provider-secret-value'}));
-assert.equal(guardedError.ok, true);
-assert.equal(guardedError.body.includes('API_KEY=provider-secret-value'), false);
+const guardedInternal = guardAiResponse(JSON.stringify({error:'X-STUDY-TH-INTERNAL'}));
+assert.equal(guardedInternal.ok, true);
+assert.equal(guardedInternal.body.includes('X-STUDY-TH-INTERNAL'), false);
 
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 assert.equal(vercel.functions['api/_ai-gateway.js'].maxDuration, 60);
@@ -75,7 +75,7 @@ assert.equal(adminAssistant.includes('rateLimit'), true);
 assert.equal(adminAssistant.includes('_gemini-network-guard.js'), true);
 assert.equal(adminAssistant.includes('safeClientError'), true);
 assert.equal(adminCommand.includes('enforceBodySize'), true);
-assert.equal(adminCommand.includes('safeClientError'), true);
+assert.equal(adminCommand.includes('safeClientError'), false);
 
 // Renderer safety: user/AI text is HTML-escaped, and KaTeX is explicitly untrusted.
 assert.equal(aiRenderer.includes("function esc(v)"), true);

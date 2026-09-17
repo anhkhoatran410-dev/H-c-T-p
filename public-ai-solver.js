@@ -4,6 +4,7 @@
 
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1400;
+  const SOLVER_TIMEOUT_MS=25000;
   const CAMERA_RESTORE_KEY='study_ai_restore_after_camera';
 
   function openImageViewer(src,alt='Ảnh đề bài'){
@@ -61,18 +62,22 @@
           const subject=(window.state&&window.state.subject)||'',message=userText+(deep?'\nHãy tự kiểm tra kỹ các bước và kết quả, tìm cách giải từ bản chất, và trình bày đầy đủ đến kết luận; không bỏ qua phần chứng minh quan trọng.':'\nHãy giải nhanh nhưng đủ bước cần thiết, tập trung vào dữ kiện, cách làm và kết quả; tránh lan man.');
           const payload=JSON.stringify({message,subject,history,imageDataUrl:img,deep});
           let r=null,d={},lastError='';
-          for(let attempt=0;attempt<4;attempt++){
+          for(let attempt=0;attempt<2;attempt++){
+            const controller=new AbortController();
+            const timer=setTimeout(()=>controller.abort(),SOLVER_TIMEOUT_MS);
             try{
-              r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json'},body:payload});
+              r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
               d=await r.json().catch(()=>({}));
               if(r.ok)break;
               lastError=String(d.error||('Solver HTTP '+r.status));
-              if(![408,409,425,429,500,502,503,504].includes(r.status)||attempt===3)throw new Error(lastError);
+              if(![408,425,429,502,503,504].includes(r.status)||attempt===1)throw new Error(lastError);
+              const retryAfter=Math.min(4000,Math.max(1000,Number(r.headers.get('Retry-After')||0)*1000||1200*(attempt+1)));
+              await new Promise(resolve=>setTimeout(resolve,retryAfter));
             }catch(err){
               lastError=String(err.message||err);
-              if(attempt===3)throw new Error(lastError);
-            }
-            await new Promise(resolve=>setTimeout(resolve,1200*(attempt+1)));
+              if(err?.name==='AbortError')lastError='AI phản hồi quá lâu.';
+              if(attempt===1)throw new Error(lastError);
+            }finally{clearTimeout(timer)}
           }
           thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.textContent=answer;box.appendChild(msg);
           if(d.tool){const tag=document.createElement('div');tag.className='study-ai-tool-tag';tag.textContent='Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}

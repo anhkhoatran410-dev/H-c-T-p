@@ -214,7 +214,8 @@ async function clientMeta(req, res) {
   if (!enforceMethod(req, res, ['GET'])) return;
   if (!sameOrigin(req, res)) return;
   if (!rateLimit(req, res, { max: 30, windowMs: 60_000, keyPrefix: 'client-meta' })) return;
-  if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin session required' });
+  // Public, read-only metadata endpoint. It exposes no secrets or admin state,
+  // so ordinary client probes must not be rejected as admin requests.
   return res.status(200).json({ ok: true });
 }
 

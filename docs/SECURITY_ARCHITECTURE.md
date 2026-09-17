@@ -2,16 +2,15 @@
 
 ## Current hardened request / response model
 
-The architecture separates the normal request path from shared state and supervisory controls.
+The architecture separates the normal request path from shared state, audit persistence, and supervisory controls.
 
 ```text
-                              [10] MONITORING / SOAR
-                       observe -> detect -> score -> respond
-                         |             |             |
-                         v             v             v
-                      [5 REDIS]   [7 AI RESILIENCE] [8 ADMIN]
-                       block/        key action       lockdown /
-                       state         / recovery      incident action
+                         [10] MONITORING / SIEM + AUTO-RESPONSE
+                         observe -> detect -> score -> respond
+                              ⇅              ⇅
+                       [5] REDIS / STATE BUS
+                         ⇅       ⇅        ⇅
+                      THREAT   RESILIENCE  ADMIN
 
 USER / EXTERNAL AI
         |
@@ -25,7 +24,7 @@ USER / EXTERNAL AI
  [3] CHALLENGE
         |
         v
-    [4] AUTH ------------------- admin scope ------------------> [8] ADMIN
+    [4] AUTH ------------------- privileged scope -----------------> [8] ADMIN
         |
         v
    [6] GATEWAY
@@ -37,17 +36,17 @@ USER / EXTERNAL AI
  [6B] DLP + SEMANTIC GUARDRAIL
         |
         v
- [7] AI RESILIENCE <----- result from external AI / model provider
+ [7] AI RESILIENCE
         |
-        +-------------------------------> [9] DATA
-        |
-        +-------------------------------> [11] RESPONSE GUARD
-                                             |
-                                             v
-                                         [6] GATEWAY
-                                             |
-                                             v
-                                      USER / EXTERNAL AI
+        +----------------------> [11] RESPONSE GUARD
+        |                              |
+        |                              +-------------------> [9] AUDIT DATA
+        |                              |                     (non-blocking)
+        |                              v
+        |                          [6] GATEWAY
+        |                              |
+        |                              v
+        +-------------------------- USER / EXTERNAL AI
 ```
 
 ### 1. Request path
@@ -68,15 +67,30 @@ User / External AI
 
 AI Input Guard is the bounded pre-filter for prompt size/history limits and high-confidence prompt-abuse patterns.
 
-DLP + Semantic Guardrail is a defense-in-depth ingress layer. DLP conservatively redacts obvious email addresses, Vietnamese phone/ID patterns, JWT-like tokens, common API-key formats, and bearer tokens before provider execution. The semantic guardrail evaluates a bounded multi-turn context and blocks only when at least two independent high-confidence instruction-hijacking/exfiltration signals are present. It is heuristic and does not claim perfect semantic jailbreak detection.
+DLP + Semantic Guardrail is a defense-in-depth ingress layer. DLP conservatively redacts obvious email addresses, Vietnamese phone/ID patterns, JWT-like tokens, common API-key formats, bearer tokens, and additional high-risk secret formats before provider execution. The semantic guardrail evaluates a bounded multi-turn context and blocks only when at least two independent high-confidence instruction-hijacking/exfiltration signals are present. It is heuristic and does not claim perfect semantic jailbreak detection.
 
 The same ingress layer is used by both the AI solve path and the public support-AI path. The privileged Admin Copilot also applies DLP to the context assembled from Supabase and repository sources before that context is placed in the provider prompt.
 
-Admin is **not** a mandatory step. It is a privileged branch activated only when the authenticated request has the required admin scope.
+### 2. Early internal proof
 
-### 2. Response path
+The internal hop between the public AI gateway and the solve core is protected with HMAC + timestamp + nonce. This is **internal channel authentication and replay protection**, not an end-user credential.
 
-For an AI-backed request, the response starts at the point where **AI Resilience receives the result from the external AI/model provider**:
+```text
+Threat Defense
+     |
+     v
+Internal Proof
+(HMAC + timestamp + nonce)
+     |
+     v
+AI processing
+```
+
+The proof is generated only when the gateway is about to call the internal solve core and is verified by the core before expensive solve processing continues.
+
+### 3. Response path
+
+For an AI-backed request:
 
 ```text
 AI / model provider
@@ -87,6 +101,9 @@ AI / model provider
         v
 [11] RESPONSE GUARD
         |
+        +---------------------> [9] AUDIT DATA
+        |                         hash / metadata only
+        |                         non-blocking
         v
 [6] GATEWAY
         |
@@ -94,63 +111,76 @@ AI / model provider
 User / External AI
 ```
 
-Response Guard is therefore part of the outbound response path, not a replacement for AI Resilience or Data.
+Response Guard protects the outbound payload. Audit persistence is a separate best-effort branch: it stores metadata such as request/actor/device hashes, endpoint, status, model, latency, response length and response hash rather than a copy of the full AI response. Failure of the audit sink must not block delivery to the user.
 
-### 3. Data and response are parallel outcomes
+Normal application data remains in the existing domain tables (for example attempts and support messages). `ai_request_audit` is the security/audit trail for the AI request/response path.
 
-AI Resilience can produce two independent outcomes at the same processing point:
+### 4. Redis is the shared state bus
 
-```text
-                     [7] AI RESILIENCE
-                       /             \
-                      v               v
-                  [9] DATA      [11] RESPONSE GUARD
-                                     |
-                                     v
-                                 [6] GATEWAY
-                                     |
-                                     v
-                               User / External AI
-```
-
-The model must **not** imply `AI Resilience -> Data -> Response`. Data persistence/logging and response delivery are separate branches.
-
-### 4. Redis is shared state, not a mandatory hop
+Redis is **shared state, not a mandatory sequential request step**:
 
 ```text
-                    [5] REDIS
-                 shared state
-                       ^
-          +------------+-------------+
-          |            |             |
-        EDGE        THREAT /      CHALLENGE
-                      AUTH
-          |            |             |
-          +------------+-------------+
-                       |
-               AI RESILIENCE
-                       |
-                     ADMIN
+                         [5] REDIS / STATE BUS
+                       ⇅          ⇅           ⇅
+                 Threat state  AI state   Admin actions
+                       ⇅          ⇅           ⇅
+                    Edge      Resilience    Admin
 ```
 
-Redis may support distributed rate limiting, replay protection, challenge/quarantine state, sessions, and AI circuit-breaker state. A normal request does not have to be drawn as `Auth -> Redis -> Admin`.
+It can hold distributed rate-limit state, replay nonces, challenge state, threat scores, quarantine/block state, AI circuit-breaker state, and emergency AI lockdown state.
 
-### 5. Monitoring / SOAR is supervisory
+Admin actions that quarantine a user/device or enable an AI lockdown write the corresponding state to Redis so subsequent requests see the change immediately.
 
-Monitoring observes the pipeline rather than becoming a final sequential step:
+### 5. Monitoring / SIEM + Auto-Response
+
+The repository already implements active defensive reactions in the request-path security modules (quarantine after accumulated violations, adaptive challenge, provider circuit state, and emergency AI lockdown). Therefore the diagram uses **Monitoring / SIEM + Auto-Response**, not a vague passive "SOAR" box.
+
+The supervisory relationship is explicitly two-way through Redis:
 
 ```text
-                  [10] MONITORING / SOAR
-                    /        |        \
-                   v         v         v
-               [5 REDIS] [7 AI RESILIENCE] [8 ADMIN]
-                block/     key action       lockdown /
-              quarantine   / recovery      incident action
+              [10] MONITORING / SIEM + AUTO-RESPONSE
+                           ⇅
+                    [5] REDIS / STATE BUS
+                           ⇅
+          +----------------+----------------+
+          |                |                |
+        THREAT         AI RESILIENCE      ADMIN
 ```
 
-This makes the auto-response destinations explicit without implying that Monitoring itself processes the request in sequence.
+Monitoring consumes security state/events and the defensive layers update shared state that Monitoring/Admin can inspect. The request itself still follows the normal sequential path and does not have to pass through Monitoring.
 
-### 6. Enterprise roadmap boundaries
+### 6. Admin branch
+
+Admin is a privileged branch, not a mandatory hop for ordinary users:
+
+```text
+Auth
+ |
+ +-----> Admin API
+            |
+            +-----> Supabase (configuration/data)
+            |
+            +-----> Redis (lockdown / subject quarantine)
+```
+
+A global AI lockdown is stored in Redis. A targeted subject/device quarantine is also stored in Redis using a one-way fingerprint. Subsequent AI requests check this shared state before entering expensive processing.
+
+### 7. Data model
+
+```text
+                 AI processing
+                      |
+          +-----------+------------+
+          |                        |
+      Domain data             Security audit
+   attempts/support          ai_request_audit
+          |                        |
+       Supabase                 Supabase
+```
+
+User-visible domain history and support conversations continue using their existing tables. The security audit table is intentionally separate so security telemetry does not become a critical dependency of ordinary user response delivery.
+
+### 8. Enterprise roadmap boundaries
 
 The following are **not enabled by this repository patch** and must not be described as current production capabilities:
 
@@ -158,15 +188,17 @@ The following are **not enabled by this repository patch** and must not be descr
 - Native Android/iOS attestation such as Play Integrity or Apple App Attest.
 - Google Cloud Private Service Connect / VPC-only provider connectivity from the hosting environment.
 
-Those require separate platform/account/network configuration. For the current web application, the repository implements the web-compatible DLP and semantic guardrail layer without claiming those external services are installed.
+Those require separate platform/account/network configuration.
 
 ## Final rules for diagrams
 
-- Admin is a conditional privileged branch, never the default request path.
-- AI Input Guard is between the public Gateway and provider processing; it does not replace Threat, Auth, Gateway, or Resilience.
-- DLP + Semantic Guardrail is a defense-in-depth ingress layer and remains heuristic.
-- Response begins from the AI processing/result point and returns through Response Guard -> Gateway -> requester.
-- Data and Response Guard are parallel outcomes from AI Resilience.
+- Monitoring/SIEM + Auto-Response is supervisory; it does not become a mandatory sequential request hop.
+- Monitoring and the defensive layers exchange state through Redis.
+- Admin lockdown and subject/device quarantine write to Redis.
+- Response Guard has a **parallel non-blocking audit branch** to `ai_request_audit`.
+- Audit records should contain hashes/metadata, not raw secrets or unnecessary full AI responses.
+- Normal application/domain data remains in its existing Supabase tables.
+- HMAC + timestamp + nonce protects the internal gateway-to-core channel and is not presented as an end-user credential.
 - Redis is shared state, not a mandatory sequential request hop.
-- Monitoring/SOAR is a horizontal supervisory layer with explicit bounded defensive actions.
+- Admin is a conditional privileged branch, never the default request path.
 - Never place API keys, secrets, service-role credentials, Redis tokens, admin passwords, or other credentials in diagrams or documentation.

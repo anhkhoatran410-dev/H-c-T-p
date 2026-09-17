@@ -1,6 +1,7 @@
 import { isAdminRequest } from './admin-login.js';
-import { applySecurityHeaders, enforceBodySize, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
+import { applySecurityHeaders, enforceBodySize, enforceMethod, enforceJsonContentType, rateLimit, sameOrigin, safeRequestId } from './_security.js';
 import { aiLockdownStatus, setAiLockdown } from './_emergency-lock.js';
+import { setShieldSubjectBlock, clearShieldSubjectBlock, shieldSubjectStatus } from './_intrusion-shield.js';
 
 const URL = String(process.env.SUPABASE_URL || '').trim();
 const KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -23,11 +24,22 @@ async function sb(path, options = {}) {
   return data;
 }
 
+async function incident(severity, title, detail, autoAction) {
+  try {
+    await sb('system_incidents', {
+      method: 'POST',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ severity, area: 'security', title, detail, status: 'open', auto_action: autoAction })
+    });
+  } catch {}
+}
+
 function protect(req, res, methods) {
   applySecurityHeaders(res);
   res.setHeader('X-Request-ID', safeRequestId());
   if (!enforceMethod(req, res, methods)) return false;
   if (!enforceBodySize(req, res, 64 * 1024)) return false;
+  if (req.method !== 'GET' && !enforceJsonContentType(req, res)) return false;
   if (!sameOrigin(req, res)) return false;
   if (!rateLimit(req, res, { max: 20, windowMs: 60_000, keyPrefix: 'system-control' })) return false;
   return true;
@@ -56,7 +68,27 @@ export default async function handler(req, res) {
     const enabled = body.enabled === true;
     const seconds = Math.max(60, Math.min(24 * 60 * 60, Number(body.seconds || 3600)));
     const state = await setAiLockdown(enabled, seconds);
+    await incident(enabled ? 'critical' : 'info', enabled ? 'AI lockdown enabled' : 'AI lockdown disabled', 'Admin thay đổi trạng thái AI lockdown.', enabled ? 'redis-ai-lockdown' : 'clear-redis-ai-lockdown');
     return res.status(200).json({ ok: true, ...state });
+  }
+
+  if (route === 'subject-block') {
+    if (!protect(req, res, req.method === 'GET' ? ['GET'] : ['POST'])) return;
+    if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin session required' });
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const subject = String(body.subject || req.query?.subject || '').trim();
+    if (!subject || subject.length > 180) return res.status(400).json({ error: 'Device/user fingerprint không hợp lệ.' });
+    if (req.method === 'GET') return res.status(200).json(await shieldSubjectStatus(subject));
+    if (body.confirmAction !== true) return res.status(409).json({ error: 'Xác nhận Admin bắt buộc để đổi trạng thái block.' });
+    if (body.enabled === false) {
+      const state = await clearShieldSubjectBlock(subject);
+      await incident('info', 'Admin subject quarantine cleared', `Đã gỡ block cho fingerprint ${state.subjectHash}.`, 'redis-subject-unblock');
+      return res.status(200).json({ ok: true, enabled: false, ...state });
+    }
+    const seconds = Math.max(60, Math.min(24 * 60 * 60, Number(body.seconds || 24 * 60 * 60)));
+    const state = await setShieldSubjectBlock(subject, seconds);
+    await incident('high', 'Admin subject quarantine enabled', `Đã block fingerprint ${state.subjectHash}.`, 'redis-subject-block');
+    return res.status(200).json({ ok: true, enabled: true, ...state });
   }
 
   if (req.method === 'GET') {

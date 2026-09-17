@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import './_gemini-network-guard.js';
 import solveHandler from './solve.js';
-import { applySecurityHeaders, enforceBodySize, rateLimit, safeRequestId } from './_security.js';
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, rateLimit, safeRequestId } from './_security.js';
 import { consumeNonce, internalSignature, timingSafeHexEqual, verifyTimestamp } from './_internal-replay.js';
 import { recordThreat } from './_adaptive-defense.js';
 import { sanitizeAiBody } from './_prompt-security.js';
@@ -14,6 +14,7 @@ export default async function handler(req,res){
   const requestId=safeRequestId();
   res.setHeader('X-Request-ID',requestId);
   if(req.method!=='POST') return res.status(405).json({error:'Method not allowed',requestId});
+  if(!enforceJsonContentType(req,res)) return;
 
   const s=secret();
   const signature=String(req.headers?.['x-study-th-internal']||'');

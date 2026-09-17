@@ -5,10 +5,12 @@ import { enforceCostChallenge } from './_adaptive-defense.js';
 import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
 import { aiLockdownStatus } from './_emergency-lock.js';
 import { guardAiResponse } from './_response-guard.js';
+import { inspectPrompt, sanitizePromptForModel } from './_prompt-security.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 10;
+const HIGH_CONFIDENCE_PROMPT_SCORE = 7;
 
 function internalSecret(){ return String(process.env.INTERNAL_GATEWAY_SECRET || '').trim(); }
 function baseUrl(req){
@@ -46,6 +48,17 @@ export default async function handler(req,res){
   const body = bodyOf(req);
   if(!body.message && !body.imageDataUrl) { await recordShieldViolation(req,'empty-ai-request'); await recordAgentSignal(req,'empty-ai-request'); return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId}); }
   if(typeof body.message === 'string' && body.message.length > 30_000) { await recordShieldViolation(req,'oversized-message'); await recordAgentSignal(req,'oversized-message'); return res.status(413).json({error:'Đề bài quá dài.',requestId}); }
+
+  const promptCheck = inspectPrompt(body.message);
+  if(promptCheck.suspicious) {
+    await recordAgentSignal(req,`prompt-injection:${promptCheck.matches.join(',')}`);
+    if(promptCheck.score >= HIGH_CONFIDENCE_PROMPT_SCORE) {
+      await recordShieldViolation(req,'high-confidence-prompt-injection');
+      return res.status(400).json({error:'Yêu cầu chứa mẫu điều khiển hệ thống không được phép.',requestId});
+    }
+  }
+  body.message = sanitizePromptForModel(body.message);
+
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);

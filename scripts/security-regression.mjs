@@ -52,8 +52,8 @@ assert.equal(guardedInternal.ok, true);
 assert.equal(guardedInternal.body.includes('X-STUDY-TH-INTERNAL'), false);
 
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
-assert.equal(vercel.functions['api/_ai-gateway.js'].maxDuration, 60);
-assert.equal(vercel.functions['api/_solve-core.js'].maxDuration, 60);
+assert.equal(vercel.functions?.['api/_ai-gateway.js'], undefined);
+assert.equal(vercel.functions?.['api/_solve-core.js'], undefined);
 assert.equal(vercel.rewrites.some(x => x.source === '/api/ai-lockdown'), true);
 assert.equal(JSON.stringify(vercel).includes('Access-Control-Allow-Origin'), false);
 

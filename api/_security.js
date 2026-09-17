@@ -66,9 +66,28 @@ export function enforceMethod(req, res, methods) {
 }
 
 export function enforceBodySize(req, res, maxBytes = MAX_BODY_BYTES) {
+  const limit = Math.max(1, Number(maxBytes || MAX_BODY_BYTES));
   const length = Number(req.headers?.['content-length']);
-  if (Number.isFinite(length) && length > maxBytes) {
+  if (Number.isFinite(length) && length > limit) {
     res.status(413).json({ error: 'Request body quá lớn.' });
+    return false;
+  }
+
+  // Re-check the parsed request body as a second boundary. Some runtimes or
+  // rewrites do not preserve a useful content-length after JSON parsing.
+  try {
+    if (req?.body !== undefined && req?.body !== null) {
+      let bytes = 0;
+      if (typeof req.body === 'string') bytes = Buffer.byteLength(req.body, 'utf8');
+      else if (Buffer.isBuffer(req.body)) bytes = req.body.length;
+      else if (typeof req.body === 'object') bytes = Buffer.byteLength(JSON.stringify(req.body), 'utf8');
+      if (bytes > limit) {
+        res.status(413).json({ error: 'Request body quá lớn.' });
+        return false;
+      }
+    }
+  } catch {
+    res.status(400).json({ error: 'Dữ liệu yêu cầu không hợp lệ.' });
     return false;
   }
   return true;

@@ -43,12 +43,16 @@ async function redisEval(script, keys, args) {
 
 export function applySecurityHeaders(res) {
   res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Pragma', 'no-cache');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
 }
 
 export function enforceMethod(req, res, methods) {
@@ -65,6 +69,15 @@ export function enforceBodySize(req, res, maxBytes = MAX_BODY_BYTES) {
   const length = Number(req.headers?.['content-length']);
   if (Number.isFinite(length) && length > maxBytes) {
     res.status(413).json({ error: 'Request body quá lớn.' });
+    return false;
+  }
+  return true;
+}
+
+export function enforceJsonContentType(req, res) {
+  const contentType = String(req.headers?.['content-type'] || '').toLowerCase();
+  if (!contentType.startsWith('application/json')) {
+    res.status(415).json({ error: 'Content-Type phải là application/json.' });
     return false;
   }
   return true;

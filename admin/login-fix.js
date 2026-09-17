@@ -1,11 +1,10 @@
 /* STUDY TH — lightweight Admin bootstrap. */
 (function(){
   'use strict';
-  if(window.__studyLoginBootstrapV9)return;
-  window.__studyLoginBootstrapV9=true;
-  const TOKEN_KEY='study_admin_session_v2';
-  const CRITICAL_SCRIPT='auth.js?v=20260915-3';
-  const APP_SCRIPT='app.js?v=20260915-3';
+  if(window.__studyLoginBootstrapV10)return;
+  window.__studyLoginBootstrapV10=true;
+  const CRITICAL_SCRIPT='auth.js?v=20260917-1';
+  const APP_SCRIPT='app.js?v=20260917-1';
   const TITLES={dashboard:'Tổng quan',support:'Hỗ trợ',participants:'Người tham gia',history:'Lịch sử làm bài',tests:'Bài kiểm tra',accounts:'Tài khoản hỗ trợ',bot:'Bot tự động',assistant:'Admin Copilot'};
   const LOADERS={dashboard:'loadDashboard',support:'startSupportLive',participants:'loadParticipants',history:'loadHistory',tests:'renderTests',accounts:'loadAccounts',bot:'loadBotRules',assistant:'loadAssistant'};
   const $=id=>document.getElementById(id);
@@ -24,8 +23,9 @@
   function loadScript(src){if(loaded.has(src))return loaded.get(src);const p=new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.async=false;s.onload=resolve;s.onerror=()=>reject(new Error('Không tải được '+src));document.body.appendChild(s)});loaded.set(src,p);return p}
   async function loadTabModules(id){for(const src of moduleMap[id]||[]){try{await loadScript(src)}catch(e){console.warn('[STUDY module]',e.message)}}}
   async function startAdmin(){if(window.__studyAdminStarted)return;window.__studyAdminStarted=true;try{await loadScript(CRITICAL_SCRIPT);await loadScript(APP_SCRIPT);setAuthenticatedView();injectMobileUX();bindNavigation();if(typeof window.bootAdmin==='function'){try{await window.bootAdmin()}catch(e){console.warn('[STUDY boot]',e)}}}catch(e){window.__studyAdminStarted=false;console.error('[STUDY bootstrap]',e);setAuthenticatedView();injectMobileUX();bindNavigation()}}
-  async function authenticate(event){event?.preventDefault();event?.stopImmediatePropagation();const form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');if(!form||!input||!btn||form.__loginBusy)return;form.__loginBusy=true;repairLogin();const password=String(input.value||'');if(!password){const m=$('loginMsg');if(m)m.textContent='⚠️ Vui lòng nhập mật khẩu Admin.';form.__loginBusy=false;input.focus();return}btn.disabled=true;input.disabled=true;btn.textContent='⏳ Đang đăng nhập...';try{const r=await fetch('/api/admin-login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({password}),cache:'no-store',credentials:'same-origin'});const text=await r.text();let data={};try{data=JSON.parse(text||'{}')}catch{}if(!r.ok)throw new Error(data.error||('Đăng nhập thất bại (HTTP '+r.status+')'));if(!data.token)throw new Error('Máy chủ không trả về session token.');sessionStorage.setItem(TOKEN_KEY,data.token);await startAdmin()}catch(e){const m=$('loginMsg');if(m)m.textContent='❌ '+e.message}finally{form.__loginBusy=false;btn.disabled=false;input.disabled=false;btn.textContent='🔐 Đăng nhập';repairLogin()}}
+  async function checkExistingSession(){try{const r=await fetch('/api/admin-login?check=1',{method:'POST',headers:{'Accept':'application/json'},cache:'no-store',credentials:'same-origin'});if(r.ok){await startAdmin();return true}}catch(_){}return false}
+  async function authenticate(event){event?.preventDefault();event?.stopImmediatePropagation();const form=$('loginForm'),input=$('adminPassword'),btn=form?.querySelector('button[type="submit"]');if(!form||!input||!btn||form.__loginBusy)return;form.__loginBusy=true;repairLogin();const password=String(input.value||'');if(!password){const m=$('loginMsg');if(m)m.textContent='⚠️ Vui lòng nhập mật khẩu Admin.';form.__loginBusy=false;input.focus();return}btn.disabled=true;input.disabled=true;btn.textContent='⏳ Đang đăng nhập...';try{const r=await fetch('/api/admin-login',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify({password}),cache:'no-store',credentials:'same-origin'});const text=await r.text();let data={};try{data=JSON.parse(text||'{}')}catch{}if(!r.ok)throw new Error(data.error||('Đăng nhập thất bại (HTTP '+r.status+')'));await startAdmin()}catch(e){const m=$('loginMsg');if(m)m.textContent='❌ '+e.message}finally{form.__loginBusy=false;btn.disabled=false;input.disabled=false;btn.textContent='🔐 Đăng nhập';repairLogin()}}
   function bindLogin(){const form=$('loginForm');if(form&&!form.__studyLoginBound){form.__studyLoginBound=true;form.addEventListener('submit',authenticate,true)}repairLogin()}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindLogin,{once:true});else bindLogin();
-  if(sessionStorage.getItem(TOKEN_KEY))startAdmin();
+  checkExistingSession();
 })();

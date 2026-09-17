@@ -10,7 +10,9 @@ const DLP_PATTERNS = [
   { name: 'phone', re: /(?<!\d)(?:\+?84|0)(?:3|5|7|8|9)\d{8}(?!\d)/g, replacement: '[PHONE_REDACTED]' },
   { name: 'vn-id', re: /(?<!\d)\d{12}(?!\d)/g, replacement: '[ID_REDACTED]' },
   { name: 'jwt', re: /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, replacement: '[TOKEN_REDACTED]' },
-  { name: 'api-key', re: /\b(?:AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,})\b/g, replacement: '[SECRET_REDACTED]' },
+  { name: 'api-key', re: /\b(?:AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{16,})\b/g, replacement: '[SECRET_REDACTED]' },
+  { name: 'aws-access-key', re: /\bAKIA[0-9A-Z]{16}\b/g, replacement: '[SECRET_REDACTED]' },
+  { name: 'private-key', re: /-----BEGIN(?: RSA| EC| OPENSSH)? PRIVATE KEY-----[\s\S]*?-----END(?: RSA| EC| OPENSSH)? PRIVATE KEY-----/g, replacement: '[PRIVATE_KEY_REDACTED]' },
   { name: 'bearer', re: /\bBearer\s+[A-Za-z0-9._~+\/-]{20,}\b/gi, replacement: 'Bearer [TOKEN_REDACTED]' },
 ];
 
@@ -19,6 +21,7 @@ const DLP_PATTERNS = [
 const SEMANTIC_SIGNALS = [
   /ignore\s+(?:all\s+)?previous\s+(?:instructions|rules|messages)/i,
   /disregard\s+(?:all\s+)?previous\s+(?:instructions|rules|messages)/i,
+  /forget\s+(?:all\s+)?previous\s+(?:instructions|rules|messages)/i,
   /reveal\s+(?:the\s+)?(?:system|developer)\s+(?:prompt|instructions)/i,
   /(?:show|print|dump|output)\s+(?:the\s+)?(?:api[_ -]?key|token|secret|credential|environment\s+variables?)/i,
   /act\s+as\s+(?:the\s+)?(?:system|developer|admin|root)/i,
@@ -50,14 +53,29 @@ export function sanitizeDlpText(value) {
   return redact(value);
 }
 
+function safeRole(value) {
+  const role = normalize(value).toLowerCase();
+  return role === 'assistant' ? 'assistant' : 'user';
+}
+
+function sanitizeHistory(history) {
+  if (!Array.isArray(history)) return [];
+  return history.slice(-MAX_CONTEXT_ITEMS).map((item) => {
+    if (!item || typeof item !== 'object') return null;
+    const next = { role: safeRole(item.role) };
+    if (typeof item.content === 'string') next.content = redact(item.content).text;
+    if (typeof item.message === 'string') next.message = redact(item.message).text;
+    if (!next.content && !next.message) return null;
+    return next;
+  }).filter(Boolean);
+}
+
 function collectConversation(message, history) {
-  const safeHistory = Array.isArray(history) ? history.slice(-MAX_CONTEXT_ITEMS) : [];
+  const safeHistory = sanitizeHistory(history);
   const chunks = [];
   for (const item of safeHistory) {
-    if (!item || typeof item !== 'object') continue;
-    const role = String(item.role || 'user').slice(0, 32);
     const content = String(item.content ?? item.message ?? '');
-    if (content) chunks.push(`${role}: ${content}`);
+    if (content) chunks.push(`${item.role}: ${content}`);
   }
   if (message) chunks.push(`user: ${message}`);
   return chunks.join('\n').slice(-MAX_CONTEXT_CHARS);
@@ -85,16 +103,7 @@ export function inspectSemanticConversation(message, history = []) {
 
 export function sanitizeAiIngress(message, history = []) {
   const messageRedacted = redact(message);
-  const nextHistory = Array.isArray(history) ? history.slice(-MAX_CONTEXT_ITEMS).map((item) => {
-    if (!item || typeof item !== 'object') return item;
-    const content = typeof item.content === 'string'
-      ? item.content
-      : (typeof item.message === 'string' ? item.message : null);
-    if (content === null) return item;
-    const r = redact(content);
-    if (typeof item.content === 'string') return { ...item, content: r.text };
-    return { ...item, message: r.text };
-  }) : history;
+  const nextHistory = sanitizeHistory(history);
 
   const semantic = inspectSemanticConversation(messageRedacted.text, nextHistory);
   if (!semantic.ok) {
@@ -112,8 +121,7 @@ export function sanitizeAiIngress(message, history = []) {
   const allTypes = new Set(messageRedacted.redactions);
   let historyRedactions = 0;
   for (const item of nextHistory) {
-    if (!item || typeof item !== 'object') continue;
-    const value = String(item.content ?? item.message ?? '');
+    const value = String(item?.content ?? item?.message ?? '');
     const r = redact(value);
     if (r.redactions.length) {
       historyRedactions += r.redactions.length;

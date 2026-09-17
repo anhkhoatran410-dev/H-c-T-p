@@ -4,7 +4,6 @@
   if (window.__studyLoginHardeningInstalled) return;
   window.__studyLoginHardeningInstalled = true;
 
-  const TOKEN_KEY = 'study_admin_session_v2';
   const LOGIN_TIMEOUT_MS = 8000;
   let submitting = false;
   const $ = id => document.getElementById(id);
@@ -89,9 +88,7 @@
       let data = {};
       try { data = JSON.parse(raw || '{}'); } catch (_) {}
       if (!response.ok) throw new Error(data.error || `Đăng nhập thất bại (HTTP ${response.status})`);
-      if (!data.token) throw new Error('Máy chủ đăng nhập không trả về session token.');
 
-      sessionStorage.setItem(TOKEN_KEY, data.token);
       message('✅ Đăng nhập thành công.', true);
       $('adminLogin')?.classList.add('hidden');
       $('adminApp')?.classList.remove('hidden');

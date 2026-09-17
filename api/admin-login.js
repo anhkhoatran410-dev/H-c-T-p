@@ -1,11 +1,13 @@
 import crypto from "node:crypto";
-import { applySecurityHeaders, enforceBodySize, enforceMethod, sameOrigin } from "./_security.js";
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, safeRequestId } from "./_security.js";
 
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 8;
 const attempts = new Map();
 const SESSION_MS = 60 * 60 * 1000;
 const MAX_TRACKED_IPS = 10_000;
+const COOKIE_NAME = "study_admin_session_v3";
+const LEGACY_COOKIE_NAME = "study_admin_session_v2";
 
 function configuredSecret(name){ return String(process.env[name] || "").trim(); }
 function secret(){
@@ -33,7 +35,32 @@ function validToken(token){
     return a.length === b.length && crypto.timingSafeEqual(a,b);
   }catch{return false;}
 }
+function readCookie(req,name){
+  const header=String(req.headers?.cookie||"");
+  for(const part of header.split(";")){
+    const i=part.indexOf("=");
+    if(i<0)continue;
+    const key=part.slice(0,i).trim();
+    if(key!==name)continue;
+    return decodeURIComponent(part.slice(i+1).trim());
+  }
+  return "";
+}
+function setSessionCookie(res,token){
+  res.setHeader("Set-Cookie",[
+    `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=${Math.floor(SESSION_MS/1000)}; HttpOnly; Secure; SameSite=Strict`,
+    `${LEGACY_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`
+  ]);
+}
+function clearSessionCookie(res){
+  res.setHeader("Set-Cookie",[
+    `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`,
+    `${LEGACY_COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Strict`
+  ]);
+}
 export function isAdminRequest(req){
+  const cookieToken=readCookie(req,COOKIE_NAME)||readCookie(req,LEGACY_COOKIE_NAME);
+  if(validToken(cookieToken)) return true;
   return validToken(String(req.headers?.authorization || "").replace(/^Bearer\s+/i,""));
 }
 function readBody(req){
@@ -44,10 +71,22 @@ function readBody(req){
 
 export default async function handler(req,res){
   applySecurityHeaders(res);
+  const requestId=safeRequestId();
+  res.setHeader("X-Request-ID",requestId);
   res.setHeader("Content-Type","application/json; charset=utf-8");
   if(!enforceMethod(req,res,["POST"])) return;
   if(!enforceBodySize(req,res,16_000)) return;
   if(!sameOrigin(req,res)) return;
+
+  if(String(req.query?.check || "") === "1"){
+    if(!isAdminRequest(req)) return res.status(401).json({ok:false,requestId});
+    return res.status(200).json({ok:true,expiresIn:SESSION_MS/1000,requestId});
+  }
+  if(String(req.query?.logout || "") === "1"){
+    clearSessionCookie(res);
+    return res.status(200).json({ok:true,requestId});
+  }
+  if(!enforceJsonContentType(req,res)) return;
 
   const ip = String(req.headers?.["x-real-ip"] || req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
   const now = Date.now();
@@ -60,22 +99,23 @@ export default async function handler(req,res){
   attempts.set(ip,entry);
   if(entry.count > MAX_ATTEMPTS){
     res.setHeader("Retry-After","60");
-    return res.status(429).json({error:"Thử đăng nhập quá nhiều lần. Hãy đợi một phút."});
+    return res.status(429).json({error:"Thử đăng nhập quá nhiều lần. Hãy đợi một phút.",requestId});
   }
 
   const body = readBody(req);
   const password = String(body.password || "");
   const configured = configuredSecret("ADMIN_PASSWORD");
-  if(!configured) return res.status(500).json({error:"ADMIN_PASSWORD chưa được cấu hình trên Vercel."});
+  if(!configured) return res.status(500).json({error:"ADMIN_PASSWORD chưa được cấu hình trên Vercel.",requestId});
 
   const ok = crypto.timingSafeEqual(digest(password), digest(configured));
-  if(!ok) return res.status(401).json({error:"Mật khẩu Admin không đúng."});
+  if(!ok) return res.status(401).json({error:"Mật khẩu Admin không đúng.",requestId});
   attempts.delete(ip);
 
   try{
     const token = makeToken();
-    return res.status(200).json({ok:true,token,expiresIn:SESSION_MS/1000});
+    setSessionCookie(res, token);
+    return res.status(200).json({ok:true,expiresIn:SESSION_MS/1000,requestId});
   }catch(e){
-    return res.status(500).json({error:e.message || "Không tạo được phiên Admin."});
+    return res.status(500).json({error:e.message || "Không tạo được phiên Admin.",requestId});
   }
 }

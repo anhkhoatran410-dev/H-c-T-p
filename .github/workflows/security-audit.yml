@@ -2,7 +2,7 @@ name: Security Audit
 
 on:
   push:
-    branches: [main, security-hardening]
+    branches: [main, security-hardening, security-final-hardening]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -58,3 +58,6 @@ jobs:
 
       - name: Security regression tests
         run: node scripts/security-regression.mjs
+
+      - name: Security static hardening checks
+        run: node scripts/security-static-hardening.mjs

@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
 
-const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://mlqaeginqsgqacdqdzbm.supabase.co').trim().replace(/\/$/, '');
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim().replace(/\/$/, '');
 const SERVICE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const REDIS_URL = String(process.env.UPSTASH_REDIS_REST_URL || '').trim().replace(/\/$/, '');
 const REDIS_TOKEN = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim();
+const AUDIT_QUEUE_KEY = 'study-th:audit:queue';
+const AUDIT_RECENT_KEY = 'study-th:audit:recent';
 
 function sha(value){
   return crypto.createHash('sha256').update(String(value || '')).digest('hex').slice(0, 32);
@@ -16,39 +18,6 @@ function device(req){
   return fromBody || String(req?.headers?.['x-study-th-device'] || '');
 }
 
-async function supabaseInsert(row){
-  if(!SERVICE_KEY || !SUPABASE_URL) return false;
-  try{
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/ai_request_audit`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json',apikey:SERVICE_KEY,Authorization:`Bearer ${SERVICE_KEY}`},
-      body:JSON.stringify(row),
-      signal:AbortSignal.timeout(2500),
-    });
-    return r.ok;
-  }catch{return false;}
-}
-
-async function redisEvent(row){
-  if(!REDIS_URL || !REDIS_TOKEN) return false;
-  try{
-    const payload = JSON.stringify(row);
-    const key = `study-th:audit:event:${Date.now()}:${crypto.randomBytes(6).toString('hex')}`;
-    const r = await fetch(`${REDIS_URL}/pipeline`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${REDIS_TOKEN}`,'Content-Type':'application/json'},
-      body:JSON.stringify([
-        ['SET',key,payload,'EX',86400],
-        ['LPUSH','study-th:audit:recent',payload],
-        ['LTRIM','study-th:audit:recent','0','199'],
-        ['EXPIRE','study-th:audit:recent',86400],
-      ]),
-      signal:AbortSignal.timeout(1200),
-    });
-    return r.ok;
-  }catch{return false;}
-}
-
 export function auditIdentity(req){
   const d=device(req);
   const actor=sha(`${ip(req)}|${String(req?.headers?.['user-agent']||'').slice(0,180)}`);
@@ -58,6 +27,7 @@ export function auditIdentity(req){
 export function auditRecord(req, fields={}){
   const id=auditIdentity(req);
   return {
+    event_id:crypto.randomUUID(),
     request_id:String(fields.request_id || ''),
     actor_hash:id.actor,
     device_hash:id.device,
@@ -74,7 +44,28 @@ export function auditRecord(req, fields={}){
   };
 }
 
+async function enqueueAudit(row){
+  if(!REDIS_URL || !REDIS_TOKEN) return false;
+  try{
+    const payload=JSON.stringify(row);
+    const key=`study-th:audit:event:${Date.now()}:${crypto.randomBytes(6).toString('hex')}`;
+    const r=await fetch(`${REDIS_URL}/pipeline`,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${REDIS_TOKEN}`,'Content-Type':'application/json'},
+      body:JSON.stringify([
+        ['LPUSH',AUDIT_QUEUE_KEY,payload],
+        ['SET',key,payload,'EX',86400],
+        ['LPUSH',AUDIT_RECENT_KEY,payload],
+        ['LTRIM',AUDIT_RECENT_KEY,'0','199'],
+        ['EXPIRE',AUDIT_RECENT_KEY,86400],
+      ]),
+      signal:AbortSignal.timeout(1200),
+    });
+    return r.ok;
+  }catch{return false;}
+}
+
 export async function persistAudit(row){
-  // Best effort only: audit persistence must never hold up the user response.
-  await Promise.allSettled([supabaseInsert(row),redisEvent(row)]);
+  // Request path only enqueues to Redis. Supabase is written by the audit worker in batches.
+  try{ await enqueueAudit(row); }catch{}
 }

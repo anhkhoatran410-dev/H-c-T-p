@@ -39,7 +39,7 @@ const checks = [
   ['Admin Redis block control', read('api/system-control.js'), ['subject-block', 'setShieldSubjectBlock', 'clearShieldSubjectBlock', 'redis-subject-block']],
   ['dynamic key pool cache warming', read('api/_ai-resilience.js'), ['warmAiKeyPool', 'study-th:ai-keypool-meta', 'study-th:ai-keypool-active']],
   ['scheduled audit queue sync', read('.github/workflows/security-audit-sync.yml'), ['SECURITY_AUDIT_WORKER_URL', 'SECURITY_AUDIT_CRON_SECRET', '*/15 * * * *']],
-  ['architecture monitoring state bus', read('docs/SECURITY_ARCHITECTURE.md'), ['MONITORING / SIEM + AUTO-RESPONSE', 'REDIS / STATE BUS', 'Response Guard', 'AUDIT DATA', 'Admin actions']],
+  ['architecture monitoring state bus', read('docs/SECURITY_ARCHITECTURE.md'), ['MONITORING / SIEM + AUTO-RESPONSE', 'REDIS / STATE BUS', 'Response Guard', 'AUDIT QUEUE', 'Admin actions']],
   ['AI audit migration', read('supabase/migrations/20260917_ai_request_audit.sql'), ['create table if not exists public.ai_request_audit', 'alter table public.ai_request_audit enable row level security']],
 ];
 for (const [name, text, needles] of checks) {

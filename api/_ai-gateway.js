@@ -52,6 +52,7 @@ export default async function handler(req,res){
   }
   const target = String(req.query?.target || '').trim();
   if(target !== 'solve') { await recordShieldViolation(req,'unexpected-route'); await recordAgentSignal(req,'unexpected-route'); return res.status(404).json({error:'Gateway route not found',requestId}); }
+
   const secret = internalSecret();
   const url = baseUrl(req);
   if(!secret || !url) return res.status(503).json({error:'AI gateway chưa được cấu hình đầy đủ.',requestId});
@@ -62,6 +63,12 @@ export default async function handler(req,res){
     await recordAgentSignal(req,'empty-ai-request');
     return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId});
   }
+
+  // Authenticate the internal gateway -> core channel before the more
+  // expensive prompt/body sanitization work. Clients never supply this proof.
+  const timestamp = internalTimestamp();
+  const nonce = internalNonce();
+  const signature = internalSignature(secret,timestamp,nonce);
 
   const guarded = sanitizeAiBody(rawBody);
   if(!guarded.ok){
@@ -79,9 +86,6 @@ export default async function handler(req,res){
   guarded.body.message = ingress.message;
   guarded.body.history = ingress.history;
 
-  const timestamp = internalTimestamp();
-  const nonce = internalNonce();
-  const signature = internalSignature(secret,timestamp,nonce);
   try{
     const upstream = await fetch(`${url}/api/_solve-core`,{
       method:'POST',

@@ -4,8 +4,6 @@
   "framework": null,
   "outputDirectory": ".",
   "functions": {
-    "api/_ai-gateway.js": { "maxDuration": 60, "supportsCancellation": true },
-    "api/_solve-core.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/support-ai.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/admin-command.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/system-control.js": { "maxDuration": 30, "supportsCancellation": true }

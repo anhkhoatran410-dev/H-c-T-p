@@ -1,6 +1,6 @@
 # STUDY TH Security Architecture
 
-## Final request / response model
+## Current hardened request / response model
 
 The architecture separates the normal request path from shared state and supervisory controls.
 
@@ -34,6 +34,9 @@ USER / EXTERNAL AI
  [6A] AI INPUT GUARD
         |
         v
+ [6B] DLP + SEMANTIC GUARDRAIL
+        |
+        v
  [7] AI RESILIENCE <----- result from external AI / model provider
         |
         +-------------------------------> [9] DATA
@@ -59,10 +62,15 @@ User / External AI
   -> Auth
   -> Gateway
   -> AI Input Guard
+  -> DLP + Semantic Guardrail
   -> AI Resilience
 ```
 
-The AI Input Guard is a bounded input-policy layer. It normalizes text, enforces prompt/history limits, blocks only high-confidence system-prompt/secret-extraction/instruction-override patterns, and detects simple repeated-input abuse. It is not a claim of perfect prompt-injection or agent detection.
+AI Input Guard is the bounded pre-filter for prompt size/history limits and high-confidence prompt-abuse patterns.
+
+DLP + Semantic Guardrail is a defense-in-depth ingress layer. DLP conservatively redacts obvious email addresses, Vietnamese phone/ID patterns, JWT-like tokens, common API-key formats, and bearer tokens before provider execution. The semantic guardrail evaluates a bounded multi-turn context and blocks only when at least two independent high-confidence instruction-hijacking/exfiltration signals are present. It is heuristic and does not claim perfect semantic jailbreak detection.
+
+The same ingress layer is used by both the AI solve path and the public support-AI path. The privileged Admin Copilot also applies DLP to the context assembled from Supabase and repository sources before that context is placed in the provider prompt.
 
 Admin is **not** a mandatory step. It is a privileged branch activated only when the authenticated request has the required admin scope.
 
@@ -142,10 +150,21 @@ Monitoring observes the pipeline rather than becoming a final sequential step:
 
 This makes the auto-response destinations explicit without implying that Monitoring itself processes the request in sequence.
 
+### 6. Enterprise roadmap boundaries
+
+The following are **not enabled by this repository patch** and must not be described as current production capabilities:
+
+- Cloudflare Enterprise WAF / advanced bot management in front of Vercel.
+- Native Android/iOS attestation such as Play Integrity or Apple App Attest.
+- Google Cloud Private Service Connect / VPC-only provider connectivity from the hosting environment.
+
+Those require separate platform/account/network configuration. For the current web application, the repository implements the web-compatible DLP and semantic guardrail layer without claiming those external services are installed.
+
 ## Final rules for diagrams
 
 - Admin is a conditional privileged branch, never the default request path.
-- AI Input Guard is between the public Gateway and AI Resilience; it does not replace Threat, Auth, Gateway, or Resilience.
+- AI Input Guard is between the public Gateway and provider processing; it does not replace Threat, Auth, Gateway, or Resilience.
+- DLP + Semantic Guardrail is a defense-in-depth ingress layer and remains heuristic.
 - Response begins from the AI processing/result point and returns through Response Guard -> Gateway -> requester.
 - Data and Response Guard are parallel outcomes from AI Resilience.
 - Redis is shared state, not a mandatory sequential request hop.

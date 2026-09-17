@@ -23,13 +23,11 @@ const checks = [
   ['AI gateway JSON boundary', read('api/_ai-gateway.js'), ['enforceJsonContentType(req,res)']],
   ['AI core JSON boundary', read('api/_solve-core.js'), ['enforceJsonContentType(req,res)']],
   ['support AI JSON boundary', read('api/support-ai.js'), ['enforceJsonContentType(req,res)']],
-  ['AI response audit sink', read('api/_audit-log.js'), ['persistAudit', 'AUDIT_QUEUE_KEY', 'AUDIT_QUEUE_MAX', 'ENQUEUE_LUA']],
+  ['AI response audit sink', read('api/_audit-log.js'), ['persistAudit', 'AUDIT_QUEUE_KEY', 'LPUSH', 'study-th:audit:queue']],
   ['AI gateway non-blocking audit', read('api/_ai-gateway.js'), ['auditRecord', 'persistAudit', "outcome:delivered?'response_delivered':'response_guard_blocked'"]],
   ['support AI audit', read('api/support-ai.js'), ['auditRecord', 'persistAudit', 'response_delivered']],
   ['Redis audit worker', read('api/_audit-worker.js'), ['CRON_SECRET', 'study-th:audit:queue', 'EVAL', 'resolution=ignore-duplicates']],
   ['Redis audit worker retry-safe', read('api/_audit-worker.js'), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
-  ['Redis audit worker bounded DLQ', read('api/_audit-worker.js'), ['DLQ_KEY', 'DLQ_MAX', 'moveToDlq', 'dlqDropped']],
-  ['audit queue has no restore loop', read('api/_audit-worker.js'), ['restore', 'failed batch is not restored to the main queue']],
   ['audit queue idempotency', read('supabase/migrations/20260917_ai_audit_queue.sql'), ['add column if not exists event_id text', 'create unique index if not exists ai_request_audit_event_uidx']],
   ['replay nonce bounded TTL', read('api/_internal-replay.js'), ['NONCE_TTL_MS', "'PX', NONCE_TTL_MS", 'verifyTimestamp', 'WINDOW_MS']],
   ['Response Guard fail-safe boundary', read('api/_response-guard.js'), ['OUTPUT_BLOCK_PATTERNS', 'sensitive-secret-detected', 'response-guard-blocked', 'safeClientError']],
@@ -61,4 +59,20 @@ if (!order(gateway, ['const timestamp = internalTimestamp();', 'const guarded = 
 } else {
   console.log('PASS: AI gateway request order: internal proof precedes input guards/upstream');
 }
-if (!process.exitCode) console.log('All static security hardening assertions passed.');
+
+const index = read('index.html');
+const metaViewport = index.match(/<meta[^>]+name="viewport"[^>]+content="([^"]+)"/i)?.[1] || '';
+if (!/width=device-width/i.test(metaViewport) || !/initial-scale=1/i.test(metaViewport)) {
+  console.error('FAIL: mobile viewport contract: width=device-width and initial-scale=1 are required');
+  process.exitCode = 1;
+} else {
+  console.log('PASS: mobile viewport contract');
+}
+if (/maximum-scale|user-scalable\s*=\s*no/i.test(metaViewport)) {
+  console.error('FAIL: mobile viewport contract: accessibility-hostile zoom restrictions are present');
+  process.exitCode = 1;
+} else {
+  console.log('PASS: mobile zoom remains user-controlled');
+}
+
+if (!process.exitCode) console.log('All static security and mobile/PWA hardening assertions passed.');

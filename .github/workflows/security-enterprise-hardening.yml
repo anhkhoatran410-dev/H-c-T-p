@@ -1,0 +1,37 @@
+name: Security enterprise hardening
+
+on:
+  pull_request:
+    paths:
+      - 'api/**'
+      - 'scripts/security-enterprise-hardening.mjs'
+      - 'docs/enterprise-security-roadmap.md'
+      - '.github/workflows/security-enterprise-hardening.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'api/**'
+      - 'scripts/security-enterprise-hardening.mjs'
+      - 'docs/enterprise-security-roadmap.md'
+      - '.github/workflows/security-enterprise-hardening.yml'
+  workflow_dispatch:
+
+jobs:
+  hardening:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check enterprise security modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in api/admin-login.js api/_admin-policy.js api/_intrusion-shield.js api/system-control.js api/_secret-provider.js api/_ai-resilience.js scripts/security-enterprise-hardening.mjs; do
+            node --check "$file"
+          done
+      - name: Run enterprise security assertions
+        run: node scripts/security-enterprise-hardening.mjs

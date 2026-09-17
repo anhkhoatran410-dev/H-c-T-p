@@ -1,0 +1,22 @@
+name: Security audit queue sync
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Flush Redis audit queue to Supabase
+        env:
+          AUDIT_WORKER_URL: ${{ secrets.SECURITY_AUDIT_WORKER_URL }}
+          CRON_SECRET: ${{ secrets.SECURITY_AUDIT_CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$AUDIT_WORKER_URL"
+          test -n "$CRON_SECRET"
+          curl --fail-with-body --silent --show-error --max-time 20 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$AUDIT_WORKER_URL?batch=100"

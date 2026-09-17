@@ -59,5 +59,8 @@ jobs:
       - name: Security regression tests
         run: node scripts/security-regression.mjs
 
+      - name: Prompt security regression tests
+        run: node scripts/prompt-security-regression.mjs
+
       - name: Defensive attack simulation
         run: node scripts/security-attack-simulation.mjs

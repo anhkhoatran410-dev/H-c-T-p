@@ -7,6 +7,9 @@ const SERVICE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const CRON_SECRET = String(process.env.CRON_SECRET || '').trim();
 const QUEUE_KEY = 'study-th:audit:queue';
 const DEFAULT_BATCH = 50;
+const MAX_RETRIES = 3;
+const RETRY_BASE_MS = 250;
+const RETRY_MAX_MS = 1_200;
 
 function unauthorized(req) {
   const header = String(req?.headers?.authorization || '').trim();
@@ -55,21 +58,56 @@ async function restore(rows) {
   return (await redis(['RPUSH', QUEUE_KEY, ...rows], 2500)) !== null;
 }
 
-async function insertBatch(rows) {
-  if (!SUPABASE_URL || !SERVICE_KEY || !rows.length) return false;
-  const parsed = rows.map((x) => typeof x === 'string' ? JSON.parse(x) : x);
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/ai_request_audit`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      Prefer: 'return=minimal,resolution=ignore-duplicates',
-    },
-    body: JSON.stringify(parsed),
-    signal: AbortSignal.timeout(5000),
-  });
-  return r.ok;
+function shouldRetry(status) {
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+function retryDelay(attempt, retryAfterMs) {
+  if (Number.isFinite(retryAfterMs) && retryAfterMs >= 0) return Math.min(RETRY_MAX_MS, retryAfterMs);
+  const exponential = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * (2 ** attempt));
+  return Math.floor(Math.random() * (exponential + 1));
+}
+
+async function insertBatchOnce(rows) {
+  if (!SUPABASE_URL || !SERVICE_KEY || !rows.length) return { ok: false, status: 0, retryable: false };
+  let parsed;
+  try {
+    parsed = rows.map((x) => typeof x === 'string' ? JSON.parse(x) : x);
+  } catch {
+    return { ok: false, status: 400, retryable: false };
+  }
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/ai_request_audit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        Prefer: 'return=minimal,resolution=ignore-duplicates',
+      },
+      body: JSON.stringify(parsed),
+      signal: AbortSignal.timeout(2500),
+    });
+    const retryAfterSeconds = Number(r.headers.get('retry-after'));
+    return {
+      ok: r.ok,
+      status: r.status,
+      retryable: shouldRetry(r.status),
+      retryAfterMs: Number.isFinite(retryAfterSeconds) ? Math.max(0, retryAfterSeconds * 1000) : null,
+    };
+  } catch {
+    return { ok: false, status: 0, retryable: true, retryAfterMs: null };
+  }
+}
+
+async function insertBatchWithRetry(rows) {
+  let last = { ok: false, status: 0, retryable: true, retryAfterMs: null };
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    last = await insertBatchOnce(rows);
+    if (last.ok || !last.retryable || attempt === MAX_RETRIES - 1) return last;
+    await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt, last.retryAfterMs)));
+  }
+  return last;
 }
 
 export default async function handler(req, res) {
@@ -85,12 +123,12 @@ export default async function handler(req, res) {
   if (!rows.length) return res.status(200).json({ ok: true, queued: 0, synced: 0 });
 
   try {
-    const ok = await insertBatch(rows);
-    if (!ok) {
-      await restore(rows);
-      return res.status(503).json({ error: 'Supabase audit batch thất bại; queue đã được khôi phục.', queued: rows.length });
+    const result = await insertBatchWithRetry(rows);
+    if (!result.ok) {
+      const restored = await restore(rows);
+      return res.status(503).json({ error: 'Supabase audit batch thất bại; queue đã được khôi phục.', queued: rows.length, restored });
     }
-    return res.status(200).json({ ok: true, queued: rows.length, synced: rows.length });
+    return res.status(200).json({ ok: true, queued: rows.length, synced: rows.length, attempts: MAX_RETRIES });
   } catch {
     await restore(rows);
     return res.status(503).json({ error: 'Audit worker gặp lỗi; queue đã được khôi phục.', queued: rows.length });

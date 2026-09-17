@@ -1,0 +1,36 @@
+name: STUDY TH Security Resilience
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  resilience:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate security JavaScript syntax
+        run: |
+          node --check api/_security.js
+          node --check api/_generation-gateway.js
+          node --check api/_ai-gateway.js
+
+      - name: Run bounded real-world resilience benchmark
+        env:
+          BASE_URL: https://hoc-va-choi.vercel.app
+          RESILIENCE_WORKERS: 8
+        run: python3 benchmarks/resilience_benchmark.py
+
+      - name: Upload resilience report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-resilience-results
+          path: resilience-benchmark-results.json
+          if-no-files-found: ignore

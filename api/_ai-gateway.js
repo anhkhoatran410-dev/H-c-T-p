@@ -5,7 +5,7 @@ import { enforceCostChallenge } from './_adaptive-defense.js';
 import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
 import { aiLockdownStatus } from './_emergency-lock.js';
 import { guardAiResponse } from './_response-guard.js';
-import { inspectAiPrompt } from './_prompt-security.js';
+import { sanitizeAiBody } from './_prompt-security.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -21,27 +21,6 @@ function bodyOf(req){
   if(req?.body && typeof req.body === 'object' && !Array.isArray(req.body)) return req.body;
   if(typeof req?.body === 'string') { try { const v = JSON.parse(req.body); return v && typeof v === 'object' ? v : {}; } catch {} }
   return {};
-}
-function guardPromptBody(body){
-  if(!body || typeof body !== 'object' || Array.isArray(body)) return { ok:false, code:'invalid-ai-body', status:400, body:{} };
-  if(typeof body.message === 'string'){
-    const checked=inspectAiPrompt(body.message);
-    if(!checked.ok) return { ...checked, body:{} };
-    body={...body,message:checked.text};
-  }
-  if(Array.isArray(body.history)){
-    if(body.history.length>80) return {ok:false,code:'history-too-large',status:413,body:{}};
-    const history=[];
-    for(const item of body.history){
-      if(!item || typeof item!=='object'){ history.push(item); continue; }
-      if(typeof item.content!=='string'){ history.push(item); continue; }
-      const checked=inspectAiPrompt(item.content);
-      if(!checked.ok) return {...checked,body:{}};
-      history.push({...item,content:checked.text});
-    }
-    body={...body,history};
-  }
-  return {ok:true,body};
 }
 export default async function handler(req,res){
   applySecurityHeaders(res);
@@ -65,12 +44,21 @@ export default async function handler(req,res){
   const secret = internalSecret();
   const url = baseUrl(req);
   if(!secret || !url) return res.status(503).json({error:'AI gateway chưa được cấu hình đầy đủ.',requestId});
-  let body = bodyOf(req);
-  if(!body.message && !body.imageDataUrl) { await recordShieldViolation(req,'empty-ai-request'); await recordAgentSignal(req,'empty-ai-request'); return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId}); }
-  if(typeof body.message === 'string' && body.message.length > 30_000) { await recordShieldViolation(req,'oversized-message'); await recordAgentSignal(req,'oversized-message'); return res.status(413).json({error:'Đề bài quá dài.',requestId}); }
-  const promptGuard=guardPromptBody(body);
-  if(!promptGuard.ok){ await recordShieldViolation(req,promptGuard.code); await recordAgentSignal(req,promptGuard.code); return res.status(promptGuard.status).json({error:'Yêu cầu AI bị chặn bởi lớp bảo vệ đầu vào.',code:promptGuard.code,requestId}); }
-  body=promptGuard.body;
+
+  const rawBody = bodyOf(req);
+  if(!rawBody.message && !rawBody.imageDataUrl) {
+    await recordShieldViolation(req,'empty-ai-request');
+    await recordAgentSignal(req,'empty-ai-request');
+    return res.status(400).json({error:'Thiếu đề bài hoặc ảnh.',requestId});
+  }
+
+  const guarded = sanitizeAiBody(rawBody);
+  if(!guarded.ok){
+    await recordShieldViolation(req,guarded.code);
+    await recordAgentSignal(req,guarded.code);
+    return res.status(guarded.status).json({error:'Yêu cầu AI bị chặn bởi lớp bảo vệ đầu vào.',code:guarded.code,requestId});
+  }
+
   const timestamp = internalTimestamp();
   const nonce = internalNonce();
   const signature = internalSignature(secret,timestamp,nonce);
@@ -78,13 +66,13 @@ export default async function handler(req,res){
     const upstream = await fetch(`${url}/api/_solve-core`,{
       method:'POST',
       headers:{'Content-Type':'application/json','X-STUDY-TH-INTERNAL':signature,'X-STUDY-TH-TIMESTAMP':String(timestamp),'X-STUDY-TH-NONCE':nonce,'X-Request-ID':requestId},
-      body:JSON.stringify(body),
+      body:JSON.stringify(guarded.body),
       signal:AbortSignal.timeout(60_000)
     });
     const text = await upstream.text();
-    const guarded=guardAiResponse(text, upstream.headers.get('content-type') || 'application/json; charset=utf-8');
-    res.status(guarded.ok ? upstream.status : guarded.status);
-    res.setHeader('Content-Type', guarded.contentType);
-    return res.end(guarded.body);
+    const response=guardAiResponse(text, upstream.headers.get('content-type') || 'application/json; charset=utf-8');
+    res.status(response.ok ? upstream.status : response.status);
+    res.setHeader('Content-Type', response.contentType);
+    return res.end(response.body);
   }catch(e){ return res.status(504).json({error:'AI backend timeout hoặc không truy cập được.',requestId}); }
 }

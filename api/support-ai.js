@@ -31,11 +31,11 @@ export default async function handler(req,res){
   const guardedMessage=ingress.message;
   const guardedHistory=ingress.history;
   const first=await acquireAiKey('GEMINI');
-  if(!first)return res.status(503).json({error:'Không còn Gemini API key khả dụng.',requestId});
+  if(!first)return res.status(503).json({error:'AI hỗ trợ tạm thời không khả dụng.',requestId});
   const noteFailure=async(k,e)=>{if(k)await reportAiFailure('GEMINI',k.id,e);};
   const noteSuccess=async k=>{if(k)await reportAiSuccess('GEMINI',k.id);};
   const badIndex=[...first.key].findIndex(ch=>ch.charCodeAt(0)>127);
-  if(badIndex>=0){await noteFailure(first,{status:401});return res.status(500).json({error:'GEMINI_API_KEY trên Vercel chứa ký tự không hợp lệ.',requestId});}
+  if(badIndex>=0){await noteFailure(first,{status:401});return res.status(500).json({error:'AI hỗ trợ chưa sẵn sàng.',requestId});}
   const subject=String(req.body?.subject||'').trim();
   const system=`Bạn là AI hỗ trợ học tập của STUDY TH. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn nhưng đủ bước. Bạn có thể giải thích kiến thức, hướng dẫn cách làm bài, sửa lỗi tư duy và hướng dẫn sử dụng website. Không bịa dữ liệu của website. Nếu câu hỏi cần dữ liệu nội bộ mà bạn không được cung cấp, nói rõ rằng cần Admin kiểm tra. Không tự nhận là Admin.\n\nQUY TẮC ĐỊNH DẠNG TOÁN BẮT BUỘC:\n- Mọi công thức toán phải dùng LaTeX có delimiter. Công thức inline bắt buộc viết dạng \\( ... \\). Công thức đứng riêng/bảng công thức bắt buộc viết dạng \\[ ... \\].\n- Không được trả về LaTeX trần như \\frac{a}{b}, \\sqrt{x}, x^2 hoặc \\infty bên ngoài delimiter.\n- Có thể dùng Unicode đơn giản như ∞, √, ≤, ≥, × khi không cần công thức LaTeX.\n- Khi có phân số, căn, đạo hàm, tích phân, giới hạn, ma trận hoặc công thức nhiều bước, ưu tiên LaTeX có delimiter để giao diện KaTeX render chính xác.`;
   const transcript=guardedHistory.map(x=>`${x.role||'user'}: ${String(x.message||x.content||'')}`).join('\n');
@@ -59,7 +59,7 @@ export default async function handler(req,res){
         if(r.ok){const answer=data2?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||'';if(answer){await noteSuccess(keyEntry);writeAudit(req,{request_id:requestId,status_code:200,outcome:'response_delivered',model,response_text:answer,response_length:answer.length,latency_ms:Date.now()-started});return res.status(200).json({answer,model,security:{dlpRedactions:ingress.dlp.types.length}});}last=`${model}: AI trả về rỗng.`;await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data2,r.status);await noteFailure(keyEntry,{status:r.status});}
       }catch(e){last=e?.message||`${model}: request failed`;await noteFailure(keyEntry,{status:e?.status||0,code:e?.code});}
     }
-    writeAudit(req,{request_id:requestId,status_code:502,outcome:'provider_error',reason:String(last||'provider-unavailable').slice(0,120),response_length:0,latency_ms:Date.now()-started});
-    return res.status(502).json({error:last||'Gemini không phản hồi.',requestId});
-  }catch(e){writeAudit(req,{request_id:requestId,status_code:500,outcome:'internal_error',reason:'support-ai-internal-error',response_length:0,latency_ms:Date.now()-started});return res.status(500).json({error:e?.message||'Không gọi được AI hỗ trợ.',requestId});}
+    writeAudit(req,{request_id:requestId,status_code:503,outcome:'provider_error',reason:String(last||'provider-unavailable').slice(0,120),response_length:0,latency_ms:Date.now()-started});
+    return res.status(503).json({error:'AI hỗ trợ tạm thời không khả dụng.',requestId});
+  }catch(e){writeAudit(req,{request_id:requestId,status_code:500,outcome:'internal_error',reason:'support-ai-internal-error',response_length:0,latency_ms:Date.now()-started});return res.status(500).json({error:'Không thể xử lý yêu cầu lúc này.',requestId});}
 }

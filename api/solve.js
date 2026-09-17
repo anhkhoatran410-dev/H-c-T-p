@@ -1,5 +1,5 @@
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, rateLimit, safeRequestId } from './_security.js';
-import solveHandler from './solve-legacy.js';
+import solveHandler from '../lib/solve-legacy.js';
 
 export default async function handler(req, res) {
   applySecurityHeaders(res);
@@ -15,8 +15,6 @@ export default async function handler(req, res) {
   try {
     return await solveHandler(req, res);
   } catch (_) {
-    if (!res.headersSent) {
-      return res.status(500).json({ error: 'Solver error.', requestId });
-    }
+    if (!res.headersSent) return res.status(500).json({ error: 'Solver error.', requestId });
   }
 }

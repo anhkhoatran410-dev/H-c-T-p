@@ -2,6 +2,7 @@ import { acquireAiKey, reportAiFailure, reportAiSuccess } from './_ai-resilience
 import { enforceBodySize, sameOrigin, distributedRateLimit, applySecurityHeaders, safeRequestId } from './_security.js';
 import { enforceCostChallenge } from './_adaptive-defense.js';
 import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
+import { sanitizeAiIngress } from './_ai-input-guard.js';
 
 const MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash','gemini-3.5-flash-lite'];
 function cleanKey(value){return String(value||'').replace(/^['"`]+|['"`]+$/g,'').replace(/[\u0000-\u0020\u007f-\u009f]/g,'').trim();}
@@ -19,6 +20,11 @@ export default async function handler(req,res){
 
   const message=String(req.body?.message||'').trim();
   if(!message)return res.status(400).json({error:'Thiếu câu hỏi.'});
+  const history=Array.isArray(req.body?.history)?req.body.history.slice(-8):[];
+  const ingress=sanitizeAiIngress(message,history);
+  if(!ingress.ok){await recordAgentSignal(req,ingress.code);return res.status(ingress.status).json({error:'Yêu cầu AI bị chặn bởi lớp bảo vệ ngữ nghĩa.',code:ingress.code});}
+  const guardedMessage=ingress.message;
+  const guardedHistory=ingress.history;
   const first=await acquireAiKey('GEMINI');
   if(!first)return res.status(503).json({error:'Không còn Gemini API key khả dụng.'});
   const noteFailure=async(k,e)=>{if(k)await reportAiFailure('GEMINI',k.id,e);};
@@ -26,9 +32,9 @@ export default async function handler(req,res){
   const badIndex=[...first.key].findIndex(ch=>ch.charCodeAt(0)>127);
   if(badIndex>=0){await noteFailure(first,{status:401});return res.status(500).json({error:'GEMINI_API_KEY trên Vercel chứa ký tự không hợp lệ.'});}
   const subject=String(req.body?.subject||'').trim();
-  const history=Array.isArray(req.body?.history)?req.body.history.slice(-8):[];
   const system=`Bạn là AI hỗ trợ học tập của STUDY TH. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn nhưng đủ bước. Bạn có thể giải thích kiến thức, hướng dẫn cách làm bài, sửa lỗi tư duy và hướng dẫn sử dụng website. Không bịa dữ liệu của website. Nếu câu hỏi cần dữ liệu nội bộ mà bạn không được cung cấp, nói rõ rằng cần Admin kiểm tra. Không tự nhận là Admin.\n\nQUY TẮC ĐỊNH DẠNG TOÁN BẮT BUỘC:\n- Mọi công thức toán phải dùng LaTeX có delimiter. Công thức inline bắt buộc viết dạng \\( ... \\). Công thức đứng riêng/bảng công thức bắt buộc viết dạng \\[ ... \\].\n- Không được trả về LaTeX trần như \\frac{a}{b}, \\sqrt{x}, x^2 hoặc \\infty bên ngoài delimiter.\n- Có thể dùng Unicode đơn giản như ∞, √, ≤, ≥, × khi không cần công thức LaTeX.\n- Khi có phân số, căn, đạo hàm, tích phân, giới hạn, ma trận hoặc công thức nhiều bước, ưu tiên LaTeX có delimiter để giao diện KaTeX render chính xác.`;
-  const prompt=`${system}\nMôn hiện tại: ${subject||'chưa chọn'}\nLịch sử chat:\n${history.map(x=>`${x.role||'user'}: ${String(x.message||'')}`).join('\n')}\nCâu hỏi mới: ${message}`;
+  const transcript=guardedHistory.map(x=>`${x.role||'user'}: ${String(x.message||x.content||'')}`).join('\n');
+  const prompt=`${system}\nMôn hiện tại: ${subject||'chưa chọn'}\nLịch sử chat:\n${transcript}\nCâu hỏi mới: ${guardedMessage}`;
   let last='';const attempted=new Set();
   try{
     for(let keyAttempt=0;keyAttempt<20;keyAttempt++){
@@ -37,7 +43,7 @@ export default async function handler(req,res){
       try{
         const interaction=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key,'Api-Revision':'2026-05-20'},body:JSON.stringify({model:'gemini-3.8-flash',store:false,input:prompt}),signal:AbortSignal.timeout(30000)});
         const raw=await interaction.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
-        if(interaction.ok){const answer=extractInteractionText(data);if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model:data?.model||'gemini-3.8-flash',api:'interactions'});}last='Interactions API trả về rỗng.';await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data,interaction.status);await noteFailure(keyEntry,{status:interaction.status});}
+        if(interaction.ok){const answer=extractInteractionText(data);if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model:data?.model||'gemini-3.8-flash',api:'interactions',security:{dlpRedactions:ingress.dlp.types.length}});}last='Interactions API trả về rỗng.';await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data,interaction.status);await noteFailure(keyEntry,{status:interaction.status});}
       }catch(e){last=e?.message||'Gemini Interactions API lỗi.';await noteFailure(keyEntry,{status:e?.status||0,code:e?.code});}
     }
     for(const model of MODELS){
@@ -45,7 +51,7 @@ export default async function handler(req,res){
       try{
         const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt}]}],generationConfig:{maxOutputTokens:1200}}),signal:AbortSignal.timeout(30000)});
         const raw2=await r.text();let data2={};try{data2=raw2?JSON.parse(raw2):{}}catch{}
-        if(r.ok){const answer=data2?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||'';if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model});}last=`${model}: AI trả về rỗng.`;await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data2,r.status);await noteFailure(keyEntry,{status:r.status});}
+        if(r.ok){const answer=data2?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||'';if(answer){await noteSuccess(keyEntry);return res.status(200).json({answer,model,security:{dlpRedactions:ingress.dlp.types.length}});}last=`${model}: AI trả về rỗng.`;await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data2,r.status);await noteFailure(keyEntry,{status:r.status});}
       }catch(e){last=e?.message||`${model}: request failed`;await noteFailure(keyEntry,{status:e?.status||0,code:e?.code});}
     }
     return res.status(502).json({error:last||'Gemini không phản hồi.'});

@@ -4,6 +4,7 @@ const REDIS_TIMEOUT = 1200;
 const SCORE_TTL = 10 * 60;
 const BLOCK_TTL = 15 * 60;
 const SCORE_THRESHOLD = 5;
+const SUBJECT_BLOCK_TTL = 24 * 60 * 60;
 
 function redisConfig(){
   const url=String(process.env.UPSTASH_REDIS_REST_URL||'').trim().replace(/\/$/,'');
@@ -21,7 +22,7 @@ async function redis(command, endpoint=''){
       method:'POST',
       headers:{Authorization:`Bearer ${cfg.token}`,'Content-Type':'application/json'},
       body:JSON.stringify(command),
-      signal:controller.signal
+      signal:controller.signal,
     });
     if(!r.ok)return null;
     const d=await r.json().catch(()=>null);
@@ -39,8 +40,24 @@ function idHash(req){
   return crypto.createHash('sha256').update(clientIdentity(req)).digest('hex').slice(0,32);
 }
 
+function subjectHash(value){
+  const raw=String(value||'').trim();
+  return raw?crypto.createHash('sha256').update(raw).digest('hex').slice(0,32):'';
+}
+
+function requestSubject(req){
+  const body=req?.body;
+  if(body && typeof body==='object' && !Array.isArray(body)){
+    const value=String(body.device_id||body.deviceId||'').trim();
+    if(value && value.length<=180)return value;
+  }
+  const header=String(req?.headers?.['x-study-th-device']||'').trim();
+  return header && header.length<=180 ? header : '';
+}
+
 function scoreKey(id){return `study-th:shield:score:${id}`;}
 function blockKey(id){return `study-th:shield:block:${id}`;}
+function subjectBlockKey(value){return `study-th:shield:subject:block:${subjectHash(value)}`;}
 
 const local=new Map();
 function localState(id){
@@ -54,11 +71,20 @@ async function blockedRemote(id){
   return Number(value||0)>Date.now();
 }
 
+async function subjectBlockedRemote(value){
+  const hash=subjectHash(value);
+  if(!hash)return false;
+  const valueRemote=await redis(['GET',subjectBlockKey(value)]);
+  return Number(valueRemote||0)>Date.now();
+}
+
 export async function shieldStatus(req){
   const id=idHash(req);
   const localBlock=localState(id).blockedUntil;
   const remoteBlock=await blockedRemote(id);
-  return {id,blocked:remoteBlock||localBlock>Date.now()};
+  const subject=requestSubject(req);
+  const subjectBlock=await subjectBlockedRemote(subject);
+  return {id,subjectHash:subject?subjectHash(subject):null,blocked:remoteBlock||localBlock>Date.now()||subjectBlock};
 }
 
 export async function shieldGate(req,res){
@@ -89,4 +115,28 @@ export async function recordShieldViolation(req, reason='policy'){
   return {reason,score:s.score,quarantined:s.score>=SCORE_THRESHOLD};
 }
 
+export async function setShieldSubjectBlock(subject, seconds=SUBJECT_BLOCK_TTL){
+  const raw=String(subject||'').trim();
+  if(!raw || raw.length>180) throw new Error('Invalid subject.');
+  const ttl=Math.max(60,Math.min(SUBJECT_BLOCK_TTL,Number(seconds)||SUBJECT_BLOCK_TTL));
+  const until=Date.now()+ttl*1000;
+  if(redisConfig()) await redis(['SET',subjectBlockKey(raw),String(until),'EX',ttl]);
+  return {subjectHash:subjectHash(raw),until,ttlSeconds:ttl,stored:Boolean(redisConfig())};
+}
+
+export async function clearShieldSubjectBlock(subject){
+  const raw=String(subject||'').trim();
+  if(!raw || raw.length>180) throw new Error('Invalid subject.');
+  if(redisConfig()) await redis(['DEL',subjectBlockKey(raw)]);
+  return {subjectHash:subjectHash(raw),stored:Boolean(redisConfig())};
+}
+
+export async function shieldSubjectStatus(subject){
+  const raw=String(subject||'').trim();
+  if(!raw)return {blocked:false,subjectHash:null};
+  const until=Number(await redis(['GET',subjectBlockKey(raw)])||0);
+  return {blocked:until>Date.now(),until:until||0,subjectHash:subjectHash(raw)};
+}
+
 export function shieldFingerprint(req){return idHash(req);}
+export function shieldSubjectFingerprint(value){return subjectHash(value);}

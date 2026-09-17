@@ -17,6 +17,13 @@ const checks = [
   ['AI gateway JSON boundary', read('api/_ai-gateway.js'), ['enforceJsonContentType(req,res)']],
   ['AI core JSON boundary', read('api/_solve-core.js'), ['enforceJsonContentType(req,res)']],
   ['support AI JSON boundary', read('api/support-ai.js'), ['enforceJsonContentType(req,res)']],
+  ['AI response audit sink', read('api/_audit-log.js'), ['ai_request_audit', 'persistAudit', 'Promise.allSettled']],
+  ['AI gateway non-blocking audit', read('api/_ai-gateway.js'), ['auditRecord', 'persistAudit', "outcome:delivered?'response_delivered':'response_guard_blocked'"]],
+  ['support AI audit', read('api/support-ai.js'), ['auditRecord', 'persistAudit', 'response_delivered']],
+  ['Redis subject quarantine', read('api/_intrusion-shield.js'), ['setShieldSubjectBlock', 'clearShieldSubjectBlock', 'study-th:shield:subject:block']],
+  ['Admin Redis block control', read('api/system-control.js'), ['subject-block', 'setShieldSubjectBlock', 'clearShieldSubjectBlock', 'redis-subject-block']],
+  ['architecture monitoring state bus', read('docs/SECURITY_ARCHITECTURE.md'), ['MONITORING / SIEM + AUTO-RESPONSE', 'REDIS / STATE BUS', 'Response Guard', 'AUDIT DATA', 'Admin actions']],
+  ['AI audit migration', read('supabase/migrations/20260917_ai_request_audit.sql'), ['create table if not exists public.ai_request_audit', 'alter table public.ai_request_audit enable row level security']],
 ];
 for (const [name, text, needles] of checks) {
   for (const needle of needles) {

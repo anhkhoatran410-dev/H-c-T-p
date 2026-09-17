@@ -75,7 +75,7 @@ assert.equal(adminAssistant.includes('rateLimit'), true);
 assert.equal(adminAssistant.includes('_gemini-network-guard.js'), true);
 assert.equal(adminAssistant.includes('safeClientError'), true);
 assert.equal(adminCommand.includes('enforceBodySize'), true);
-assert.equal(adminCommand.includes('safeClientError'), false);
+assert.equal(adminCommand.includes('safeClientError'), true);
 
 // Renderer safety: user/AI text is HTML-escaped, and KaTeX is explicitly untrusted.
 assert.equal(aiRenderer.includes("function esc(v)"), true);

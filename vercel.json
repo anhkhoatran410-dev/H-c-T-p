@@ -7,7 +7,7 @@
     "api/support-ai.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/admin-command.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/system-control.js": { "maxDuration": 30, "supportsCancellation": true },
-    "api/_generation-gateway.js": { "maxDuration": 60, "supportsCancellation": true }
+    "api/generation-gateway.js": { "maxDuration": 60, "supportsCancellation": true }
   },
   "headers": [
     {
@@ -35,12 +35,12 @@
   "rewrites": [
     { "source": "/api/solve", "destination": "/api/_ai-gateway?target=solve" },
     { "source": "/api/solve.js", "destination": "/api/_ai-gateway?target=solve" },
-    { "source": "/api/generate-exam", "destination": "/api/_generation-gateway?target=exam" },
-    { "source": "/api/generate-exam.js", "destination": "/api/_generation-gateway?target=exam" },
-    { "source": "/api/generate-flashcards", "destination": "/api/_generation-gateway?target=flashcards" },
-    { "source": "/api/generate-flashcards.js", "destination": "/api/_generation-gateway?target=flashcards" },
-    { "source": "/api/generate-flashcards-v3", "destination": "/api/_generation-gateway?target=flashcards" },
-    { "source": "/api/generate-flashcards-v3.js", "destination": "/api/_generation-gateway?target=flashcards" },
+    { "source": "/api/generate-exam", "destination": "/api/generation-gateway?target=exam" },
+    { "source": "/api/generate-exam.js", "destination": "/api/generation-gateway?target=exam" },
+    { "source": "/api/generate-flashcards", "destination": "/api/generation-gateway?target=flashcards" },
+    { "source": "/api/generate-flashcards.js", "destination": "/api/generation-gateway?target=flashcards" },
+    { "source": "/api/generate-flashcards-v3", "destination": "/api/generation-gateway?target=flashcards" },
+    { "source": "/api/generate-flashcards-v3.js", "destination": "/api/generation-gateway?target=flashcards" },
     { "source": "/api/admin-assistant", "destination": "/api/admin-tools?route=admin-assistant" },
     { "source": "/api/admin-command", "destination": "/api/admin-tools?route=admin-command" },
     { "source": "/api/admin-health", "destination": "/api/admin-tools?route=admin-health" },

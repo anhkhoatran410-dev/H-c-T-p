@@ -5,8 +5,8 @@
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1100;
   const MAX_IMAGE_DATA_CHARS=900000;
-  const FAST_SOLVER_TIMEOUT_MS=20000;
-  const DEEP_SOLVER_TIMEOUT_MS=58000;
+  const FAST_SOLVER_TIMEOUT_MS=55000;
+  const DEEP_SOLVER_TIMEOUT_MS=59000;
   const CAMERA_RESTORE_KEY='study_ai_restore_after_camera';
 
   function openImageViewer(src,alt='Ảnh đề bài'){

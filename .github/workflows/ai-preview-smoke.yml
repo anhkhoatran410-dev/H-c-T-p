@@ -4,6 +4,11 @@ on:
   push:
     paths:
       - '.github/workflows/ai-preview-smoke.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/ai-preview-smoke.yml'
+      - 'lib/solve-legacy.js'
+      - 'api/solve.js'
 
 permissions:
   contents: read

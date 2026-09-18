@@ -39,14 +39,14 @@ if(!globalThis.__STUDY_TH_GEMINI_GUARD__){
     // Availability guard: if the distributed pool is temporarily unavailable,
     // fall back to the primary configured key instead of turning a healthy API
     // request into an immediate 503.
-    const primary=getAiKeyPool('GEMINI')[0];
-    if(primary?.key){
-      const fallbackHeaders=headersWithoutKey(init);fallbackHeaders.set('x-goog-api-key',primary.key);
+    const primary=String(process.env.GEMINI_API_KEY||'').trim().replace(/^['"`]+|['"`]+$/g,'');
+    if(primary){
+      const fallbackHeaders=headersWithoutKey(init);fallbackHeaders.set('x-goog-api-key',primary);
       try{
         const response=await nativeFetch(input,{...init,headers:fallbackHeaders});
-        if(response.ok){await reportAiSuccess('GEMINI',primary.id);return response;}
+        if(response.ok)return response;
         const status=Number(response.status||0);
-        if(status===401||status===403||status===404||status===429||status>=500)await reportAiFailure('GEMINI',primary.id,{status});
+        lastError={status};
         return response;
       }catch(error){lastError=error;}
     }

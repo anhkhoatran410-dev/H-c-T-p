@@ -66,7 +66,8 @@
     }
     if(!form.dataset.studyBound){
       form.dataset.studyBound='1';
-      form.onsubmit=async function(e){
+      const submitQuestion=async function(e){
+        if(e){e.preventDefault?.();e.stopImmediatePropagation?.();}
         e.preventDefault();e.stopImmediatePropagation();if(form.dataset.studyBusy==='1')return;
         const text=ta.value.trim(),img=form.__studyImageData||'';if(!text&&!img)return;
         const box=modal.querySelector('#studyAiMessages');if(!box)return;
@@ -86,7 +87,7 @@
           box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;
         }
         const thinking=document.createElement('div');thinking.className='study-ai-msg bot study-ai-thinking';thinking.dataset.studyThinking='1';thinking.setAttribute('aria-label','Đang xử lý');thinking.innerHTML='<span></span><span></span><span></span>';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
-        const submit=form.querySelector('[type="submit"]');if(submit){submit.disabled=true;submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}
+        const submit=form.querySelector('[data-study-send]');if(submit){submit.disabled=true;submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}
         try{
           const subject=(window.state&&window.state.subject)||'',message=userText+(deep?'\nHãy tự kiểm tra kỹ các bước và kết quả, tìm cách giải từ bản chất, và trình bày đầy đủ đến kết luận; không bỏ qua phần chứng minh quan trọng.':'\nHãy giải nhanh nhưng đủ bước cần thiết, tập trung vào dữ kiện, cách làm và kết quả; tránh lan man.');
           const payload=JSON.stringify({message,subject,history,imageDataUrl:img,deep});
@@ -111,6 +112,20 @@
         }catch(err){thinking.textContent='Lỗi: '+String(err.message||err);thinking.classList.remove('study-ai-thinking')}
         finally{form.dataset.studyBusy='0';if(submit){submit.disabled=false;submit.removeAttribute('aria-busy');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}}
       };
+      form.__studySubmit=submitQuestion;
+      const sendButton=form.querySelector('[data-study-send]');
+      if(sendButton&&!sendButton.dataset.studyBound){
+        sendButton.dataset.studyBound='1';
+        sendButton.addEventListener('click',function(e){submitQuestion(e)});
+      }
+      if(!ta.dataset.studyEnterBound){
+        ta.dataset.studyEnterBound='1';
+        ta.addEventListener('keydown',function(e){
+          if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+            e.preventDefault();e.stopImmediatePropagation();submitQuestion(e);
+          }
+        },true);
+      }
     }
   }
 

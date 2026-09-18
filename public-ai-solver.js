@@ -36,6 +36,21 @@
     thumb.addEventListener('click',()=>openImageViewer(img,thumb.alt));wrap.appendChild(thumb);wrap.appendChild(hint);messageBubble.appendChild(wrap);
   }
 
+  function localGraphReply(text){
+    var s=String(text||'').toLowerCase();
+    if(!/(đồ thị|hình dung|vẽ|biểu diễn|graph|plot)/i.test(s))return null;
+    var kind=null;
+    if(/\bsin\s*\(?\s*x\s*\)?/.test(s))kind='sin';
+    else if(/\bcos\s*\(?\s*x\s*\)?/.test(s))kind='cos';
+    else if(/\btan\s*\(?\s*x\s*\)?/.test(s))kind='tan';
+    if(!kind)return null;
+    var fn='y = '+kind+'(x)';
+    var spec;
+    if(kind==='sin')spec={type:'function',title:'Đồ thị y = sin(x)',caption:'Rê chuột lên đường cong hoặc điểm đánh dấu để xem tọa độ.',xMin:-2*Math.PI,xMax:2*Math.PI,yMin:-1.5,yMax:1.5,xLabel:'x',yLabel:'y',functions:[{equation:fn,label:fn}],points:[{x:0,y:0,label:'O'},{x:Math.PI/2,y:1,label:'A'},{x:Math.PI,y:0,label:'B'},{x:3*Math.PI/2,y:-1,label:'C'}],annotations:[{x:Math.PI/2,y:1,text:'Cực đại',dx:28,dy:-34},{x:3*Math.PI/2,y:-1,text:'Cực tiểu',dx:28,dy:34}]};
+    else if(kind==='cos')spec={type:'function',title:'Đồ thị y = cos(x)',caption:'Rê chuột để xem tọa độ.',xMin:-2*Math.PI,xMax:2*Math.PI,yMin:-1.5,yMax:1.5,xLabel:'x',yLabel:'y',functions:[{equation:fn,label:fn}],points:[{x:0,y:1,label:'A'},{x:Math.PI,y:-1,label:'B'}],annotations:[{x:0,y:1,text:'Cực đại',dx:28,dy:-34},{x:Math.PI,y:-1,text:'Cực tiểu',dx:28,dy:34}]};
+    else spec={type:'function',title:'Đồ thị y = tan(x)',caption:'Rê chuột lên nhánh đồ thị để xem tọa độ.',xMin:-Math.PI,xMax:Math.PI,yMin:-5,yMax:5,xLabel:'x',yLabel:'y',functions:[{equation:fn,label:fn}],points:[{x:0,y:0,label:'O'}],annotations:[{x:0,y:0,text:'Giao trục',dx:28,dy:-34}]};
+    return 'Mình dựng ngay đồ thị '+fn+'.\n\n```study-graph\n'+JSON.stringify(spec,null,2)+'\n```';
+  }
   function addComposerTools(){
     const modal=document.getElementById('study-ai-support');if(!modal)return;
     const form=modal.querySelector('#studyAiForm');if(!form)return;
@@ -61,6 +76,12 @@
         const userMsg=document.createElement('div');userMsg.className='study-ai-msg user';userMsg.textContent=userText+(img?' · ảnh':'');if(img)addSentImage(userMsg,img);box.appendChild(userMsg);
         if(localFastReply&&!img){
           const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent=localFastReply;msg.dataset.studyQuery=userText;box.appendChild(msg);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;
+        }
+        const localGraph=localGraphReply(userText);
+        if(localGraph&&!img){
+          const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.dataset.studyQuery=userText;msg.textContent=localGraph;box.appendChild(msg);
+          if(window.renderStudyAiMessage){try{window.renderStudyAiMessage(msg,localGraph)}catch(_e){}}
+          box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;
         }
         const thinking=document.createElement('div');thinking.className='study-ai-msg bot study-ai-thinking';thinking.dataset.studyThinking='1';thinking.setAttribute('aria-label','Đang xử lý');thinking.innerHTML='<span></span><span></span><span></span>';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
         const submit=form.querySelector('[type="submit"]');if(submit){submit.disabled=true;submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}

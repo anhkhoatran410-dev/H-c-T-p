@@ -119,6 +119,7 @@
     if(!spec||typeof spec!=='object')return null;
     var type=String(spec.type||'function').toLowerCase();
     if(type==='geometry')return buildGeometry(spec);
+    if(type==='diagram')return buildDiagram(spec);
     if(type!=='function'&&type!=='cartesian'&&type!=='chart')return null;
     var W=760,H=440,L=64,R=22,T=52,B=54;
     var fs=Array.isArray(spec.functions)?spec.functions:[];if(!fs.length&&spec.equation)fs=[{equation:spec.equation,label:spec.equation}];
@@ -163,6 +164,30 @@
     return '<div class="study-visual-card"><div class="study-visual-title">'+esc(title)+'</div><svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'">'+g.join('')+axes.join('')+paths.join('')+pointSvg+annotationSvg+'</svg>'+(legend?'<div class="study-visual-legend">'+legend+'</div>':'')+'</div>';
   }
 
+  function buildDiagram(spec){
+    var W=760,H=420,L=40,R=40,T=60,B=40;
+    var nodes=Array.isArray(spec.nodes)?spec.nodes.slice(0,30):[], by={};
+    nodes.forEach(function(n){if(n&&n.id)by[String(n.id)]=n});
+    function X(v){return L+Math.max(0,Math.min(1,Number(v)))*(W-L-R)}
+    function Y(v){return T+Math.max(0,Math.min(1,Number(v)))*(H-T-B)}
+    var parts=['<defs><marker id="studyArrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="currentColor"/></marker></defs>'];
+    (Array.isArray(spec.arrows)?spec.arrows:[]).slice(0,50).forEach(function(a){
+      var n1=by[String(a&&a[0])],n2=by[String(a&&a[1])];if(!n1||!n2)return;
+      parts.push('<line x1="'+X(n1.x).toFixed(2)+'" y1="'+Y(n1.y).toFixed(2)+'" x2="'+X(n2.x).toFixed(2)+'" y2="'+Y(n2.y).toFixed(2)+'" class="diagramArrow" marker-end="url(#studyArrow)"/>');
+    });
+    nodes.forEach(function(n){
+      if(!n||!n.id)return;
+      var x=X(n.x),y=Y(n.y),label=String(n.label||n.id),w=Math.max(92,Math.min(220,label.length*7+28));
+      parts.push('<rect x="'+(x-w/2).toFixed(2)+'" y="'+(y-22).toFixed(2)+'" width="'+w.toFixed(2)+'" height="44" rx="12" class="diagramNode"/><text x="'+x.toFixed(2)+'" y="'+(y+4).toFixed(2)+'" text-anchor="middle" class="diagramText">'+esc(label)+'</text>');
+    });
+    (Array.isArray(spec.annotations)?spec.annotations:[]).slice(0,20).forEach(function(a){
+      var n=a&&a.node?by[String(a.node)]:null;if(!n||!a.text)return;
+      var x=X(n.x),y=Y(n.y),tx=x+number(a.dx,0)+28,ty=y+number(a.dy,-36);
+      parts.push('<text x="'+tx.toFixed(2)+'" y="'+ty.toFixed(2)+'" class="annotationText">'+esc(a.text)+'</text>');
+    });
+    return '<div class="study-visual-card"><div class="study-visual-title">'+esc(spec.title||'Sơ đồ minh họa')+'</div>'+(spec.caption?'<div class="study-visual-caption">'+esc(spec.caption)+'</div>':'')+'<svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(spec.title||'Sơ đồ minh họa')+'">'+parts.join('')+'</svg></div>';
+  }
+
   function buildGeometry(spec){
     var W=760,H=440,L=64,R=22,T=52,B=54,pts=Array.isArray(spec.points)?spec.points.slice(0,60):[],by={};
     pts.forEach(function(p){if(p&&p.name)by[String(p.name)]=p});
@@ -172,9 +197,15 @@
     var dx=Math.max(1,(xmax-xmin)*.18),dy=Math.max(1,(ymax-ymin)*.18);xmin-=dx;xmax+=dx;ymin-=dy;ymax+=dy;
     function X(x){return L+(x-xmin)/(xmax-xmin)*(W-L-R)} function Y(y){return T+(ymax-y)/(ymax-ymin)*(H-T-B)}
     var parts=[];
-    (Array.isArray(spec.segments)?spec.segments:[]).slice(0,80).forEach(function(s){var a=by[String(s&&s[0])],b=by[String(s&&s[1])];if(!a||!b)return;parts.push('<line x1="'+X(Number(a.x)).toFixed(2)+'" y1="'+Y(Number(a.y)).toFixed(2)+'" x2="'+X(Number(b.x)).toFixed(2)+'" y2="'+Y(Number(b.y)).toFixed(2)+'" class="geoLine"/>')});
+    var circles=Array.isArray(spec.circles)?spec.circles.slice(0,30):[];
+    var polygons=Array.isArray(spec.polygons)?spec.polygons.slice(0,30):[];
+    var annotations=Array.isArray(spec.annotations)?spec.annotations.slice(0,20).filter(function(a){return a&&a.text}):[];
+    polygons.forEach(function(poly){var ids=Array.isArray(poly)?poly.map(String):[],coords=ids.map(function(id){return by[id]}).filter(Boolean);if(coords.length<3)return;var d=coords.map(function(p,i){return (i?'L':'M')+X(Number(p.x)).toFixed(2)+' '+Y(Number(p.y)).toFixed(2)}).join(' ')+' Z';parts.push('<path d="'+d+'" class="geoPoly"/>')});
+        (Array.isArray(spec.segments)?spec.segments:[]).slice(0,80).forEach(function(s){var a=by[String(s&&s[0])],b=by[String(s&&s[1])];if(!a||!b)return;parts.push('<line x1="'+X(Number(a.x)).toFixed(2)+'" y1="'+Y(Number(a.y)).toFixed(2)+'" x2="'+X(Number(b.x)).toFixed(2)+'" y2="'+Y(Number(b.y)).toFixed(2)+'" class="geoLine"/>')}); 
+    circles.forEach(function(c){if(!Number.isFinite(Number(c.cx))||!Number.isFinite(Number(c.cy))||!Number.isFinite(Number(c.r)))return;var rx=Math.abs(Number(c.r)),cx=X(Number(c.cx)),cy=Y(Number(c.cy)),sx=Math.abs(X(Number(c.cx+rx))-X(Number(c.cx)));parts.push('<circle cx="'+cx.toFixed(2)+'" cy="'+cy.toFixed(2)+'" r="'+Math.max(3,sx).toFixed(2)+'" class="geoCircle"/>')});
     pts.forEach(function(p){if(!p||!Number.isFinite(Number(p.x))||!Number.isFinite(Number(p.y)))return;var px=X(Number(p.x)),py=Y(Number(p.y));parts.push('<circle cx="'+px.toFixed(2)+'" cy="'+py.toFixed(2)+'" r="4.5" class="point"/><text x="'+(px+8).toFixed(2)+'" y="'+(py-8).toFixed(2)+'" class="pointLabel">'+esc(p.name||'')+'</text>')});
-    return '<div class="study-visual-card"><div class="study-visual-title">'+esc(spec.title||'Hình minh họa')+'</div><svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(spec.title||'Hình minh họa')+'">'+parts.join('')+'</svg></div>';
+    annotations.forEach(function(a){var target=a.point&&by[String(a.point)]?by[String(a.point)]:null;if(!target&&Number.isFinite(Number(a.x))&&Number.isFinite(Number(a.y)))target={x:Number(a.x),y:Number(a.y)};if(!target)return;var px=X(Number(target.x)),py=Y(Number(target.y)),dx=number(a.dx,28),dy=number(a.dy,-34),tx=px+dx,ty=py+dy;parts.push('<line x1="'+px.toFixed(2)+'" y1="'+py.toFixed(2)+'" x2="'+tx.toFixed(2)+'" y2="'+ty.toFixed(2)+'" class="annotationLine"/><rect x="'+(tx-5).toFixed(2)+'" y="'+(ty-16).toFixed(2)+'" width="'+Math.max(70,String(a.text).length*7+14)+'" height="24" rx="7" class="annotationBox"/><text x="'+(tx+2).toFixed(2)+'" y="'+ty.toFixed(2)+'" class="annotationText">'+esc(a.text)+'</text>')});
+    return '<div class="study-visual-card"><div class="study-visual-title">'+esc(spec.title||'Hình minh họa')+'</div>'+(spec.caption?'<div class="study-visual-caption">'+esc(spec.caption)+'</div>':'')+'<svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(spec.title||'Hình minh họa')+'">'+parts.join('')+'</svg></div>';
   }
 
   function isSep(x){return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(x)}
@@ -213,7 +244,7 @@
   function style(){
     if(document.getElementById('study-ai-renderer-v3-style'))return;
     var s=document.createElement('style');s.id='study-ai-renderer-v3-style';
-    s.textContent='.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
+    s.textContent='.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
     document.head.appendChild(s);
   }
 

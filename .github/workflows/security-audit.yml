@@ -62,5 +62,39 @@ jobs:
       - name: Security regression tests
         run: node scripts/security-regression.mjs
 
+      - name: Live AI preview smoke test
+        if: \${{ github.event_name == 'pull_request' }}
+        env:
+          ENDPOINT: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app/api/solve
+          ORIGIN: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=== FAST path ==="
+          curl -fsS --max-time 90 -X POST "$ENDPOINT" \
+            -H 'Content-Type: application/json' \
+            -H "Origin: $ORIGIN" \
+            --data '{"message":"Tính 2+3*4. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 14","subject":"Toán","history":[],"imageDataUrl":"","deep":false}' \
+            -o /tmp/fast.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/fast.json','utf8'));
+          if(!d.answer || d.deepMode!==false || d.olympiadMode!==false) throw new Error('FAST path failed');
+          console.log(JSON.stringify({model:d.model,deepMode:d.deepMode,totalLatencyMs:d.totalLatencyMs,tool:d.tool}));
+          NODE
+
+          echo "=== VMO deep path ==="
+          curl -fsS --max-time 150 -X POST "$ENDPOINT" \
+            -H 'Content-Type: application/json' \
+            -H "Origin: $ORIGIN" \
+            --data '{"message":"VMO: Chứng minh rằng với mọi số thực x,y,z thỏa x+y+z=0 thì x^3+y^3+z^3=3xyz. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 0","subject":"Toán Olympic","history":[],"imageDataUrl":"","deep":true}' \
+            -o /tmp/deep.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/deep.json','utf8'));
+          if(!d.answer || d.deepMode!==true || d.olympiadMode!==true || d.router?.used!==true) throw new Error('VMO deep path failed');
+          console.log(JSON.stringify({model:d.model,deepMode:d.deepMode,olympiadMode:d.olympiadMode,router:d.router,auditVerdict:d.auditVerdict,totalLatencyMs:d.totalLatencyMs,tool:d.tool}));
+          NODE
       - name: Security static hardening checks
         run: node scripts/security-static-hardening.mjs

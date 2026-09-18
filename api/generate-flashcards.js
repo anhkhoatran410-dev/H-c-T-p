@@ -33,7 +33,7 @@ export default async function handler(req,res){
       try{
         const rr=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:12000}})});
         const raw=await rr.text();let d={};try{d=raw?JSON.parse(raw):{}}catch{}
-        if(!rr.ok){last=`${model}: HTTP ${rr.status}${d?.error?.message?` — ${d.error.message}`:''}`;continue}
+        if(!rr.ok){last=`${model}: HTTP ${rr.status}`;continue}
         const out=d?.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim()||'';
         const a=out.indexOf('{'),z=out.lastIndexOf('}');if(a<0||z<=a){last=`${model}: JSON không hợp lệ`;continue}
         const obj=JSON.parse(out.slice(a,z+1));

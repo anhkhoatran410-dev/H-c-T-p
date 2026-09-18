@@ -4,7 +4,7 @@
   "framework": null,
   "outputDirectory": ".",
   "functions": {
-    "api/solve.js": { "maxDuration": 300, "supportsCancellation": true },
+    "api/solve.js": { "maxDuration": 60, "supportsCancellation": true },
     "api/generate-exam.js": { "maxDuration": 300, "supportsCancellation": true },
     "api/generate-flashcards.js": { "maxDuration": 300, "supportsCancellation": true },
     "api/support-ai.js": { "maxDuration": 60, "supportsCancellation": true },

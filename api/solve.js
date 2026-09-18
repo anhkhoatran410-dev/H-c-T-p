@@ -1,3 +1,4 @@
+import './_gemini-network-guard.js';
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, distributedRateLimit, safeRequestId } from './_security.js';
 import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
 import { enforceCostChallenge } from './_adaptive-defense.js';

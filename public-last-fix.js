@@ -47,8 +47,8 @@
 
     var oldRender=window.render;if(typeof oldRender==='function'&&!oldRender.__stateSafeFinalFix){var render=async function(){var r=oldRender.apply(this,arguments);if(r&&typeof r.then==='function')await r;afterRender();return r};render.__stateSafeFinalFix=true;window.render=render}
 
-    window.studyOpenExamFromUrl=function(){try{var s=getState(),list=window.exams||[],id=new URLSearchParams(location.search).get('exam');if(!s||!id||!Array.isArray(list))return;var e=list.find(function(x){return String(x.id)===String(id)});if(!e)return;s.subject=e.subject||'';s.page='subject';if(typeof window.render==='function')window.render()}catch(_){ }};
-    afterRender();setTimeout(window.studyOpenExamFromUrl,250);
+    // Exam navigation is owned by app.js; no delayed URL-to-state rewrite.
+
 
     /* Final chat reliability: optimistic render plus realtime/poll fallback. */
     var chatTimer=null,chatChannel=null,chatBusy=false;

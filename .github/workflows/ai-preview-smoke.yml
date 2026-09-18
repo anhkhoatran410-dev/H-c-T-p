@@ -1,0 +1,57 @@
+name: AI Preview Smoke Test
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ai-preview-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Test preview solver
+        env:
+          ENDPOINT: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app/api/solve
+          ORIGIN: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app
+        run: |
+          set -euo pipefail
+
+          echo "=== GET guard ==="
+          status=$(curl -sS -o /tmp/get.json -w '%{http_code}' --max-time 30 "$ENDPOINT")
+          echo "HTTP $status"
+          test "$status" = "405"
+
+          echo "=== FAST math ==="
+          fast=$(curl -sS --max-time 90 -X POST "$ENDPOINT" \
+            -H 'Content-Type: application/json' \
+            -H "Origin: $ORIGIN" \
+            --data '{"message":"Tính 2+3*4. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 14","subject":"Toán","history":[],"imageDataUrl":"","deep":false}')
+          echo "$fast" > /tmp/fast.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/fast.json','utf8'));
+          if(!d.answer) throw new Error('FAST: thiếu answer');
+          if(d.deepMode!==false) throw new Error('FAST: deepMode không phải false');
+          if(d.olympiadMode!==false) throw new Error('FAST: olympiadMode không phải false');
+          console.log(JSON.stringify({model:d.model,deepMode:d.deepMode,olympiadMode:d.olympiadMode,totalLatencyMs:d.totalLatencyMs,tool:d.tool}).slice(0,1200));
+          NODE
+
+          echo "=== VMO / OLYMPIAD deep ==="
+          deep=$(curl -sS --max-time 150 -X POST "$ENDPOINT" \
+            -H 'Content-Type: application/json' \
+            -H "Origin: $ORIGIN" \
+            --data '{"message":"VMO: Chứng minh rằng với mọi số thực x,y,z thỏa x+y+z=0 thì x^3+y^3+z^3=3xyz. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 0","subject":"Toán Olympic","history":[],"imageDataUrl":"","deep":true}')
+          echo "$deep" > /tmp/deep.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/deep.json','utf8'));
+          if(!d.answer) throw new Error('DEEP: thiếu answer');
+          if(d.deepMode!==true) throw new Error('DEEP: deepMode không phải true');
+          if(d.olympiadMode!==true) throw new Error('DEEP: olympiadMode không phải true');
+          if(!d.router || d.router.used!==true) throw new Error('DEEP: router chưa chạy');
+          console.log(JSON.stringify({model:d.model,deepMode:d.deepMode,olympiadMode:d.olympiadMode,router:d.router,auditVerdict:d.auditVerdict,totalLatencyMs:d.totalLatencyMs,tool:d.tool}).slice(0,2400));
+          NODE

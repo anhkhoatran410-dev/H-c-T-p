@@ -42,6 +42,6 @@ export default async function handler(req,res){
         return res.status(200).json({flashcards:cards,questions:cards,provider:'gemini',model,vision:urls.length>0,sourceCount:urls.length,validated:true});
       }catch(e){last=`${model}: ${e?.message||String(e)}`}
     }
-    return res.status(502).json({error:`Gemini không tạo được Flashcard. ${last}`});
+    return res.status(502).json({error:'AI generation tạm thời không khả dụng.'});
   }catch(e){console.error('generate-flashcards',e);return res.status(500).json({error:e?.message||'Lỗi máy chủ khi tạo flashcard.'})}
 }

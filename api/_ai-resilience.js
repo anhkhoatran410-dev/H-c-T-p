@@ -39,7 +39,12 @@ export async function warmAiKeyPool(prefix='GEMINI'){
 }
 export async function acquireAiKey(prefix='GEMINI',excludedIds=[]){
   const warmed=await warmAiKeyPool(prefix);
-  if(!warmed)return null;
+  // AI availability must not disappear solely because the optional distributed
+  // circuit-breaker store is unavailable. Fall back to the local key pool.
+  if(!warmed){
+    const localPool=getAiKeyPool(prefix).filter(k=>!(Array.isArray(excludedIds)?excludedIds:[]).map(String).includes(String(k.id)));
+    return localPool[0]||null;
+  }
   const ex=new Set((Array.isArray(excludedIds)?excludedIds:[]).map(String));const pool=getAiKeyPool(prefix).filter(k=>!ex.has(k.id));if(!pool.length)return null;const now=Date.now(),remote=await load(prefix,pool);pool.forEach((k,i)=>{const r=remote?.[i];if(!r)return;const s=st(k.id);for(const f of ['failures','successes','uses','openedUntil','probeUntil','lastFailure','lastUsed'])if(r[f]!==undefined)s[f]=Number(r[f])||0;});let candidates=pool.filter(k=>{const s=st(k.id);return s.openedUntil<=now&&s.probeUntil<=now;});if(!candidates.length)return null;candidates.sort((a,b)=>{const x=st(a.id),y=st(b.id);return(x.failures-y.failures)||(x.lastUsed-y.lastUsed)||(x.uses-y.uses);});for(const selected of candidates){const s=st(selected.id);if(s.openedUntil>0&&s.openedUntil<=now&&cfg()){const ok=await redis(['SET',probeKey(prefix,selected.id),String(now),'NX','PX',PROBE_MS]);if(ok!=='OK')continue;s.probeUntil=now+PROBE_MS;}s.lastUsed=now;s.uses+=1;if(!cfg())return selected;await redis(['HINCRBY',key(prefix,selected.id),'uses',1]);await redis(['HSET',key(prefix,selected.id),'lastUsed',now,'probeUntil',s.probeUntil]);return selected;}return null;}
 const SUCCESS_LUA="local k=KEYS[1] redis.call('HSET',k,'failures',0,'openedUntil',0,'probeUntil',0,'lastFailure',0,'lastUsed',ARGV[1]) redis.call('HINCRBY',k,'successes',1) return 1";
 const FAILURE_LUA="local k=KEYS[1] local status=tonumber(ARGV[1]) local now=tonumber(ARGV[2]) local threshold=tonumber(ARGV[3]) local cooldown=tonumber(ARGV[4]) local f=tonumber(redis.call('HGET',k,'failures') or '0') local opened=0 if status==401 or status==403 then f=threshold opened=now+cooldown elseif status==429 or status>=500 or ARGV[5]=='ETIMEDOUT' or ARGV[5]=='ECONNRESET' or ARGV[5]=='EAI_AGAIN' then f=f+1 if f>=threshold then opened=now+cooldown end end redis.call('HSET',k,'failures',f,'openedUntil',opened,'probeUntil',0,'lastFailure',now) return {f,opened}";

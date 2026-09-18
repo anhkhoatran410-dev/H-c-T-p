@@ -137,9 +137,10 @@
       if(!text||form.dataset.busy==='1')return;
       form.dataset.busy='1';ta.value='';ta.disabled=true;if(submit)submit.disabled=true;
       var box=el.querySelector('#studyAiMessages');
+      var history=[...box.querySelectorAll('.study-ai-msg:not([data-thinking])')].slice(-8).map(function(x){return {role:x.classList.contains('user')?'user':'assistant',message:x.textContent}});
       box.insertAdjacentHTML('beforeend',`<div class="study-ai-msg user">${esc(text)}</div><div class="study-ai-msg bot" data-thinking>Đang suy nghĩ…</div>`);box.scrollTop=box.scrollHeight;
       try{
-        var d=await callSupportAI({message:text,subject:state.subject||'',history:[...box.querySelectorAll('.study-ai-msg')].slice(-8).map(function(x){return {role:x.classList.contains('user')?'user':'assistant',message:x.textContent}})});
+        var d=await callSupportAI({message:text,subject:state.subject||'',history:history});
         box.querySelector('[data-thinking]')?.remove();
         box.insertAdjacentHTML('beforeend',`<div class="study-ai-msg bot">${esc(d.answer||'Mình chưa có câu trả lời.')}</div>`);
       }catch(err){

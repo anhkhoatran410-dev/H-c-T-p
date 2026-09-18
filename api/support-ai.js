@@ -5,7 +5,10 @@ import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-de
 import { sanitizeAiIngress } from './_ai-input-guard.js';
 import { auditRecord, persistAudit } from './_audit-log.js';
 
-const MODELS=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash','gemini-3.5-flash-lite'];
+const MODELS=['gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash-lite'];
+const SUPPORT_MODEL='gemini-3.8-flash';
+const SUPPORT_TIMEOUT_MS=18000;
+const MAX_KEY_ATTEMPTS=3;
 function cleanKey(value){return String(value||'').replace(/^['"`]+|['"`]+$/g,'').replace(/[\u0000-\u0020\u007f-\u009f]/g,'').trim();}
 function providerMessage(data,status){return data?.error?.message||data?.message||`Gemini HTTP ${status}`;}
 function extractInteractionText(data){const direct=String(data?.output_text||'').trim();if(direct)return direct;const outputs=Array.isArray(data?.outputs)?data.outputs:[];for(const item of outputs){const text=Array.isArray(item?.content)?item.content.filter(x=>x?.type==='text').map(x=>String(x.text||'')).join(' ').trim():'';if(text)return text;}const steps=Array.isArray(data?.steps)?data.steps:[];for(let i=steps.length-1;i>=0;i--){const content=steps[i]?.content;const text=Array.isArray(content)?content.filter(x=>x?.type==='text').map(x=>String(x.text||'')).join(' ').trim():'';if(text)return text;}return '';}
@@ -42,13 +45,13 @@ export default async function handler(req,res){
   const prompt=`${system}\nMôn hiện tại: ${subject||'chưa chọn'}\nLịch sử chat:\n${transcript}\nCâu hỏi mới: ${guardedMessage}`;
   let last='';const attempted=new Set();
   try{
-    for(let keyAttempt=0;keyAttempt<20;keyAttempt++){
+    for(let keyAttempt=0;keyAttempt<MAX_KEY_ATTEMPTS;keyAttempt++){
       const keyEntry=keyAttempt===0?first:await acquireAiKey('GEMINI',Array.from(attempted));
       if(!keyEntry)break;attempted.add(keyEntry.id);const key=cleanKey(keyEntry.key);
       try{
-        const interaction=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key,'Api-Revision':'2026-05-20'},body:JSON.stringify({model:'gemini-3.8-flash',store:false,input:prompt}),signal:AbortSignal.timeout(30000)});
+        const interaction=await fetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({model:SUPPORT_MODEL,store:false,input:prompt,generation_config:{thinking_level:'low'}}),signal:AbortSignal.timeout(SUPPORT_TIMEOUT_MS)});
         const raw=await interaction.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
-        if(interaction.ok){const answer=extractInteractionText(data);if(answer){await noteSuccess(keyEntry);writeAudit(req,{request_id:requestId,status_code:200,outcome:'response_delivered',model:data?.model||'gemini-3.8-flash',response_text:answer,response_length:answer.length,latency_ms:Date.now()-started});return res.status(200).json({answer,model:data?.model||'gemini-3.8-flash',api:'interactions',security:{dlpRedactions:ingress.dlp.types.length}});}last='Interactions API trả về rỗng.';await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data,interaction.status);await noteFailure(keyEntry,{status:interaction.status});}
+        if(interaction.ok){const answer=extractInteractionText(data);if(answer){await noteSuccess(keyEntry);writeAudit(req,{request_id:requestId,status_code:200,outcome:'response_delivered',model:data?.model||SUPPORT_MODEL,response_text:answer,response_length:answer.length,latency_ms:Date.now()-started});return res.status(200).json({answer,model:data?.model||SUPPORT_MODEL,api:'interactions',security:{dlpRedactions:ingress.dlp.types.length}});}last='Interactions API trả về rỗng.';await noteFailure(keyEntry,{status:502});}else{last=providerMessage(data,interaction.status);await noteFailure(keyEntry,{status:interaction.status});}
       }catch(e){last=e?.message||'Gemini Interactions API lỗi.';await noteFailure(keyEntry,{status:e?.status||0,code:e?.code});}
     }
     for(const model of MODELS){

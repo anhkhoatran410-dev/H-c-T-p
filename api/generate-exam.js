@@ -1,4 +1,9 @@
+import { protectGeneration } from '../lib/generation-guard.js';
+export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };
 export default async function handler(req,res){
+  const cleanup=await protectGeneration(req,res,'exam');
+  if(!cleanup)return;
+  try{
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   try{
@@ -69,5 +74,5 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
     const bad=[];normalized.forEach((q,i)=>{if(!selectedTypes.includes(q.type))bad.push(`Câu ${i+1}: loại không được chọn`);if(q.type!=='flashcard'&&!q.q)bad.push(`Câu ${i+1}: thiếu nội dung`);if(q.type==='mcq'&&(q.opts.length!==4||![0,1,2,3].includes(q.a)))bad.push(`Câu ${i+1}: MCQ không hợp lệ`);if(q.type==='true_false'&&(q.statements.length!==4||q.answers.length!==4))bad.push(`Câu ${i+1}: Đúng/Sai không hợp lệ`);if(q.type==='short'&&(!q.answer||Array.from(q.answer).length>4))bad.push(`Câu ${i+1}: trả lời ngắn không hợp lệ`);if(q.type==='flashcard'&&(!q.front||!q.back))bad.push(`Thẻ ${i+1}: thiếu front/back`);if(q.type!=='flashcard'&&!q.explanation)bad.push(`Câu ${i+1}: thiếu giải thích`)});
     if(bad.length)return res.status(422).json({error:'AI tạo nội dung nhưng chưa đạt kiểm tra cấu trúc.',problems:bad,questions:normalized});
     return res.status(200).json({questions:normalized,provider:'gemini',model,validated:true,sourceVision:sources.length>0,sourceCount:Math.max(1,sources.length)});
-  }catch(e){console.error('generate-exam:',e);const status=Number(e?.status)||500;return res.status(status).json({error:status===429||status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo nội dung lúc này.'})}
+  }catch(e){console.error('generate-exam:',e);const status=Number(e?.status)||500;return res.status(status).json({error:status===429||status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo nội dung lúc này.'})}finally{cleanup()}
 }

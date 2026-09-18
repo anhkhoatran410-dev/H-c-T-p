@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-import concurrent.futures, json, random, re, time, urllib.request
+import concurrent.futures, json, os, random, re, time, urllib.request
 
-ENDPOINT = 'https://hoc-va-choi.vercel.app/api/solve'
+ENDPOINT = os.getenv('SMOKE_ENDPOINT') or 'https://hoc-va-choi.vercel.app/api/solve'
+SMOKE_ONLY = os.getenv('SMOKE_ONLY') == '1'
 DATA_URL = 'https://raw.githubusercontent.com/openai/grade-school-math/master/grade_school_math/data/test.jsonl'
 N_HARD = 25
 N_CHALLENGE = 15
@@ -52,12 +53,13 @@ def select(rows):
 
 def call(item):
     prompt = item['question'] + "\n\nGiải cẩn thận từ dữ kiện đến kết luận. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: <số>"
-    payload = json.dumps({'message':prompt,'subject':'Toán','history':[],'imageDataUrl':'','deep':False}).encode()
+    payload = json.dumps({'message':prompt,'subject':item.get('subject','Toán'),'history':[],'imageDataUrl':'','deep':item.get('group') in ('VMO','OLYMPIAD')}).encode()
     last = None
     started = time.time()
     for attempt in range(RETRIES + 1):
         req_start = time.time()
-        req=urllib.request.Request(ENDPOINT,data=payload,headers={'Content-Type':'application/json'})
+        origin = ENDPOINT.split('/api/solve',1)[0]
+        req=urllib.request.Request(ENDPOINT,data=payload,headers={'Content-Type':'application/json','Origin':origin})
         try:
             with urllib.request.urlopen(req,timeout=TIMEOUT) as r:
                 d=json.loads(r.read().decode()); text=str(d.get('answer',''))
@@ -75,6 +77,33 @@ def stat(rows):
     return {'total':len(rows),'graded':len(graded),'passed':passed,'accuracy_percent':round(100*passed/len(graded),2) if graded else 0,'http_ok':http,'http_ok_percent':round(100*http/len(rows),2) if rows else 0}
 
 def main():
+    if SMOKE_ONLY:
+        items = [
+            {
+                'group': 'FAST',
+                'question': 'Tính 2+3*4. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 14',
+                'answer': '#### 14'
+            },
+            {
+                'group': 'VMO',
+                'question': 'VMO: Chứng minh rằng với mọi số thực x,y,z thỏa x+y+z=0 thì x^3+y^3+z^3=3xyz. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 0',
+                'answer': '#### 0'
+            }
+        ]
+        for item in items:
+            item['subject'] = 'Toán Olympic' if item['group'] == 'VMO' else 'Toán'
+        results=[]
+        for i,item in enumerate(items,1):
+            r=call(item); r['i']=i; results.append(r)
+            status='PASS' if r.get('pred')==r.get('gold') else ('NO_ANSWER' if not r.get('pred') else 'FAIL')
+            print(f"[SMOKE {i}/{len(items)}] {status} {r.get('group')} {r.get('latency',0):.1f}s attempts={r.get('attempts')} model={r.get('model')}")
+        summary={'endpoint':ENDPOINT,'benchmark':'STUDY TH AI preview smoke','selection':{'fast':1,'vmo':1},
+                 'overall':stat(results),'avg_latency_sec':round(sum(r.get('total_latency',r.get('latency',0)) for r in results)/len(results),2)}
+        print(json.dumps(summary,ensure_ascii=False,indent=2))
+        with open('benchmark-hard-results.json','w',encoding='utf-8') as f: json.dump(summary,f,ensure_ascii=False,indent=2)
+        if summary['overall']['http_ok_percent'] < 100:
+            raise SystemExit(1)
+        return
     items=select(load_rows()); results=[]
     with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS) as ex:
         futures=[ex.submit(call,x) for x in items]

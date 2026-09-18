@@ -18,7 +18,6 @@ jobs:
       - name: Validate security JavaScript syntax
         run: |
           node --check api/_security.js
-          node --check api/_generation-gateway.js
           node --check api/_ai-gateway.js
 
       - name: Run bounded real-world resilience benchmark

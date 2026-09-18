@@ -1,9 +1,12 @@
 name: STUDY TH Hard Math Benchmark
 
 on:
+  pull_request:
+    branches: [main]
   push:
     paths:
       - 'benchmarks/study_th_hard_benchmark.py'
+      - 'lib/solve-legacy.js'
       - '.github/workflows/study-th-hard-benchmark.yml'
   workflow_dispatch:
 
@@ -18,6 +21,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Run hard benchmark
+        env:
+          SMOKE_ONLY: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+          SMOKE_ENDPOINT: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app/api/solve
         run: python3 benchmarks/study_th_hard_benchmark.py
       - name: Publish result
         uses: actions/upload-artifact@v4

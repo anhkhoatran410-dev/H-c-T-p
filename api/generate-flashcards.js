@@ -1,9 +1,9 @@
+import { protectGeneration } from '../lib/generation-guard.js';
 /* STUDY TH — Flashcard AI: one simple, reliable multimodal path. */
 export const maxDuration=300;
 export default async function handler(req,res){
-  res.setHeader('Cache-Control','no-store');
-  res.setHeader('X-Content-Type-Options','nosniff');
-  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  const cleanup=await protectGeneration(req,res,'flashcards');
+  if(!cleanup)return;
   try{
     const b=req.body||{};
     const key=String(process.env.GEMINI_API_KEY||'').trim();
@@ -33,7 +33,7 @@ export default async function handler(req,res){
       try{
         const rr=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:12000}})});
         const raw=await rr.text();let d={};try{d=raw?JSON.parse(raw):{}}catch{}
-        if(!rr.ok){last=`${model}: HTTP ${rr.status}${d?.error?.message?` — ${d.error.message}`:''}`;continue}
+        if(!rr.ok){last=`${model}: HTTP ${rr.status}`;continue}
         const out=d?.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim()||'';
         const a=out.indexOf('{'),z=out.lastIndexOf('}');if(a<0||z<=a){last=`${model}: JSON không hợp lệ`;continue}
         const obj=JSON.parse(out.slice(a,z+1));
@@ -42,6 +42,6 @@ export default async function handler(req,res){
         return res.status(200).json({flashcards:cards,questions:cards,provider:'gemini',model,vision:urls.length>0,sourceCount:urls.length,validated:true});
       }catch(e){last=`${model}: ${e?.message||String(e)}`}
     }
-    return res.status(502).json({error:`Gemini không tạo được Flashcard. ${last}`});
-  }catch(e){console.error('generate-flashcards',e);return res.status(500).json({error:e?.message||'Lỗi máy chủ khi tạo flashcard.'})}
+    return res.status(502).json({error:'AI generation tạm thời không khả dụng.'});
+  }catch(e){console.error('generate-flashcards',e);const status=Number(e?.status)||500;return res.status(status).json({error:status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo flashcard lúc này.'})}finally{cleanup()}
 }

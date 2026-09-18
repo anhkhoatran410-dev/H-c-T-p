@@ -114,7 +114,7 @@
 
   async function callSupportAI(payload){
     var controller=new AbortController();
-    var timer=setTimeout(function(){controller.abort()},45000);
+    var timer=setTimeout(function(){controller.abort()},20000);
     try{
       var r=await fetch('/api/support-ai',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload),credentials:'same-origin',cache:'no-store',signal:controller.signal});
       var text=await r.text();var d={};try{d=JSON.parse(text||'{}')}catch{}

@@ -62,5 +62,65 @@ jobs:
       - name: Security regression tests
         run: node scripts/security-regression.mjs
 
+      - name: Live AI preview smoke test
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          ENDPOINT: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app/api/solve
+          ORIGIN: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          smoke_request() {
+            local body="$1"
+            local out="$2"
+            local status
+            status=$(curl -sS --max-time 90 -o "$out" -w '%{http_code}' -X POST "$ENDPOINT" \
+              -H 'Content-Type: application/json' \
+              -H "Origin: $ORIGIN" \
+              --data "$body" || true)
+            echo "$status" > "$out.status"
+          }
+
+          smoke_request '{"message":"Tính 2+3*4. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 14","subject":"Toán","history":[],"imageDataUrl":"","deep":false}' /tmp/fast.json
+          FAST_STATUS=$(cat /tmp/fast.json.status)
+
+          if [ "$FAST_STATUS" != "200" ]; then
+            echo "Preview returned HTTP $FAST_STATUS; checking whether the deployment is unavailable."
+            if [ "$FAST_STATUS" = "502" ] || [ "$FAST_STATUS" = "503" ]; then
+              echo "SKIP: Vercel preview is temporarily unavailable/platform-limited."
+              exit 0
+            fi
+            echo "FAST smoke test failed with unexpected HTTP $FAST_STATUS"
+            cat /tmp/fast.json || true
+            exit 1
+          fi
+
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/fast.json','utf8'));
+          if(!d.answer || d.deepMode!==false || d.olympiadMode!==false) throw new Error('FAST path failed');
+          console.log(JSON.stringify({model:d.model,deepMode:d.deepMode,totalLatencyMs:d.totalLatencyMs,tool:d.tool}));
+          NODE
+
+          smoke_request '{"message":"VMO: Chứng minh rằng với mọi số thực x,y,z thỏa x+y+z=0 thì x^3+y^3+z^3=3xyz. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 0","subject":"Toán Olympic","history":[],"imageDataUrl":"","deep":true}' /tmp/deep.json
+          DEEP_STATUS=$(cat /tmp/deep.json.status)
+
+          if [ "$DEEP_STATUS" != "200" ]; then
+            echo "VMO preview returned HTTP $DEEP_STATUS."
+            if [ "$DEEP_STATUS" = "502" ] || [ "$DEEP_STATUS" = "503" ]; then
+              echo "SKIP: Vercel preview became temporarily unavailable after FAST test."
+              exit 0
+            fi
+            cat /tmp/deep.json || true
+            exit 1
+          fi
+
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/deep.json','utf8'));
+          if(!d.answer || d.deepMode!==true || d.olympiadMode!==true || d.router?.used!==true) throw new Error('VMO deep path failed');
+          console.log(JSON.stringify({model:d.model,deepMode:d.deepMode,olympiadMode:d.olympiadMode,router:d.router,auditVerdict:d.auditVerdict,totalLatencyMs:d.totalLatencyMs,tool:d.tool}));
+          NODE
       - name: Security static hardening checks
         run: node scripts/security-static-hardening.mjs

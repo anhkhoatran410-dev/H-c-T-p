@@ -1,4 +1,9 @@
+import { protectGeneration } from '../lib/generation-guard.js';
+export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };
 export default async function handler(req,res){
+  const cleanup=await protectGeneration(req,res,'exam');
+  if(!cleanup)return;
+  try{
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
   try{
@@ -59,7 +64,7 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
     const key=String(process.env.GEMINI_API_KEY||'').replace(/^[\'"`]+|[\'"`]+$/g,'').replace(/[\u0000-\u0020\u007f-\u009f]/g,'').trim();
     if(!key)return res.status(500).json({error:'GEMINI_API_KEY chưa được cấu hình trên Vercel.'});
     const model=String(process.env.GEMINI_MODEL||'gemini-3.6-flash').trim();
-    async function callAI(p){const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts:p}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:20000}})});const txt=await r.text();let d={};try{d=txt?JSON.parse(txt):{}}catch{throw Object.assign(new Error(`Gemini trả về dữ liệu không hợp lệ (HTTP ${r.status}).`),{status:r.status})}if(!r.ok)throw Object.assign(new Error(d?.error?.message||`Gemini lỗi HTTP ${r.status}`),{status:r.status});const out=d?.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim()||'';const clean=out.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'').trim();const a=clean.indexOf('{'),z=clean.lastIndexOf('}');if(a<0||z<=a)throw new Error('Gemini không trả về JSON hợp lệ.');return JSON.parse(clean.slice(a,z+1));}
+    async function callAI(p){const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts:p}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:20000}})});const txt=await r.text();let d={};try{d=txt?JSON.parse(txt):{}}catch{throw Object.assign(new Error(`Gemini trả về dữ liệu không hợp lệ (HTTP ${r.status}).`),{status:r.status})}if(!r.ok)throw Object.assign(new Error('Gemini generation failed.'),{status:r.status,providerMessage:d?.error?.message||''});const out=d?.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim()||'';const clean=out.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'').trim();const a=clean.indexOf('{'),z=clean.lastIndexOf('}');if(a<0||z<=a)throw new Error('Gemini không trả về JSON hợp lệ.');return JSON.parse(clean.slice(a,z+1));}
 
     let data;try{data=await callAI(parts)}catch(first){const repair=[{text:`Tạo lại từ đầu. Trả đúng ${count} câu JSON, sửa mọi lỗi cấu trúc.\nLỗi lần trước: ${first.message}\n\n${prompt}`}];if(documentText)repair.push({text:`\nTEXT:\n${documentText}`});for(const s of sources){if(s?.data)repair.push({text:`\nNGUỒN: ${s.fileName}`},{inlineData:{mimeType:s.mimeType,data:s.data}})}data=await callAI(repair)}
 
@@ -69,5 +74,5 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
     const bad=[];normalized.forEach((q,i)=>{if(!selectedTypes.includes(q.type))bad.push(`Câu ${i+1}: loại không được chọn`);if(q.type!=='flashcard'&&!q.q)bad.push(`Câu ${i+1}: thiếu nội dung`);if(q.type==='mcq'&&(q.opts.length!==4||![0,1,2,3].includes(q.a)))bad.push(`Câu ${i+1}: MCQ không hợp lệ`);if(q.type==='true_false'&&(q.statements.length!==4||q.answers.length!==4))bad.push(`Câu ${i+1}: Đúng/Sai không hợp lệ`);if(q.type==='short'&&(!q.answer||Array.from(q.answer).length>4))bad.push(`Câu ${i+1}: trả lời ngắn không hợp lệ`);if(q.type==='flashcard'&&(!q.front||!q.back))bad.push(`Thẻ ${i+1}: thiếu front/back`);if(q.type!=='flashcard'&&!q.explanation)bad.push(`Câu ${i+1}: thiếu giải thích`)});
     if(bad.length)return res.status(422).json({error:'AI tạo nội dung nhưng chưa đạt kiểm tra cấu trúc.',problems:bad,questions:normalized});
     return res.status(200).json({questions:normalized,provider:'gemini',model,validated:true,sourceVision:sources.length>0,sourceCount:Math.max(1,sources.length)});
-  }catch(e){console.error('generate-exam:',e);return res.status(Number(e?.status)||500).json({error:e?.message||'Lỗi máy chủ khi tạo bài kiểm tra.'})}
+  }catch(e){console.error('generate-exam:',e);const status=Number(e?.status)||500;return res.status(status).json({error:status===429||status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo nội dung lúc này.'})}finally{cleanup()}
 }

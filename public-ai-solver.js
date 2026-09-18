@@ -5,7 +5,8 @@
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1100;
   const MAX_IMAGE_DATA_CHARS=900000;
-  const SOLVER_TIMEOUT_MS=25000;
+  const FAST_SOLVER_TIMEOUT_MS=20000;
+  const DEEP_SOLVER_TIMEOUT_MS=58000;
   const CAMERA_RESTORE_KEY='study_ai_restore_after_camera';
 
   function openImageViewer(src,alt='Ảnh đề bài'){
@@ -35,6 +36,21 @@
     thumb.addEventListener('click',()=>openImageViewer(img,thumb.alt));wrap.appendChild(thumb);wrap.appendChild(hint);messageBubble.appendChild(wrap);
   }
 
+  function localGraphReply(text){
+    var s=String(text||'').toLowerCase();
+    if(!/(đồ thị|hình dung|vẽ|biểu diễn|graph|plot)/i.test(s))return null;
+    var kind=null;
+    if(/\bsin\s*\(?\s*x\s*\)?/.test(s))kind='sin';
+    else if(/\bcos\s*\(?\s*x\s*\)?/.test(s))kind='cos';
+    else if(/\btan\s*\(?\s*x\s*\)?/.test(s))kind='tan';
+    if(!kind)return null;
+    var fn='y = '+kind+'(x)';
+    var spec;
+    if(kind==='sin')spec={type:'function',title:'Đồ thị y = sin(x)',caption:'Rê chuột lên đường cong hoặc điểm đánh dấu để xem tọa độ.',xMin:-2*Math.PI,xMax:2*Math.PI,yMin:-1.5,yMax:1.5,xLabel:'x',yLabel:'y',functions:[{equation:fn,label:fn}],points:[{x:0,y:0,label:'O'},{x:Math.PI/2,y:1,label:'A'},{x:Math.PI,y:0,label:'B'},{x:3*Math.PI/2,y:-1,label:'C'}],annotations:[{x:Math.PI/2,y:1,text:'Cực đại',dx:28,dy:-34},{x:3*Math.PI/2,y:-1,text:'Cực tiểu',dx:28,dy:34}]};
+    else if(kind==='cos')spec={type:'function',title:'Đồ thị y = cos(x)',caption:'Rê chuột để xem tọa độ.',xMin:-2*Math.PI,xMax:2*Math.PI,yMin:-1.5,yMax:1.5,xLabel:'x',yLabel:'y',functions:[{equation:fn,label:fn}],points:[{x:0,y:1,label:'A'},{x:Math.PI,y:-1,label:'B'}],annotations:[{x:0,y:1,text:'Cực đại',dx:28,dy:-34},{x:Math.PI,y:-1,text:'Cực tiểu',dx:28,dy:34}]};
+    else spec={type:'function',title:'Đồ thị y = tan(x)',caption:'Rê chuột lên nhánh đồ thị để xem tọa độ.',xMin:-Math.PI,xMax:Math.PI,yMin:-5,yMax:5,xLabel:'x',yLabel:'y',functions:[{equation:fn,label:fn}],points:[{x:0,y:0,label:'O'}],annotations:[{x:0,y:0,text:'Giao trục',dx:28,dy:-34}]};
+    return 'Mình dựng ngay đồ thị '+fn+'.\n\n```study-graph\n'+JSON.stringify(spec,null,2)+'\n```';
+  }
   function addComposerTools(){
     const modal=document.getElementById('study-ai-support');if(!modal)return;
     const form=modal.querySelector('#studyAiForm');if(!form)return;
@@ -55,33 +71,36 @@
         const text=ta.value.trim(),img=form.__studyImageData||'';if(!text&&!img)return;
         const box=modal.querySelector('#studyAiMessages');if(!box)return;
         const userText=text||'Giải bài trong ảnh này.',deep=!!form.querySelector('[data-study-deep]')?.checked;
-        const history=[...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')].map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim()})).filter(x=>x.message).slice(-8);
+        const localFastReply=(()=>{const s=userText.trim().toLowerCase().replace(/[!?.,]+$/g,'');if(/^(hi|hello|hey|chào|chao|xin chào|xin chao|alo|hí|helo)$/.test(s))return 'Chào bạn 👋 Mình đang sẵn sàng hỗ trợ học tập. Bạn gửi bài hoặc câu hỏi mình sẽ xử lý ngay.';if(/^(cảm ơn|cam on|thanks|thank you)$/.test(s))return 'Không có gì 👌 Gửi bài tiếp theo khi cần nhé.';return null})();
+        const history=[...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')].map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim().slice(0,3500)})).filter(x=>x.message).slice(-6);
         const userMsg=document.createElement('div');userMsg.className='study-ai-msg user';userMsg.textContent=userText+(img?' · ảnh':'');if(img)addSentImage(userMsg,img);box.appendChild(userMsg);
+        if(localFastReply&&!img){
+          const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent=localFastReply;msg.dataset.studyQuery=userText;box.appendChild(msg);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;
+        }
+        const localGraph=localGraphReply(userText);
+        if(localGraph&&!img){
+          const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.dataset.studyQuery=userText;msg.textContent=localGraph;box.appendChild(msg);
+          if(window.renderStudyAiMessage){try{window.renderStudyAiMessage(msg,localGraph)}catch(_e){}}
+          box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;
+        }
         const thinking=document.createElement('div');thinking.className='study-ai-msg bot study-ai-thinking';thinking.dataset.studyThinking='1';thinking.setAttribute('aria-label','Đang xử lý');thinking.innerHTML='<span></span><span></span><span></span>';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
         const submit=form.querySelector('[type="submit"]');if(submit){submit.disabled=true;submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}
         try{
           const subject=(window.state&&window.state.subject)||'',message=userText+(deep?'\nHãy tự kiểm tra kỹ các bước và kết quả, tìm cách giải từ bản chất, và trình bày đầy đủ đến kết luận; không bỏ qua phần chứng minh quan trọng.':'\nHãy giải nhanh nhưng đủ bước cần thiết, tập trung vào dữ kiện, cách làm và kết quả; tránh lan man.');
           const payload=JSON.stringify({message,subject,history,imageDataUrl:img,deep});
-          let r=null,d={},lastError='';
-          for(let attempt=0;attempt<2;attempt++){
-            const controller=new AbortController();
-            const timer=setTimeout(()=>controller.abort(),SOLVER_TIMEOUT_MS);
-            try{
-              r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
-              d=await r.json().catch(()=>({}));
-              if(r.ok)break;
-              lastError=String(d.error||('Solver HTTP '+r.status));
-              if(![408,425,429,502,503,504].includes(r.status)||attempt===1)throw new Error(lastError);
-              const retryAfter=Math.min(4000,Math.max(1000,Number(r.headers.get('Retry-After')||0)*1000||1200*(attempt+1)));
-              await new Promise(resolve=>setTimeout(resolve,retryAfter));
-            }catch(err){
-              lastError=String(err.message||err);
-              if(err?.name==='AbortError')lastError='AI phản hồi quá lâu.';
-              if(attempt===1)throw new Error(lastError);
-            }finally{clearTimeout(timer)}
-          }
-          if(!r?.ok)throw new Error(lastError||'AI chưa phản hồi.');
-          thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.textContent=answer;box.appendChild(msg);
+          const controller=new AbortController();
+          const timeoutMs=deep?DEEP_SOLVER_TIMEOUT_MS:FAST_SOLVER_TIMEOUT_MS;
+          const timer=setTimeout(()=>controller.abort(),timeoutMs);
+          let r=null,d={};
+          try{
+            r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
+            d=await r.json().catch(()=>({}));
+            if(!r.ok)throw new Error(String(d.error||('Solver HTTP '+r.status)));
+          }catch(err){
+            if(err?.name==='AbortError')throw new Error(deep?'AI kiểm tra sâu phản hồi quá lâu.':'AI phản hồi quá lâu.');
+            throw err;
+          }finally{clearTimeout(timer)}
+          thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.dataset.studyQuery=userText;msg.textContent=answer;box.appendChild(msg);
           if(d.tool){const tag=document.createElement('div');tag.className='study-ai-tool-tag';tag.textContent='Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
           if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}
           box.scrollTop=box.scrollHeight;form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();

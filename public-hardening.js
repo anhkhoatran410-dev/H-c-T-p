@@ -58,24 +58,7 @@
       };
     }
 
-    window.studyOpenExamFromUrl=function(){
-      try{
-        var id=new URLSearchParams(location.search).get('exam');
-        if(!id || !Array.isArray(exams) || !exams.length)return;
-        var e=exams.find(function(x){return String(x.id)===String(id)});
-        if(!e)return;
-        state.subject=e.subject||''; state.page='subject'; render();
-        setTimeout(function(){var card=document.querySelector('.exam');if(card)card.scrollIntoView({behavior:'smooth',block:'center'});},50);
-      }catch(_){ }
-    };
-
-    var oldStart=window.startExam;
-    if(typeof oldStart==='function'){
-      window.startExam=function(id){
-        try{var u=new URL(location.href);u.searchParams.set('exam',id);history.replaceState(null,'',u.pathname+'?'+u.searchParams.toString())}catch(_){ }
-        return oldStart(id);
-      };
-    }
+    // Exam navigation is owned by app.js. Do not rewrite startExam or mutate page from URL after launch.
 
     var oldRender=window.render;
     window.render=async function(){

@@ -58,7 +58,8 @@ def call(item):
     started = time.time()
     for attempt in range(RETRIES + 1):
         req_start = time.time()
-        req=urllib.request.Request(ENDPOINT,data=payload,headers={'Content-Type':'application/json'})
+        origin = ENDPOINT.split('/api/solve',1)[0]
+        req=urllib.request.Request(ENDPOINT,data=payload,headers={'Content-Type':'application/json','Origin':origin})
         try:
             with urllib.request.urlopen(req,timeout=TIMEOUT) as r:
                 d=json.loads(r.read().decode()); text=str(d.get('answer',''))

@@ -161,7 +161,7 @@
     var annotationSvg=annotations.map(function(a){var px=X(Number(a.x)),py=Y(Number(a.y)),dx=number(a.dx,28),dy=number(a.dy,-34),tx=px+dx,ty=py+dy;return '<line x1="'+px.toFixed(2)+'" y1="'+py.toFixed(2)+'" x2="'+tx.toFixed(2)+'" y2="'+ty.toFixed(2)+'" class="annotationLine"/><rect x="'+(tx-5).toFixed(2)+'" y="'+(ty-16).toFixed(2)+'" width="'+Math.max(70,String(a.text).length*7+14)+'" height="24" rx="7" class="annotationBox"/><text x="'+(tx+2).toFixed(2)+'" y="'+(ty).toFixed(2)+'" class="annotationText">'+esc(a.text)+'</text>'}).join('');
     var legend=parsed.map(function(f,fi){return '<span class="legendItem"><i class="legendDot f'+fi+'"></i>'+esc(f.label||f.equation)+'</span>'}).join('');
     var title=String(spec.title||'Đồ thị');
-    return '<div class="study-visual-card"><div class="study-visual-title">'+esc(title)+'</div><svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'">'+g.join('')+axes.join('')+paths.join('')+pointSvg+annotationSvg+'</svg>'+(legend?'<div class="study-visual-legend">'+legend+'</div>':'')+'</div>';
+    return '<div class="study-visual-card"><div class="study-visual-title">'+esc(title)+'</div>'+(spec.caption?'<div class="study-visual-caption">'+esc(spec.caption)+'</div>':'')+'<svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'">'+g.join('')+axes.join('')+paths.join('')+pointSvg+annotationSvg+'</svg>'+(legend?'<div class="study-visual-legend">'+legend+'</div>':'')+'</div>';
   }
 
   function buildDiagram(spec){
@@ -220,7 +220,7 @@
   function md(text,node){
     var visual=graphSpecFromRaw(text,node),stripped=String(text==null?'':text),visualHtml='';
     if(visual){if(visual.explicit&&visual.rawBlock)stripped=stripped.replace(visual.rawBlock,'');if(visual.spec)visualHtml=buildGraph(visual.spec)||''}
-    var lines=stripped.replace(/\r/g,'').split('\n'),out=[],list=false;
+    var lines=stripped.replace(/\r/g,'').split('\n'),out=[],list=false,visualInjected=false;
     function end(){if(list){out.push('</ul>');list=false}}
     for(var i=0;i<lines.length;i++){
       var raw=lines[i].trim(),m;
@@ -237,8 +237,9 @@
       m=raw.match(/^(?:[-*]|•)\s+(.+)$/);if(m){if(!list){out.push('<ul>');list=true}out.push('<li>'+inline(m[1])+'</li>');continue}
       m=raw.match(/^\d+[.)]\s+(.+)$/);if(m){end();out.push('<div class="ai-numbered"><b>'+m[0].match(/^\d+/)[0]+'.</b> '+inline(m[1])+'</div>');continue}
       end();out.push('<p>'+inline(raw)+'</p>');
+      if(visualHtml&&!visualInjected){out.push(visualHtml);visualInjected=true}
     }
-    end();return visualHtml+out.join('');
+    end();return visualInjected?out.join(''):visualHtml+out.join('');
   }
 
   function style(){

@@ -78,7 +78,9 @@
           const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent=localFastReply;msg.dataset.studyQuery=userText;box.appendChild(msg);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;
         }
         const localGraph=localGraphReply(userText);
-        if(localGraph&&!img){
+        const graphOnly=/^\s*(?:tôi\s+muốn\s+)?(?:hãy\s+)?(?:hình\s+dung|vẽ|biểu\s+diễn|tạo|cho\s+mình\s+)?(?:đồ\s+thị|graph|plot)\b[\\s:,-]*(?:y\s*=\s*)?(?:sin|cos|tan)\s*\\(?(?:x)\\)?\\s*[.!?]*\s*$/i.test(userText);
+        const looksCompound=/\n/.test(userText)||/(?:^|\n|[.;])\s*(?:\d+[.)]|[-•])\s*/.test(userText);
+        if(localGraph&&graphOnly&&!looksCompound&&!img){
           const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.dataset.studyQuery=userText;msg.textContent=localGraph;box.appendChild(msg);
           if(window.renderStudyAiMessage){try{window.renderStudyAiMessage(msg,localGraph)}catch(_e){}}
           box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;

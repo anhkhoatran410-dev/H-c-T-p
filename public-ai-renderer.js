@@ -161,7 +161,8 @@
     var annotationSvg=annotations.map(function(a){var px=X(Number(a.x)),py=Y(Number(a.y)),dx=number(a.dx,28),dy=number(a.dy,-34),tx=px+dx,ty=py+dy;return '<line x1="'+px.toFixed(2)+'" y1="'+py.toFixed(2)+'" x2="'+tx.toFixed(2)+'" y2="'+ty.toFixed(2)+'" class="annotationLine"/><rect x="'+(tx-5).toFixed(2)+'" y="'+(ty-16).toFixed(2)+'" width="'+Math.max(70,String(a.text).length*7+14)+'" height="24" rx="7" class="annotationBox"/><text x="'+(tx+2).toFixed(2)+'" y="'+(ty).toFixed(2)+'" class="annotationText">'+esc(a.text)+'</text>'}).join('');
     var legend=parsed.map(function(f,fi){return '<span class="legendItem"><i class="legendDot f'+fi+'"></i>'+esc(f.label||f.equation)+'</span>'}).join('');
     var title=String(spec.title||'Đồ thị');
-    return '<div class="study-visual-card"><div class="study-visual-title">'+esc(title)+'</div>'+(spec.caption?'<div class="study-visual-caption">'+esc(spec.caption)+'</div>':'')+'<svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'">'+g.join('')+axes.join('')+paths.join('')+pointSvg+annotationSvg+'</svg>'+(legend?'<div class="study-visual-legend">'+legend+'</div>':'')+'</div>';
+    var graphMeta=esc(JSON.stringify({w:W,h:H,xMin:xmin,xMax:xmax,yMin:ymin,yMax:ymax,functions:parsed.map(function(f){return {equation:f.equation,label:f.label}}),points:points.map(function(p){return {x:Number(p.x),y:Number(p.y),label:String(p.label||p.name||'')}})}));
+    return '<div class="study-visual-card" data-study-graph-card="1"><div class="study-visual-title">'+esc(title)+'</div>'+(spec.caption?'<div class="study-visual-caption">'+esc(spec.caption)+'</div>':'')+'<svg class="study-graph-svg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(title)+'" data-study-graph-meta="'+graphMeta+'">'+g.join('')+axes.join('')+paths.join('')+pointSvg+annotationSvg+'<g class="study-graph-hover" aria-hidden="true" style="display:none"><line class="study-graph-cross-x" x1="0" y1="'+T+'" x2="0" y2="'+(H-B)+'"></line><line class="study-graph-cross-y" x1="'+L+'" y1="0" x2="'+(W-R)+'" y2="0"></line><circle class="study-graph-hover-point" cx="0" cy="0" r="5"></circle></g></svg>'+(legend?'<div class="study-visual-legend">'+legend+'</div>':'')+'<div class="study-graph-tooltip" role="status" aria-live="polite"></div></div>';
   }
 
   function buildDiagram(spec){
@@ -245,15 +246,51 @@
   function style(){
     if(document.getElementById('study-ai-renderer-v3-style'))return;
     var s=document.createElement('style');s.id='study-ai-renderer-v3-style';
-    s.textContent='.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
+    s.textContent='.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7} .study-visual-card[data-study-graph-card="1"]{position:relative}.study-graph-svg{cursor:crosshair;touch-action:none}.study-graph-cross-x,.study-graph-cross-y{stroke:currentColor;stroke-width:1;stroke-dasharray:5 4;opacity:.42;pointer-events:none}.study-graph-hover-point{fill:currentColor;stroke:var(--study-visual-bg,#fff);stroke-width:2;pointer-events:none}.study-graph-tooltip{position:absolute;z-index:4;pointer-events:none;display:none;min-width:118px;padding:6px 9px;border:1px solid rgba(80,95,130,.28);border-radius:9px;background:var(--study-visual-bg,#fff);box-shadow:0 6px 20px rgba(15,23,42,.12);font:700 12px/1.4 system-ui,sans-serif;color:inherit;white-space:nowrap}';
     document.head.appendChild(s);
   }
 
+  function installGraphHover(root){
+    if(!root)return;
+    root.querySelectorAll('[data-study-graph-card="1"]').forEach(function(card){
+      if(card.__studyGraphHover)return;
+      card.__studyGraphHover=true;
+      var svg=card.querySelector('.study-graph-svg'),tip=card.querySelector('.study-graph-tooltip'),group=card.querySelector('.study-graph-hover');
+      if(!svg||!tip||!group)return;
+      var meta={};try{meta=JSON.parse(svg.getAttribute('data-study-graph-meta')||'{}')}catch(_){return}
+      var W=Number(meta.w)||760,H=Number(meta.h)||440,L=64,R=22,T=52,B=54,xmin=Number(meta.xMin),xmax=Number(meta.xMax),ymin=Number(meta.yMin),ymax=Number(meta.yMax);
+      var funcs=(Array.isArray(meta.functions)?meta.functions:[]).map(function(f){return {label:String(f.label||f.equation||''),fn:parseEquation(f.equation)}}).filter(function(f){return !!f.fn});
+      var pts=Array.isArray(meta.points)?meta.points:[];
+      function sx(x){return L+(x-xmin)/(xmax-xmin)*(W-L-R)} function sy(y){return T+(ymax-y)/(ymax-ymin)*(H-T-B)}
+      function fmtX(x){var p=nicePi(x);return p===String(Number(x.toFixed(2)))?String(Number(x.toFixed(3))):p}
+      function fmtY(y){var n=Math.abs(y)<1e-9?0:Number(y.toFixed(3));return String(n)}
+      function hide(){group.style.display='none';tip.style.display='none'}
+      function move(ev){
+        var r=svg.getBoundingClientRect();if(!r.width||!r.height)return;
+        var px=(ev.clientX-r.left)/r.width*W,py=(ev.clientY-r.top)/r.height*H;
+        var x=xmin+(px-L)/(W-L-R)*(xmax-xmin);if(!Number.isFinite(x))return;
+        var best=null;
+        pts.forEach(function(p){var xx=Number(p.x),yy=Number(p.y);if(!Number.isFinite(xx)||!Number.isFinite(yy))return;var d=Math.hypot(sx(xx)-px,sy(yy)-py);if(!best||d<best.d)best={d:d,x:xx,y:yy,label:String(p.label||'Điểm')};});
+        if(best&&best.d<=14){best.kind='point';}
+        else{
+          funcs.forEach(function(f){var yy=f.fn(x);if(!Number.isFinite(yy)||Math.abs(yy)>1e6)return;var d=Math.abs(sy(yy)-py);if(!best||d<best.d)best={d:d,x:x,y:yy,label:f.label,kind:'curve'};});
+          if(!best||best.d>18){hide();return;}
+        }
+        var cx=sx(best.x),cy=sy(best.y);group.style.display='block';
+        var vx=group.querySelector('.study-graph-cross-x'),vy=group.querySelector('.study-graph-cross-y'),dot=group.querySelector('.study-graph-hover-point');
+        vx.setAttribute('x1',cx.toFixed(2));vx.setAttribute('x2',cx.toFixed(2));vy.setAttribute('y1',cy.toFixed(2));vy.setAttribute('y2',cy.toFixed(2));dot.setAttribute('cx',cx.toFixed(2));dot.setAttribute('cy',cy.toFixed(2));
+        tip.innerHTML='<span class="study-graph-tooltip-label">'+esc(best.label||'Tọa độ')+'</span><br><span class="study-graph-tooltip-value">('+esc(fmtX(best.x))+', '+esc(fmtY(best.y))+')</span>';
+        tip.style.display='block';
+        var cr=card.getBoundingClientRect(),left=ev.clientX-cr.left+14,top=ev.clientY-cr.top-48;left=Math.max(8,Math.min(left,cr.width-150));top=Math.max(8,top);tip.style.left=left+'px';tip.style.top=top+'px';
+      }
+      svg.addEventListener('pointermove',move);svg.addEventListener('pointerleave',hide);svg.addEventListener('pointercancel',hide);
+    });
+  }
   function renderOne(node,raw){
     if(!node||node.hasAttribute('data-thinking'))return;
     raw=raw!=null?String(raw):String(node.dataset.aiRaw!=null?node.dataset.aiRaw:node.textContent||'');
     if(!raw.trim())return;
-    node.dataset.aiRaw=raw;node.dataset.aiRendered='html';node.innerHTML=md(raw,node);
+    node.dataset.aiRaw=raw;node.dataset.aiRendered='html';node.innerHTML=md(raw,node);installGraphHover(node);
     loadKatex().then(function(ok){
       if(ok&&document.documentElement.contains(node)&&typeof window.renderMathInElement==='function'){
         try{window.renderMathInElement(node,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false},{left:'$',right:'$',display:false}],throwOnError:false,strict:false,trust:false});node.dataset.aiMathRendered='1'}catch(e){console.warn('AI KaTeX',e)}

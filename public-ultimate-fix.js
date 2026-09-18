@@ -73,8 +73,16 @@
     var form=document.getElementById('studyAiForm'),ta=form?.querySelector('textarea');if(!form||!ta)return;
     if(form.dataset.ultimateBound!=='1'){
       form.dataset.ultimateBound='1';
-      form.addEventListener('submit',function(e){e.preventDefault();e.stopImmediatePropagation()},true);
-      ta.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();e.stopImmediatePropagation();form.requestSubmit()}},true);
+      // Do NOT intercept #studyAiForm submit here.
+      // public-ai-solver.js owns the submit pipeline and calls /api/solve.
+      // The previous capture listener cancelled that handler, making the
+      // composer appear to send and then fall back to the home page.
+      ta.addEventListener('keydown',function(e){
+        if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){
+          e.preventDefault();
+          form.requestSubmit();
+        }
+      },true);
     }
     formatAi();aiStyle();
     var box=document.getElementById('studyAiMessages');if(box&&!box.__ultimateObserver){box.__ultimateObserver=new MutationObserver(function(){formatAi()});box.__ultimateObserver.observe(box,{childList:true,subtree:true})}

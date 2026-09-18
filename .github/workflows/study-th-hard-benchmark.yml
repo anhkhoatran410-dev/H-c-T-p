@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'benchmarks/study_th_hard_benchmark.py'
+      - 'lib/solve-legacy.js'
       - '.github/workflows/study-th-hard-benchmark.yml'
   workflow_dispatch:
 

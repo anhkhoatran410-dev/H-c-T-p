@@ -1,9 +1,9 @@
+import { protectGeneration } from '../lib/generation-guard.js';
 /* STUDY TH — Flashcard AI: one simple, reliable multimodal path. */
 export const maxDuration=300;
 export default async function handler(req,res){
-  res.setHeader('Cache-Control','no-store');
-  res.setHeader('X-Content-Type-Options','nosniff');
-  if(req.method!=='POST')return res.status(405).json({error:'Method not allowed'});
+  const cleanup=await protectGeneration(req,res,'flashcards');
+  if(!cleanup)return;
   try{
     const b=req.body||{};
     const key=String(process.env.GEMINI_API_KEY||'').trim();
@@ -43,5 +43,5 @@ export default async function handler(req,res){
       }catch(e){last=`${model}: ${e?.message||String(e)}`}
     }
     return res.status(502).json({error:'AI generation tạm thời không khả dụng.'});
-  }catch(e){console.error('generate-flashcards',e);const status=Number(e?.status)||500;return res.status(status).json({error:status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo flashcard lúc này.'})}
+  }catch(e){console.error('generate-flashcards',e);const status=Number(e?.status)||500;return res.status(status).json({error:status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo flashcard lúc này.'})}finally{cleanup()}
 }

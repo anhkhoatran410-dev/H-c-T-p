@@ -63,7 +63,7 @@ jobs:
         run: node scripts/security-regression.mjs
 
       - name: Live AI preview smoke test
-        if: \${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' }}
         env:
           ENDPOINT: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app/api/solve
           ORIGIN: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app

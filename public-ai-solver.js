@@ -97,9 +97,11 @@
           try{
             r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
             d=await r.json().catch(()=>({}));
-            if(!r.ok)throw new Error(String(d.error||('Solver HTTP '+r.status)));
+            if(!r.ok)throw Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:r.status});
           }catch(err){
             if(err?.name==='AbortError')throw new Error(deep?'AI kiểm tra sâu phản hồi quá lâu.':'AI phản hồi quá lâu.');
+            if(err?.status===429)throw new Error('AI đang bận hoặc đã chạm giới hạn tạm thời. Thử lại sau ít giây.');
+            if(err?.status===502||err?.status===503||err?.status===504)throw new Error('AI backend đang tạm thời không khả dụng. Thử lại sau ít giây.');
             throw err;
           }finally{clearTimeout(timer)}
           thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.dataset.studyQuery=userText;msg.textContent=answer;box.appendChild(msg);

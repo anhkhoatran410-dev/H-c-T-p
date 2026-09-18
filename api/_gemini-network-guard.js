@@ -2,7 +2,8 @@ import { acquireAiKey, reportAiFailure, reportAiSuccess } from './_ai-resilience
 import { classifyGeminiFailure } from './_gemini-error-policy.js';
 
 const GEMINI_HOST='generativelanguage.googleapis.com';
-const MAX_ATTEMPTS=8;
+const DEFAULT_MAX_ATTEMPTS=4;
+function maxAttempts(init){const tier=String(new Headers(init?.headers||{}).get('x-study-th-ai-tier')||'').toLowerCase();return tier==='fast'?2:tier==='deep'?4:DEFAULT_MAX_ATTEMPTS;}
 function headersWithoutKey(init){const headers=new Headers(init?.headers||{});headers.delete('x-goog-api-key');return headers;}
 const nativeFetch=globalThis.fetch.bind(globalThis);
 
@@ -13,7 +14,8 @@ if(!globalThis.__STUDY_TH_GEMINI_GUARD__){
     let parsed;try{parsed=new URL(url);}catch{parsed=null;}
     if(!parsed||parsed.hostname!==GEMINI_HOST)return nativeFetch(input,init);
     const attempted=new Set();let lastError=null;
-    for(let attempt=0;attempt<MAX_ATTEMPTS;attempt++){
+    const attempts=maxAttempts(init);
+    for(let attempt=0;attempt<attempts;attempt++){
       const entry=await acquireAiKey('GEMINI',[...attempted]);
       if(!entry)break;
       attempted.add(entry.id);
@@ -31,7 +33,7 @@ if(!globalThis.__STUDY_TH_GEMINI_GUARD__){
         const policy=classifyGeminiFailure(status,error);
         if(policy.countFailure)await reportAiFailure('GEMINI',entry.id,{status,code:error?.code});
         lastError=error;
-        if(attempt+1>=MAX_ATTEMPTS)throw error;
+        if(attempt+1>=attempts)throw error;
       }
     }
     if(lastError?.status)return new Response(JSON.stringify({error:{status:lastError.status,message:'All Gemini keys are temporarily unavailable.'}}),{status:lastError.status,headers:{'content-type':'application/json; charset=utf-8'}});

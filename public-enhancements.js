@@ -131,23 +131,8 @@
     var old=document.getElementById('study-ai-support'); if(old){old.classList.remove('hidden');old.querySelector('textarea')?.focus();return;}
     var el=document.createElement('div');el.id='study-ai-support';el.className='study-ai-modal';el.innerHTML=`<div class="study-ai-card"><div class="study-ai-head"><div><span class="support-kicker">AI STUDY</span><h2>🤖 Trợ lý học tập</h2><p>Hỏi bài, cách làm, giải thích khái niệm hoặc hỏi cách sử dụng website.</p></div><button type="button" class="theme-chip" data-ai-close>×</button></div><div class="study-ai-messages" id="studyAiMessages"><div class="study-ai-msg bot">Chào bạn 👋 Mình có thể giải thích bài học, gợi ý cách làm và hỗ trợ bạn dùng STUDY TH.</div></div><form id="studyAiForm" class="study-ai-form"><textarea rows="2" placeholder="Ví dụ: Giải thích vì sao đạo hàm của x² là 2x..." required></textarea><button class="composer-send" type="submit">➤</button></form></div>`;
     document.body.appendChild(el);el.querySelector('[data-ai-close]').onclick=function(){el.classList.add('hidden')};
-    el.querySelector('form').onsubmit=async function(e){
-      e.preventDefault();
-      var form=e.currentTarget,ta=form.querySelector('textarea'),submit=form.querySelector('button[type="submit"]'),text=ta.value.trim();
-      if(!text||form.dataset.busy==='1')return;
-      form.dataset.busy='1';ta.value='';ta.disabled=true;if(submit)submit.disabled=true;
-      var box=el.querySelector('#studyAiMessages');
-      box.insertAdjacentHTML('beforeend',`<div class="study-ai-msg user">${esc(text)}</div><div class="study-ai-msg bot" data-thinking>Đang suy nghĩ…</div>`);box.scrollTop=box.scrollHeight;
-      try{
-        var d=await callSupportAI({message:text,subject:state.subject||'',history:[...box.querySelectorAll('.study-ai-msg')].slice(-8).map(function(x){return {role:x.classList.contains('user')?'user':'assistant',message:x.textContent}})});
-        box.querySelector('[data-thinking]')?.remove();
-        box.insertAdjacentHTML('beforeend',`<div class="study-ai-msg bot">${esc(d.answer||'Mình chưa có câu trả lời.')}</div>`);
-      }catch(err){
-        var t=box.querySelector('[data-thinking]');if(t)t.textContent='⚠️ '+err.message;
-      }finally{
-        form.dataset.busy='0';ta.disabled=false;if(submit)submit.disabled=false;ta.focus();box.scrollTop=box.scrollHeight;
-      }
-    };
+    // The advanced student solver owns #studyAiForm. Keep this module focused on opening the modal only.
+    // Do not attach a second submit handler here; it would race the solver and call /api/support-ai.
     el.querySelector('textarea').focus();
   }
 

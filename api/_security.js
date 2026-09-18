@@ -103,7 +103,10 @@ export function enforceJsonContentType(req, res) {
 }
 
 export function sameOrigin(req, res) {
-  const configured = String(process.env.APP_ORIGIN || '').trim().replace(/\/$/, '');
+  const configuredEnv = String(process.env.APP_ORIGIN || '').trim().replace(/\/$/, '');
+  const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
+  const proto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim() || 'https';
+  const configured = configuredEnv || (host ? proto + '://' + host : '');
   if (!configured) return true;
   const origin = String(req.headers?.origin || '').trim().replace(/\/$/, '');
   const referer = String(req.headers?.referer || '').trim();

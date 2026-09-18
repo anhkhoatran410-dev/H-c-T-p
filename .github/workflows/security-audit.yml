@@ -122,5 +122,27 @@ jobs:
           if(!d.answer || d.deepMode!==true || d.olympiadMode!==true || d.router?.used!==true) throw new Error('VMO deep path failed');
           console.log(JSON.stringify({model:d.model,deepMode:d.deepMode,olympiadMode:d.olympiadMode,router:d.router,auditVerdict:d.auditVerdict,totalLatencyMs:d.totalLatencyMs,tool:d.tool}));
           NODE
+      - name: Live AI production smoke test
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          ENDPOINT: https://hoc-va-choi.vercel.app/api/solve
+          ORIGIN: https://hoc-va-choi.vercel.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload='{"message":"Tính 2+3. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 5","subject":"Toán","history":[],"imageDataUrl":"","deep":false}'
+          status=$(curl -sS --max-time 60 -o /tmp/ai-smoke.json -w '%{http_code}' -X POST "$ENDPOINT" \
+            -H 'Content-Type: application/json' \
+            -H "Origin: $ORIGIN" \
+            --data "$payload")
+          echo "AI smoke HTTP $status"
+          cat /tmp/ai-smoke.json
+          if [ "$status" != "200" ]; then exit 1; fi
+          node - <<'NODE'
+          const fs=require('fs');
+          const d=JSON.parse(fs.readFileSync('/tmp/ai-smoke.json','utf8'));
+          if(!d.answer) throw new Error('AI response has no answer');
+          console.log(JSON.stringify({model:d.model,source:d.source,answerPreview:String(d.answer).slice(0,120),router:d.router||null}));
+          NODE
       - name: Security static hardening checks
         run: node scripts/security-static-hardening.mjs

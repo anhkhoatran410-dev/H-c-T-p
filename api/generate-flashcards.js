@@ -43,5 +43,5 @@ export default async function handler(req,res){
       }catch(e){last=`${model}: ${e?.message||String(e)}`}
     }
     return res.status(502).json({error:'AI generation tạm thời không khả dụng.'});
-  }catch(e){console.error('generate-flashcards',e);return res.status(500).json({error:e?.message||'Lỗi máy chủ khi tạo flashcard.'})}
+  }catch(e){console.error('generate-flashcards',e);const status=Number(e?.status)||500;return res.status(status).json({error:status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo flashcard lúc này.'})}
 }

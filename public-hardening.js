@@ -67,7 +67,6 @@
       closePickers();
     };
 
-    setTimeout(window.studyOpenExamFromUrl,250);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',function(){setTimeout(boot,0)});else setTimeout(boot,0);
   window.addEventListener('study-app-loaded',function(){setTimeout(boot,0)});

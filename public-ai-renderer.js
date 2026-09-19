@@ -298,7 +298,7 @@
   }
 
   function style(){
-    if(document.getElementById('study-ai-renderer-v4-style'))return;
+    if(document.getElementById('study-ai-renderer-v7-style'))return;
     var s=document.createElement('style');s.id='study-ai-renderer-v4-style';
     s.textContent='.study-math-fallback{display:inline-block;font-family:Cambria,Georgia,serif;font-size:1.05em;vertical-align:middle}.study-math-block{display:block;text-align:center;margin:8px 0}.study-math-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.05;margin:0 2px}.study-math-num{padding:0 3px;border-bottom:1px solid currentColor}.study-math-den{padding:0 3px}.study-math-sqrt{display:inline-flex;align-items:center}.study-math-sqrt>span{border-top:1px solid currentColor;margin-left:1px;padding:0 2px}.study-math-fallback sup,.study-math-fallback sub{font-size:.72em;line-height:0}'+
 '.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-case-row{display:block;padding:2px 0}.study-ai-msg.bot .ai-loose-table{display:block;overflow-x:auto;margin:8px 0 14px}.study-ai-msg.bot .ai-loose-table table{border-collapse:collapse;margin:auto;min-width:70%}.study-ai-msg.bot .ai-loose-table th,.study-ai-msg.bot .ai-loose-table td{border:1px solid rgba(90,100,150,.18);padding:7px 11px;text-align:center;white-space:nowrap}.study-ai-msg.bot .ai-loose-table th{font-weight:800;background:rgba(90,100,150,.07)}.study-cases{display:inline-block;vertical-align:middle;border-left:2px solid currentColor;padding:2px 0 2px 14px;margin-right:6px}.study-cases-tail{display:inline-block;vertical-align:middle}.ai-math-block{display:block;text-align:center;overflow-x:auto;padding:8px 4px;margin:10px 0 14px;line-height:1.8}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
@@ -384,6 +384,12 @@
     nodes.forEach(function(t){
       var raw=t.nodeValue||'';
       if(!/\$\$|\\\[|\\\(|\\frac|\\dfrac|\\sqrt|(?:\\)?begin\{cases\}|(?:\\)?(?:frac|dfrac|cdot|times|geq|leq|neq|iff|infty|mathbb)\b|\\(?:ge|le|neq|cdot|times|pm|infty|alpha|beta|gamma|delta|theta|lambda|mu|pi|rho|sigma|tau|phi|omega)\b/.test(raw))return;
+      if(!/\$\$|\\\[|\\\(|\$[^$]+\$/.test(raw)){
+        var pretty=fallbackMathHtml(raw);
+        var wrapBare=document.createElement('span');wrapBare.className='study-math-fallback';wrapBare.innerHTML=pretty;
+        t.parentNode.replaceChild(wrapBare,t);
+        return;
+      }
       var out='',last=0,rx=/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([^$\n]+)\$/g,m;
       while((m=rx.exec(raw))){
         out+=esc(raw.slice(last,m.index));
@@ -403,9 +409,7 @@
     if(!node||node.hasAttribute('data-thinking'))return;
     raw=raw!=null?String(raw):String(node.dataset.aiRaw!=null?node.dataset.aiRaw:node.textContent||'');
     if(!raw.trim())return;
-    raw=raw.replace(/\\[object\\s*Object\\]/gi,'≥').replace(/\\[objectObject\\]/gi,'≥');
-    // Repair common AI markdown glitches such as a rule marker immediately before a heading.
-    raw=raw.replace(/^\\s*-{3,}\\s+(?=#+\\s)/gm,'');
+    raw=normalizeStudentMathSource(raw);
     node.dataset.aiRaw=raw;node.dataset.aiRendered='html';node.innerHTML=md(raw,node);
     // Always render a local math fallback immediately. KaTeX is an enhancement, not a dependency.
     try{applyFallbackMath(node)}catch(_e){}

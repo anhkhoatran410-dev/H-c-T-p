@@ -96,16 +96,32 @@
           const timer=setTimeout(()=>controller.abort(),timeoutMs);
           let r=null,d={};
           try{
-            r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
-            d=await r.json().catch(()=>({}));
-            if(!r.ok)throw Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:r.status});
+            let lastErr=null;
+            for(let attempt=0;attempt<3;attempt++){
+              try{
+                r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
+                d=await r.json().catch(()=>({}));
+                if(r.ok)break;
+                lastErr=Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:r.status,providerStatus:d.providerStatus,code:d.code,retryable:d.retryable});
+                const retryable=!!d.retryable||r.status===408||r.status===409||r.status===425||r.status===429||r.status>=500;
+                if(!retryable||attempt===2)throw lastErr;
+                await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
+              }catch(fetchErr){
+                if(fetchErr?.name==='AbortError')throw fetchErr;
+                lastErr=fetchErr;
+                if(fetchErr?.status===429||fetchErr?.status>=500){
+                  if(attempt<2){await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));continue;}
+                }
+                throw fetchErr;
+              }
+            }
           }catch(err){
             if(err?.name==='AbortError')throw new Error(deep?'AI kiểm tra sâu phản hồi quá lâu.':'AI phản hồi quá lâu.');
-            if(err?.status===429)throw new Error(String(d?.error||'AI đang bận hoặc đã chạm giới hạn tạm thời. Thử lại sau ít giây.'));
+            if(err?.status===429)throw new Error(String(d?.error||'AI đang bận. Hệ thống đã thử lại 3 lần nhưng chưa nhận được phản hồi.'));
             if((err?.status===502||err?.status===503||err?.status===504)&&/^ai-provider-unavailable$|^gemini-config-missing$/i.test(String(d?.code||''))){
               throw new Error(String(d?.error||'AI backend chưa sẵn sàng.'));
             }
-            if(err?.status===502||err?.status===503||err?.status===504)throw new Error('AI backend đang tạm thời không khả dụng. Thử lại sau ít giây.');
+            if(err?.status===502||err?.status===503||err?.status===504)throw new Error(String(d?.error||'AI backend đang tạm thời không khả dụng. Hệ thống đã thử lại 3 lần.'));
             throw err;
           }finally{clearTimeout(timer)}
           thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.dataset.studyQuery=userText;msg.textContent=answer;box.appendChild(msg);

@@ -10,8 +10,6 @@ import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
 import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
 import solveHandler from '../lib/solve-legacy.js';
 
-
-
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 60;
@@ -84,7 +82,7 @@ export default async function handler(req,res){
     res.setHeader('X-Accel-Buffering','no');
     const writeEvent=(event,payload)=>{
       if(res.writableEnded)return;
-      try{res.write('event: '+event+'\n'+'data: '+JSON.stringify(payload??{})+'\n\n');}catch{}
+      try{res.write('event: '+event+'\\n'+'data: '+JSON.stringify(payload??{})+'\\n\\n');}catch{}
     };
     writeEvent('connected',{requestId});
     req.__aiStage=async(stage,data={})=>writeEvent('stage',{stage,...data});

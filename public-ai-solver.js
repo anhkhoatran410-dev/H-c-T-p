@@ -1,6 +1,6 @@
 /* STUDY TH — student AI solver: camera/file input + fast/deep routing. */
 (function(){
-  if(window.__studyStudentSolverInstalled===18)return;window.__studyStudentSolverInstalled=18;
+  if(window.__studyStudentSolverInstalled===19)return;window.__studyStudentSolverInstalled=19;
 
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1100;
@@ -141,24 +141,36 @@
             const jobId=String(jd.jobId||'');
             if(!jobId)throw new Error('Backend không trả job ID.');
             stageText('queued');
-            const maxWait=15*60*1000,startedAt=Date.now();
+            const maxWait=15*60*1000,queueMaxWait=3*60*1000,startedAt=Date.now();let pollDelay=1500,pollErrors=0,workerSeen=false;
             while(Date.now()-startedAt<maxWait){
-              const sr=await fetch('/api/solve-job-status?id='+encodeURIComponent(jobId),{
-                method:'GET',headers:{'Accept':'application/json'},credentials:'same-origin',cache:'no-store'
-              });
-              const sd=await sr.json().catch(()=>({}));
-              if(!sr.ok)throw Object.assign(new Error(String(sd.error||'Không đọc được trạng thái job.')),{status:sr.status,code:sd.code});
-              if(sd.stage)stageText(String(sd.stage),sd.stageDetail||{});
-              if(sd.status==='done'){
-                d=sd.result||{};
-                break;
+              try{
+                const sr=await fetch('/api/solve-job-status?id='+encodeURIComponent(jobId),{
+                  method:'GET',headers:{'Accept':'application/json'},credentials:'same-origin',cache:'no-store'
+                });
+                const sd=await sr.json().catch(()=>({}));
+                if(!sr.ok)throw Object.assign(new Error(String(sd.error||'Không đọc được trạng thái job.')),{status:sr.status,code:sd.code});
+                pollErrors=0;
+                if(sd.status==='running'||sd.stage==='worker_started'||sd.stage==='solver_started')workerSeen=true;
+                if(sd.stage)stageText(String(sd.stage),sd.stageDetail||{});
+                if(sd.status==='done'){
+                  d=sd.result||{};
+                  break;
+                }
+                if(sd.status==='failed'){
+                  const err=new Error(String(sd.error||'Bài Deep chưa hoàn tất.'));
+                  err.deepJob=true;err.jobId=jobId;
+                  throw err;
+                }
+                if(!workerSeen&&Date.now()-startedAt>=queueMaxWait){
+                  throw new Error('Hàng đợi Deep chưa có worker nhận bài sau 3 phút. Vui lòng thử lại.');
+                }
+              }catch(netErr){
+                pollErrors++;
+                if(pollErrors>=6)throw netErr;
+                await new Promise(resolve=>setTimeout(resolve,Math.min(5000,pollDelay*2)));
               }
-              if(sd.status==='failed'){
-                const err=new Error(String(sd.error||'Bài Deep chưa hoàn tất.'));
-                err.deepJob=true;err.jobId=jobId;
-                throw err;
-              }
-              await new Promise(resolve=>setTimeout(resolve,1500));
+              await new Promise(resolve=>setTimeout(resolve,pollDelay));
+              pollDelay=Math.min(5000,pollDelay+250);
             }
             if(!d.answer){
               const err=new Error('Bài Deep đang xử lý quá lâu. Bạn có thể thử lại bằng nút Thử lại.');
@@ -219,7 +231,8 @@
             }finally{clearTimeout(timer)}
           }
           thinking.remove();
-          const answer=String(d.answer||'Mình chưa có câu trả lời.');
+          let answer=String(d.answer||'Mình chưa có câu trả lời.');
+          if(d.degraded&&d.answer)answer+='\n\n> ⚠️ Lời giải này chưa qua bước kiểm tra kỹ. Hãy đối chiếu cẩn thận hoặc bấm Thử lại.';
           const msg=document.createElement('div');
           msg.className='study-ai-msg bot';
           msg.style.whiteSpace='normal';

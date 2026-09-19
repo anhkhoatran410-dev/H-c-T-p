@@ -106,7 +106,8 @@
           let r=null,d={};
           try{
             let lastErr=null;
-            for(let attempt=0;attempt<3;attempt++){
+            const maxAttempts=deep?1:2;
+            for(let attempt=0;attempt<maxAttempts;attempt++){
               try{
                 r=await fetch('/api/solve?stream=1',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
                 const contentType=String(r.headers.get('content-type')||'').toLowerCase();
@@ -162,14 +163,14 @@
                 if(r.ok&&d?.answer)break;
                 if(r.ok&&!d?.error)break;
                 lastErr=Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:Number(d.status)||r.status,providerStatus:d.providerStatus,code:d.code,retryable:d.retryable});
-                const retryable=!!d.retryable||r.status===408||r.status===409||r.status===425||r.status===429||r.status>=500;
-                if(!retryable||attempt===2)throw lastErr;
+                const retryable=r.status===408||r.status===409||r.status===425||r.status===429;
+                if(!retryable||attempt===maxAttempts-1)throw lastErr;
                 await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
               }catch(fetchErr){
                 if(fetchErr?.name==='AbortError')throw fetchErr;
                 lastErr=fetchErr;
                 if(fetchErr?.status===429||fetchErr?.status>=500){
-                  if(attempt<2){await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));continue;}
+                  if(attempt<maxAttempts-1){await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));continue;}
                 }
                 throw fetchErr;
               }

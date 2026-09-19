@@ -282,13 +282,13 @@
   function fallbackMathHtml(math){
     var s=String(math||'').trim();
     // Common malformed model output should never leak into the student UI.
-    s=s.replace(/\\[object\\s*Object\\]/gi,'≥').replace(/\\[objectObject\\]/gi,'≥');
-    s=s.replace(/\\\\left\\s*|\\\\right\\s*/g,'');
+    s=s.replace(/\[object\s*Object\]/gi,'≥').replace(/\[objectObject\]/gi,'≥');
+    s=s.replace(/\\left\s*|\\right\s*/g,'');
 
-    // Simple \"cases\" fallback for proof conclusions/equality conditions.
-    var cm=s.match(/\\\\begin\\{cases\\}([\\s\\S]*?)\\\\end\\{cases\\}/i);
+    // Simple "cases" fallback for equality conditions.
+    var cm=s.match(/\\begin\{cases\}([\s\S]*?)\\end\{cases\}/i);
     if(cm){
-      var rows=cm[1].split(/\\\\\\\\/).map(function(row){return String(row||'').trim()}).filter(Boolean);
+      var rows=cm[1].split(/\\\\/).map(function(row){return String(row||'').trim()}).filter(Boolean);
       var inner=rows.map(function(row){return '<div class="study-case-row">'+fallbackMathHtml(row)+'</div>'}).join('');
       var rest=s.replace(cm[0],'');
       var restHtml=rest.trim()?fallbackMathHtml(rest):'';
@@ -305,37 +305,37 @@
 
     for(var pass=0;pass<6;pass++){
       var before=s;
-      s=s.replace(/\\\\frac\\s*\\{([^{}]*)\\}\\s*\\{([^{}]*)\\}/g,function(_,a,b){
+      s=s.replace(/\\frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g,function(_,a,b){
         return hold('<span class="study-math-frac"><span class="study-math-num">'+esc(a)+'</span><span class="study-math-den">'+esc(b)+'</span></span>');
       });
-      s=s.replace(/\\\\dfrac\\s*\\{([^{}]*)\\}\\s*\\{([^{}]*)\\}/g,function(_,a,b){
+      s=s.replace(/\\dfrac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g,function(_,a,b){
         return hold('<span class="study-math-frac"><span class="study-math-num">'+esc(a)+'</span><span class="study-math-den">'+esc(b)+'</span></span>');
       });
-      s=s.replace(/\\\\sqrt\\s*\\{([^{}]*)\\}/g,function(_,a){
+      s=s.replace(/\\sqrt\s*\{([^{}]*)\}/g,function(_,a){
         return hold('<span class="study-math-sqrt">√<span>'+esc(a)+'</span></span>');
       });
       if(s===before)break;
     }
 
     s=esc(s)
-      .replace(/\\\\geq?/g,'≥').replace(/\\\\leq?/g,'≤').replace(/\\\\neq?/g,'≠')
-      .replace(/\\\\iff\\b/g,'⟺').replace(/\\\\Longleftrightarrow/g,'⟺').replace(/\\\\Leftrightarrow/g,'⇔')
-      .replace(/\\\\cdot/g,'·').replace(/\\\\times/g,'×').replace(/\\\\pm/g,'±').replace(/\\\\mp/g,'∓')
-      .replace(/\\\\infty/g,'∞').replace(/\\\\forall/g,'∀').replace(/\\\\exists/g,'∃')
-      .replace(/\\\\in/g,'∈').replace(/\\\\notin/g,'∉')
-      .replace(/\\\\Rightarrow|\\\\Longrightarrow/g,'⇒').replace(/\\\\rightarrow|\\\\to/g,'→')
-      .replace(/\\\\leftarrow/g,'←').replace(/\\\\leftrightarrow/g,'↔')
-      .replace(/\\\\approx/g,'≈').replace(/\\\\equiv/g,'≡')
-      .replace(/\\\\alpha/g,'α').replace(/\\\\beta/g,'β').replace(/\\\\gamma/g,'γ').replace(/\\\\delta/g,'δ')
-      .replace(/\\\\theta/g,'θ').replace(/\\\\lambda/g,'λ').replace(/\\\\mu/g,'μ').replace(/\\\\pi/g,'π')
-      .replace(/\\\\rho/g,'ρ').replace(/\\\\sigma/g,'σ').replace(/\\\\tau/g,'τ').replace(/\\\\phi/g,'φ').replace(/\\\\omega/g,'ω')
-      .replace(/\\\\text\\{([^{}]*)\\}/g,'$1').replace(/\\\\mathrm\\{([^{}]*)\\}/g,'$1')
-      .replace(/\\\\,/g,' ').replace(/\\\\;/g,' ').replace(/\\\\!/g,'').replace(/\\\\quad/g,'  ')
-      .replace(/\\\\/g,' ')
-      .replace(/\\\\begin\\{[^{}]+\\}/g,'').replace(/\\\\end\\{[^{}]+\\}/g,'')
-      .replace(/\\\\([A-Za-z]+)/g,'$1')
-      .replace(/\\\^\\{([^{}]+)\\}/g,'<sup>$1</sup>').replace(/\\\^([A-Za-z0-9]+)/g,'<sup>$1</sup>')
-      .replace(/_\\{([^{}]+)\\}/g,'<sub>$1</sub>').replace(/_([A-Za-z0-9]+)/g,'<sub>$1</sub>');
+      .replace(/\\geq?/g,'≥').replace(/\\leq?/g,'≤').replace(/\\neq?/g,'≠')
+      .replace(/\\iff\b/g,'⟺').replace(/\\Longleftrightarrow/g,'⟺').replace(/\\Leftrightarrow/g,'⇔')
+      .replace(/\\cdot/g,'·').replace(/\\times/g,'×').replace(/\\pm/g,'±').replace(/\\mp/g,'∓')
+      .replace(/\\infty/g,'∞').replace(/\\forall/g,'∀').replace(/\\exists/g,'∃')
+      .replace(/\\in\b/g,'∈').replace(/\\notin\b/g,'∉')
+      .replace(/\\Rightarrow|\\Longrightarrow/g,'⇒').replace(/\\rightarrow|\\to/g,'→')
+      .replace(/\\leftarrow/g,'←').replace(/\\leftrightarrow/g,'↔')
+      .replace(/\\approx/g,'≈').replace(/\\equiv/g,'≡')
+      .replace(/\\alpha/g,'α').replace(/\\beta/g,'β').replace(/\\gamma/g,'γ').replace(/\\delta/g,'δ')
+      .replace(/\\theta/g,'θ').replace(/\\lambda/g,'λ').replace(/\\mu/g,'μ').replace(/\\pi/g,'π')
+      .replace(/\\rho/g,'ρ').replace(/\\sigma/g,'σ').replace(/\\tau/g,'τ').replace(/\\phi/g,'φ').replace(/\\omega/g,'ω')
+      .replace(/\\text\{([^{}]*)\}/g,'$1').replace(/\\mathrm\{([^{}]*)\}/g,'$1')
+      .replace(/\\,/g,' ').replace(/\\;/g,' ').replace(/\\!/g,'').replace(/\\quad/g,'  ')
+      .replace(/\\/g,' ')
+      .replace(/\\begin\{[^{}]+\}/g,'').replace(/\\end\{[^{}]+\}/g,'')
+      .replace(/\\([A-Za-z]+)/g,'$1')
+      .replace(/\^\{([^{}]+)\}/g,'<sup>$1</sup>').replace(/\^([A-Za-z0-9]+)/g,'<sup>$1</sup>')
+      .replace(/_\{([^{}]+)\}/g,'<sub>$1</sub>').replace(/_([A-Za-z0-9]+)/g,'<sub>$1</sub>');
 
     stash.forEach(function(v,i){s=s.split(HOLD_OPEN+i+HOLD_CLOSE).join(v)});
     return s;

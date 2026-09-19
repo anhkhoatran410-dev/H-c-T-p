@@ -28,10 +28,6 @@
       "maxDuration": 60,
       "supportsCancellation": true
     },
-    "api/admin-command.js": {
-      "maxDuration": 60,
-      "supportsCancellation": true
-    },
     "api/system-control.js": {
       "maxDuration": 30,
       "supportsCancellation": true

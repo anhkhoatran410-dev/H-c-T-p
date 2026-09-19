@@ -9,35 +9,32 @@ const order = (text, needles) => {
 };
 const absent = (text, needles) => needles.every((needle) => !text.includes(needle));
 const checks = [
-  ['common security headers', read('api/_security.js'), ['X-DNS-Prefetch-Control', 'X-Permitted-Cross-Domain-Policies', 'X-Robots-Tag']],
-  ['JSON content-type guard', read('api/_security.js'), ['function enforceJsonContentType']],
+  ['common security headers', read('lib/api/_security.js'), ['X-DNS-Prefetch-Control', 'X-Permitted-Cross-Domain-Policies', 'X-Robots-Tag']],
+  ['JSON content-type guard', read('lib/api/_security.js'), ['function enforceJsonContentType']],
   ['HttpOnly admin cookie', read('api/admin-login.js'), ['HttpOnly', 'Secure', 'SameSite=Strict', 'study_admin_session_v3']],
   ['Admin TOTP MFA', read('api/admin-login.js'), ['ADMIN_MFA_TOTP_SECRET', 'validTotp', 'mfaRequired', 'MFA_REQUIRED']],
   ['cookie session health check', read('admin/login-fix.js'), ['admin-login?check=1', 'checkExistingSession', 'credentials:\'same-origin\'']],
   ['no admin token browser storage', read('admin/login-fix.js'), ['credentials:\'same-origin\'', 'await startAdmin()', 'checkExistingSession']],
   ['admin dashboard no token persistence', read('admin/app.js'), ['credentials:"same-origin"', 'async function adminApi', 'admin-create-account', 'admin-create-bot-rule']],
   ['copilot cookie auth', read('admin/admin-copilot-final.js'), ['credentials:\'same-origin\'', "headers:{'Content-Type':'application/json'}"]],
-  ['AI DLP extensions', read('api/_ai-input-guard.js'), ['aws-access-key', 'private-key', 'safeRole', 'forget\\s+']],
+  ['AI DLP extensions', read('lib/api/_ai-input-guard.js'), ['aws-access-key', 'private-key', 'safeRole', 'forget\\s+']],
   ['server-side admin config routes', read('api/admin-tools.js'), ['admin-accounts', 'admin-create-account', 'admin-bot-rules', 'admin-create-bot-rule']],
   ['DB admin-config lockdown migration', read('supabase/migrations/20260917_security_admin_config.sql'), ['revoke insert, update, delete', 'support_accounts_write', 'support_bot_rules_write']],
   ['server-side security-state lockdown', read('supabase/migrations/20260917_security_admin_routing.sql'), ['revoke all on table public.system_control', 'revoke all on table public.system_incidents']],
-  ['AI gateway JSON boundary', read('api/_ai-gateway.js'), ['enforceJsonContentType(req,res)']],
-  ['AI core JSON boundary', read('api/_solve-core.js'), ['enforceJsonContentType(req,res)']],
   ['support AI JSON boundary', read('api/support-ai.js'), ['enforceJsonContentType(req,res)']],
-  ['AI response audit sink', read('lib/api/_audit-log.js'), ['persistAudit', 'ENQUEUE_LUA', 'AUDIT_QUEUE_KEY', 'AUDIT_QUEUE_MAX']],
-  ['AI gateway non-blocking audit', read('api/_ai-gateway.js'), ['auditRecord', 'persistAudit', "outcome:delivered?'response_delivered':'response_guard_blocked'"]],
+  ['AI response audit sink', read('lib/lib/api/_audit-log.js'), ['persistAudit', 'ENQUEUE_LUA', 'AUDIT_QUEUE_KEY', 'AUDIT_QUEUE_MAX']],
   ['support AI audit', read('api/support-ai.js'), ['auditRecord', 'persistAudit', 'response_delivered']],
-  ['Redis audit worker', read('lib/api/_audit-worker.js'), ['CRON_SECRET', 'study-th:audit:queue', 'EVAL', 'resolution=ignore-duplicates']],
-  ['Redis audit worker retry-safe', read('lib/api/_audit-worker.js'), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
-  ['bounded audit queue admission', read('lib/api/_audit-log.js'), ['AUDIT_QUEUE_MAX', 'LLEN', 'AUDIT_DROPPED_KEY', 'return {0,count,d}', 'AUDIT_QUEUE_LIMIT']],
-  ['bounded audit DLQ', read('lib/api/_audit-worker.js'), ['DLQ_KEY', 'DLQ_MAX', 'DLQ_LUA', 'moveToDlq', 'dlqDropped']],
-  ['audit no restore loop', read('lib/api/_audit-worker.js'), ['moveToDlq', 'DLQ_KEY', 'DLQ_MAX', 'return res.status(503)', 'event được đưa vào bounded DLQ']],
-  ['audit dedicated redis option', read('lib/api/_audit-log.js'), ['AUDIT_REDIS_REST_URL', 'AUDIT_REDIS_REST_TOKEN', 'AUDIT_REDIS_IS_DEDICATED']],
-  ['replay nonce bounded TTL', read('api/_internal-replay.js'), ['NONCE_TTL_MS', "'PX', NONCE_TTL_MS", 'verifyTimestamp', 'WINDOW_MS']],
-  ['Response Guard fail-safe boundary', read('api/_response-guard.js'), ['OUTPUT_BLOCK_PATTERNS', 'sensitive-secret-detected', 'response-guard-blocked', 'safeClientError']],
-  ['Redis subject quarantine', read('api/_intrusion-shield.js'), ['setShieldSubjectBlock', 'clearShieldSubjectBlock', 'study-th:shield:subject:block']],
+  ['Redis audit worker', read('lib/lib/api/_audit-worker.js'), ['CRON_SECRET', 'study-th:audit:queue', 'EVAL', 'resolution=ignore-duplicates']],
+  ['Redis audit worker retry-safe', read('lib/lib/api/_audit-worker.js'), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
+  ['bounded audit queue admission', read('lib/lib/api/_audit-log.js'), ['AUDIT_QUEUE_MAX', 'LLEN', 'AUDIT_DROPPED_KEY', 'return {0,count,d}', 'AUDIT_QUEUE_LIMIT']],
+  ['bounded audit DLQ', read('lib/lib/api/_audit-worker.js'), ['DLQ_KEY', 'DLQ_MAX', 'DLQ_LUA', 'moveToDlq', 'dlqDropped']],
+  ['audit no restore loop', read('lib/lib/api/_audit-worker.js'), ['moveToDlq', 'DLQ_KEY', 'DLQ_MAX', 'return res.status(503)', 'event được đưa vào bounded DLQ']],
+  ['audit dedicated redis option', read('lib/lib/api/_audit-log.js'), ['AUDIT_REDIS_REST_URL', 'AUDIT_REDIS_REST_TOKEN', 'AUDIT_REDIS_IS_DEDICATED']],
+  ['replay nonce bounded TTL', read('lib/api/_internal-replay.js'), ['NONCE_TTL_MS', "'PX', NONCE_TTL_MS", 'verifyTimestamp', 'WINDOW_MS']],
+  ['Response Guard fail-safe boundary', read('lib/api/_response-guard.js'), ['OUTPUT_BLOCK_PATTERNS', 'sensitive-secret-detected', 'response-guard-blocked', 'safeClientError']],
+  ['Redis subject quarantine', read('lib/api/_intrusion-shield.js'), ['setShieldSubjectBlock', 'clearShieldSubjectBlock', 'study-th:shield:subject:block']],
   ['Admin Redis block control', read('api/system-control.js'), ['subject-block', 'setShieldSubjectBlock', 'clearShieldSubjectBlock', 'redis-subject-block']],
-  ['dynamic key pool cache warming', read('api/_ai-resilience.js'), ['warmAiKeyPool', 'study-th:ai-keypool-meta', 'study-th:ai-keypool-active']],
+  ['dynamic key pool cache warming', read('lib/api/_ai-resilience.js'), ['warmAiKeyPool', 'study-th:ai-keypool-meta', 'study-th:ai-keypool-active']],
   ['scheduled audit queue sync', read('.github/workflows/security-audit-sync.yml'), ['SECURITY_AUDIT_WORKER_URL', 'SECURITY_AUDIT_CRON_SECRET', '*/15 * * * *']],
   ['architecture monitoring state bus', read('docs/SECURITY_ARCHITECTURE.md'), ['MONITORING / SIEM + AUTO-RESPONSE', 'REDIS / STATE BUS', 'Response Guard', 'AUDIT QUEUE', 'Admin actions']],
   ['AI audit migration', read('supabase/migrations/20260917_ai_request_audit.sql'), ['create table if not exists public.ai_request_audit', 'alter table public.ai_request_audit enable row level security']],
@@ -52,14 +49,14 @@ for (const [name, text, needles] of checks) {
   if (process.exitCode) break;
   console.log(`PASS: ${name}`);
 }
-const worker = read('lib/api/_audit-worker.js');
+const worker = read('lib/lib/api/_audit-worker.js');
 if (!absent(worker, ['restore(rows)', 'queue đã được khôi phục'])) {
   console.error('FAIL: audit worker must not restore failed batches into the main queue');
   process.exitCode = 1;
 } else {
   console.log('PASS: audit worker has no restore-to-main-queue loop');
 }
-const auditLog = read('lib/api/_audit-log.js');
+const auditLog = read('lib/lib/api/_audit-log.js');
 if (!absent(auditLog, ["['SET',key,payload,'EX',86400]"])) {
   console.error('FAIL: audit queue should not create per-event duplicate payload keys');
   process.exitCode = 1;

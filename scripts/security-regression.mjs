@@ -85,17 +85,16 @@ assert.equal(vercel.rewrites.some(x => x.source === '/api/ai-lockdown'), true);
 assert.equal(vercel.rewrites.some(x => x.source === '/api/admin-assistant' && x.destination.includes('admin-tools?route=admin-assistant')), true);
 assert.equal(JSON.stringify(vercel).includes('Access-Control-Allow-Origin'), false);
 
-const [adminTools, adminAssistant, adminCommand, systemControl, aiRenderer, mathRenderer, aiGuard] = await Promise.all([
+const [adminTools, adminAssistant , systemControl, aiRenderer, mathRenderer, aiGuard] = await Promise.all([
   readFile(new URL('../api/admin-tools.js', import.meta.url), 'utf8'),
   readFile(new URL('../lib/admin-assistant.js', import.meta.url), 'utf8'),
-  readFile(new URL('../api/admin-command.js', import.meta.url), 'utf8'),
   readFile(new URL('../api/system-control.js', import.meta.url), 'utf8'),
   readFile(new URL('../public-ai-renderer.js', import.meta.url), 'utf8'),
   readFile(new URL('../math-render-final.js', import.meta.url), 'utf8'),
   readFile(new URL('../lib/api/_ai-input-guard.js', import.meta.url), 'utf8'),
 ]);
 
-for (const source of [adminTools, adminAssistant, adminCommand, systemControl]) {
+for (const source of [adminTools, adminAssistant, systemControl]) {
   assert.equal(source.includes('isAdminRequest'), true);
   assert.equal(source.includes('sameOrigin'), true);
 }
@@ -104,8 +103,6 @@ assert.equal(adminAssistant.includes('enforceBodySize'), true);
 assert.equal(adminAssistant.includes('rateLimit'), true);
 assert.equal(adminAssistant.includes('_gemini-network-guard.js'), true);
 assert.equal(adminAssistant.includes('safeClientError'), true);
-assert.equal(adminCommand.includes('enforceBodySize'), true);
-assert.equal(adminCommand.includes('safeClientError'), true);
 assert.equal(aiGuard.includes('sanitizeAiIngress'), true);
 assert.equal(aiGuard.includes('semantic-risk-high'), true);
 

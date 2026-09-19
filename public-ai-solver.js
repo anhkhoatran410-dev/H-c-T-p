@@ -1,6 +1,6 @@
 /* STUDY TH — student AI solver: camera/file input + fast/deep routing. */
 (function(){
-  if(window.__studyStudentSolverInstalled)return;window.__studyStudentSolverInstalled=true;
+  if(window.__studyStudentSolverInstalled===17)return;window.__studyStudentSolverInstalled=17;
 
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1100;

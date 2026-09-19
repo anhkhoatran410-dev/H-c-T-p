@@ -170,12 +170,18 @@ def call_solver(item):
                 data = json.loads(response.read().decode("utf-8"))
                 text = str(data.get("answer", ""))
                 pred = extract_answer(text)
+                stages = data.get("stages") or {}
                 return {
                     "ok": True,
                     "status": "PASS" if pred == item["gold"] else ("NO_ANSWER" if pred is None else "FAIL"),
                     "pred": pred, "gold": item["gold"], "model": data.get("model"),
                     "audit": data.get("auditVerdict"), "tool": data.get("tool"),
-                    "verified": data.get("verified"), "latency_sec": round(time.time() - req_started, 3),
+                    "verified": data.get("verified"), "reasoning_tier": (data.get("reasoningTier") or {}).get("tier"),
+                    "review_skipped": bool(data.get("reviewSkipped")), "agreement_score": data.get("agreementScore"),
+                    "cache_hit": bool(data.get("cacheHit")), "stages": stages,
+                    "solver_latency_sec": round(float(stages.get("solverMs") or 0) / 1000, 3) if stages.get("solverMs") is not None else None,
+                    "audit_latency_sec": round(float(stages.get("auditMs") or 0) / 1000, 3) if stages.get("auditMs") is not None else None,
+                    "latency_sec": round(time.time() - req_started, 3),
                     "total_latency_sec": round(time.time() - started, 3), "attempts": attempt + 1,
                     "error": None,
                 }
@@ -189,6 +195,17 @@ def call_solver(item):
             "total_latency_sec": round(time.time() - started, 3),
             "attempts": OUTER_RETRIES + 1, "error": last_error}
 
+
+def percentile(values, p):
+    xs=sorted(float(v) for v in values if v is not None)
+    if not xs:
+        return 0
+    idx=min(len(xs)-1, max(0, int((len(xs)-1)*p)))
+    return round(xs[idx], 3)
+
+def metric(rows, key):
+    vals=[r.get(key) for r in rows if r.get(key) is not None]
+    return {"count":len(vals),"p50_sec":percentile(vals,0.50),"p95_sec":percentile(vals,0.95),"avg_sec":round(sum(vals)/len(vals),3) if vals else 0}
 
 def summarize(rows):
     total = len(rows)
@@ -205,13 +222,21 @@ def summarize(rows):
         "http_ok": http_ok, "http_ok_percent": round(100 * http_ok / total, 2) if total else 0,
         "no_answer": sum(r["status"] == "NO_ANSWER" for r in rows),
         "http_errors": sum(r["status"] == "HTTP_ERROR" for r in rows),
+        "timeouts": sum("timeout" in str(r.get("error","")).lower() or "timed out" in str(r.get("error","")).lower() for r in rows),
         "audited": len(audits),
         "audit_pass": sum(r.get("audit") == "PASS" for r in rows),
         "audit_fail": sum(r.get("audit") == "FAIL" for r in rows),
         "audit_uncertain": sum(r.get("audit") == "UNCERTAIN" for r in rows),
         "repair_engine_used": sum("Repair Engine" in str(r.get("tool")) for r in rows),
+        "review_skipped": sum(bool(r.get("review_skipped")) for r in rows),
+        "review_skipped_percent": round(100 * sum(bool(r.get("review_skipped")) for r in rows) / total, 2) if total else 0,
+        "cache_hits": sum(bool(r.get("cache_hit")) for r in rows),
+        "cache_hit_percent": round(100 * sum(bool(r.get("cache_hit")) for r in rows) / total, 2) if total else 0,
         "avg_latency_sec": round(sum(latencies) / total, 2) if total else 0,
         "p95_latency_sec": round(p95, 2),
+        "latency": metric(rows,"total_latency_sec"),
+        "solver": metric(rows,"solver_latency_sec"),
+        "audit_latency": metric(rows,"audit_latency_sec"),
     }
 
 

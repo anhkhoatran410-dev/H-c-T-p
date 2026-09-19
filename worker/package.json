@@ -1,0 +1,7 @@
+{
+  "name": "study-th-ai-worker",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": { "start": "node ai-worker.js" }
+}

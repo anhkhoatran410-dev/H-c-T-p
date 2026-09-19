@@ -1,6 +1,6 @@
 /* STUDY TH — student AI solver: camera/file input + fast/deep routing. */
 (function(){
-  if(window.__studyStudentSolverInstalled===17)return;window.__studyStudentSolverInstalled=17;
+  if(window.__studyStudentSolverInstalled===18)return;window.__studyStudentSolverInstalled=18;
 
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1100;
@@ -124,9 +124,23 @@
             if(err?.status===502||err?.status===503||err?.status===504)throw new Error(String(d?.error||'AI backend đang tạm thời không khả dụng. Hệ thống đã thử lại 3 lần.'));
             throw err;
           }finally{clearTimeout(timer)}
-          thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.dataset.studyQuery=userText;msg.textContent=answer;box.appendChild(msg);
+          thinking.remove();
+          const answer=String(d.answer||'Mình chưa có câu trả lời.');
+          const msg=document.createElement('div');
+          msg.className='study-ai-msg bot';
+          msg.style.whiteSpace='normal';
+          msg.dataset.studyQuery=userText;
+          box.appendChild(msg);
+          // Render through the dedicated AI renderer first. This prevents raw \\[ \\], \\frac, \\le,
+          // and other TeX from leaking into the chat even when MathJax is not ready yet.
+          if(typeof window.renderStudyAiMessage==='function'){
+            try{window.renderStudyAiMessage(msg,answer)}catch(_e){msg.textContent=answer}
+          }else{
+            msg.textContent=answer;
+            if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}
+          }
           if(d.tool){const tag=document.createElement('div');tag.className='study-ai-tool-tag';tag.textContent=String(d.tool).startsWith('MER')?'🧠 '+String(d.tool):'Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
-          if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}
+          box.scrollTop=box.scrollHeight;
           box.scrollTop=box.scrollHeight;form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
         }catch(err){thinking.textContent='Lỗi: '+String(err.message||err);thinking.classList.remove('study-ai-thinking')}
         finally{form.dataset.studyBusy='0';if(submit){submit.disabled=false;submit.removeAttribute('aria-busy');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}}

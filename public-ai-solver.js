@@ -183,6 +183,24 @@
     compressImage(file).then(dataUrl=>{form.__studyImageData=dataUrl;let pv=form.querySelector('[data-study-image-preview]');if(!pv){pv=document.createElement('div');pv.dataset.studyImagePreview='1';pv.style.cssText='margin-top:8px;display:flex;align-items:center;gap:8px';pv.innerHTML='<img alt="Ảnh đề bài" style="width:72px;height:54px;object-fit:cover;border-radius:10px;border:1px solid rgba(100,100,140,.25);cursor:zoom-in"><button type="button" class="theme-chip">Xoá ảnh</button>';form.insertBefore(pv,form.querySelector('textarea'));pv.querySelector('button').onclick=e=>{e.preventDefault();e.stopPropagation();form.__studyImageData='';pv.remove()};pv.querySelector('img').onclick=()=>openImageViewer(pv.querySelector('img').src,'Ảnh đề bài')}pv.querySelector('img').src=dataUrl;modal.classList.remove('hidden')}).catch(err=>{form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();modal.classList.remove('hidden');const box=modal.querySelector('#studyAiMessages');if(box){const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent='Lỗi: '+String(err.message||err);box.appendChild(msg);box.scrollTop=box.scrollHeight}})
   }
   function restoreSolverAfterCamera(){try{if(sessionStorage.getItem(CAMERA_RESTORE_KEY)!=='1')return;sessionStorage.removeItem(CAMERA_RESTORE_KEY)}catch(_e){}setTimeout(()=>{const modal=document.getElementById('study-ai-support');if(modal)modal.classList.remove('hidden');addComposerTools()},0)}
+  // Global capture fallback: some mobile webviews/embedded browsers can swallow the button's
+  // direct listener. Capture here and route the click to the same solver exactly once.
+  document.addEventListener('click',function(e){
+    const btn=e.target?.closest?.('[data-study-send]');
+    if(!btn)return;
+    const form=btn.closest('#studyAiForm');
+    if(!form)return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if(typeof form.__studySubmit==='function'){
+      form.__studySubmit(e);
+      return;
+    }
+    // The modal may have been created after the initial observer pass.
+    addComposerTools();
+    setTimeout(()=>{ if(typeof form.__studySubmit==='function') form.__studySubmit(e); },0);
+  },true);
+
   const obs=new MutationObserver(()=>setTimeout(addComposerTools,0));obs.observe(document.documentElement,{childList:true,subtree:true});window.addEventListener('pageshow',restoreSolverAfterCamera);window.addEventListener('focus',restoreSolverAfterCamera);
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{addComposerTools();restoreSolverAfterCamera()},100));else setTimeout(()=>{addComposerTools();restoreSolverAfterCamera()},100);
 })();

@@ -108,10 +108,60 @@
             let lastErr=null;
             for(let attempt=0;attempt<3;attempt++){
               try{
-                r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
-                d=await r.json().catch(()=>({}));
-                if(r.ok)break;
-                lastErr=Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:r.status,providerStatus:d.providerStatus,code:d.code,retryable:d.retryable});
+                r=await fetch('/api/solve?stream=1',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
+                const contentType=String(r.headers.get('content-type')||'').toLowerCase();
+                if(contentType.includes('text/event-stream')&&r.body){
+                  const reader=r.body.getReader(),decoder=new TextDecoder(),chunks=[];let buffer='',streamDone=false;
+                  const stageText=(stage,p={})=>{
+                    const label=thinking.querySelector('.study-ai-thinking-label');if(!label)return;
+                    const map={
+                      connected:'Đã kết nối bộ giải…',
+                      cache_hit:'⚡ Đã tìm thấy lời giải đã lưu.',
+                      cache_miss:'🔎 Đang xử lý bài mới…',
+                      solver_started:p.tier==='deep'?'🧠 Đang giải theo chế độ Deep / VMO…':p.tier==='hard'?'🧠 Đang giải bài nâng cao…':'⚡ Đang xử lý…',
+                      experts_started:'🧠 Đang chạy các chuyên gia song song…',
+                      experts_done:'🔎 Đã nhận các hướng giải, đang đối chiếu…',
+                      review_started:'🧪 Đang kiểm tra và hoàn thiện lời giải…',
+                      review_skipped:'✅ Hai hướng giải đồng ý, bỏ qua vòng kiểm tra nặng.',
+                      review_done:'✅ Đã kiểm tra xong, chuẩn bị hiển thị lời giải.',
+                      review_fallback:'⚡ Vòng kiểm tra quá lâu, dùng lời giải tốt nhất đã có.',
+                      audit_started:'🔬 Đang kiểm chứng bước quan trọng…',
+                      audit_done:'✅ Kiểm chứng hoàn tất.',
+                      verification_started:'🔍 Đang kiểm tra bằng công cụ…',
+                      verification_done:'✅ Kiểm tra công cụ hoàn tất.',
+                      completed:'✅ Hoàn tất.'
+                    };
+                    label.textContent=map[stage]||'Đang xử lý…';
+                  };
+                  while(!streamDone){
+                    const part=await reader.read();if(part.done)break;
+                    buffer+=decoder.decode(part.value,{stream:true});
+                    const events=buffer.split(/\n\n/);buffer=events.pop()||'';
+                    for(const block of events){
+                      let event='message',data='';
+                      for(const line of block.split(/\n/)){
+                        if(line.startsWith('event:'))event=line.slice(6).trim();
+                        else if(line.startsWith('data:'))data+=line.slice(5).trim();
+                      }
+                      if(!data)continue;
+                      let obj={};try{obj=JSON.parse(data)}catch{continue}
+                      if(event==='stage'){stageText(String(obj.stage||''),obj);}
+                      else if(event==='result'){
+                        const st=Number(obj.status||200),payloadData=obj.data||{};
+                        if(st>=400)throw Object.assign(new Error(String(payloadData.error||'Solver error')),{status:st,code:payloadData.code,retryable:payloadData.retryable});
+                        d=payloadData;streamDone=true;break;
+                      }else if(event==='error'){
+                        throw new Error(String(obj.message||'AI backend error'));
+                      }
+                    }
+                  }
+                  await reader.cancel().catch(()=>{});
+                }else{
+                  d=await r.json().catch(()=>({}));
+                }
+                if(r.ok&&d?.answer)break;
+                if(r.ok&&!d?.error)break;
+                lastErr=Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:Number(d.status)||r.status,providerStatus:d.providerStatus,code:d.code,retryable:d.retryable});
                 const retryable=!!d.retryable||r.status===408||r.status===409||r.status===425||r.status===429||r.status>=500;
                 if(!retryable||attempt===2)throw lastErr;
                 await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));

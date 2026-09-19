@@ -1,7 +1,7 @@
 /* STUDY TH — AI chat renderer V3: Markdown + KaTeX + safe math visualizations. */
 (function(){
-  if(window.__studyAiRendererV6)return;
-  window.__studyAiRendererV6=true;
+  if(window.__studyAiRendererV7)return;
+  window.__studyAiRendererV7=true;
   var BASE='https://cdn.jsdelivr.net/npm/katex@0.18.0/dist/';
   var ready=null;
 
@@ -219,9 +219,34 @@
     return {html:'<div class="ai-table-wrap"><table class="ai-table"><thead><tr>'+h.map(function(c){return '<th>'+inline(c)+'</th>'}).join('')+'</tr></thead><tbody>'+rows.map(function(r){return '<tr>'+h.map(function(_,k){return '<td>'+inline(r[k]||'')+'</td>'}).join('')+'</tr>'}).join('')+'</tbody></table></div>',next:j};
   }
 
+  function looseTable(lines,i){
+    if(i+1>=lines.length)return null;
+    function splitRow(x){
+      return x.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(function(v){return v.trim()});
+    }
+    var first=splitRow(lines[i]),second=splitRow(lines[i+1]);
+    if(first.length<4||second.length<4)return null;
+    if(lines[i].trim().indexOf('|')<0||lines[i+1].trim().indexOf('|')<0)return null;
+    var rows=[first,second],j=i+2;
+    while(j<lines.length&&lines[j].trim().indexOf('|')>=0){
+      var row=splitRow(lines[j]);if(row.length<3)break;
+      rows.push(row);j++;
+    }
+    var cols=Math.max.apply(null,rows.map(function(r){return r.length}));
+    var html='<div class="ai-loose-table"><table><tbody>'+rows.map(function(r,ri){
+      var cells=[];
+      for(var k=0;k<cols;k++){
+        var tag=ri===0?'th':'td';
+        cells.push('<'+tag+'>'+inline(r[k]||'')+'</'+tag+'>');
+      }
+      return '<tr>'+cells.join('')+'</tr>';
+    }).join('')+'</tbody></table></div>';
+    return {html:html,next:j};
+  }
+
   function md(text,node){
     var visual=graphSpecFromRaw(text,node),src=String(text==null?'':text).replace(/\r/g,''),visualHtml='';
-    src=src.replace(/^[ \\t]*(?:---+|\.)[ \\t]+(?=(?:#{1,3}[ \\t]+|\\d+[.)][ \\t]+))/gm,'');
+    src=normalizeStudentMathSource(src);
     if(visual){if(visual.explicit&&visual.rawBlock)src=src.replace(visual.rawBlock,'');if(visual.spec)visualHtml=buildGraph(visual.spec)||''}
 
     // Keep display-math delimiters together. The previous renderer split \\[ ... \\]
@@ -261,6 +286,7 @@
         i=j2;
         out.push('<pre><code>'+esc(block.join('\\n'))+'</code></pre>');continue;
       }
+      var lt=looseTable(lines,i);if(lt){end();out.push(lt.html);i=lt.next-1;continue}
       if(/^---+$/.test(raw)){end();out.push('<hr>');continue}
       m=raw.match(/^#{1,3}\\s+(.+)$/);if(m){end();out.push('<h3>'+inline(m[1])+'</h3>');continue}
       m=raw.match(/^(?:[-*]|•)\\s+(.+)$/);if(m){if(!list){out.push('<ul>');list=true}out.push('<li>'+inline(m[1])+'</li>');continue}
@@ -275,8 +301,18 @@
     if(document.getElementById('study-ai-renderer-v4-style'))return;
     var s=document.createElement('style');s.id='study-ai-renderer-v4-style';
     s.textContent='.study-math-fallback{display:inline-block;font-family:Cambria,Georgia,serif;font-size:1.05em;vertical-align:middle}.study-math-block{display:block;text-align:center;margin:8px 0}.study-math-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.05;margin:0 2px}.study-math-num{padding:0 3px;border-bottom:1px solid currentColor}.study-math-den{padding:0 3px}.study-math-sqrt{display:inline-flex;align-items:center}.study-math-sqrt>span{border-top:1px solid currentColor;margin-left:1px;padding:0 2px}.study-math-fallback sup,.study-math-fallback sub{font-size:.72em;line-height:0}'+
-'.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-case-row{display:block;padding:2px 0}.study-cases{display:inline-block;vertical-align:middle;border-left:2px solid currentColor;padding:2px 0 2px 14px;margin-right:6px}.study-cases-tail{display:inline-block;vertical-align:middle}.ai-math-block{display:block;text-align:center;overflow-x:auto;padding:8px 4px;margin:10px 0 14px;line-height:1.8}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
+'.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-case-row{display:block;padding:2px 0}.study-ai-msg.bot .ai-loose-table{display:block;overflow-x:auto;margin:8px 0 14px}.study-ai-msg.bot .ai-loose-table table{border-collapse:collapse;margin:auto;min-width:70%}.study-ai-msg.bot .ai-loose-table th,.study-ai-msg.bot .ai-loose-table td{border:1px solid rgba(90,100,150,.18);padding:7px 11px;text-align:center;white-space:nowrap}.study-ai-msg.bot .ai-loose-table th{font-weight:800;background:rgba(90,100,150,.07)}.study-cases{display:inline-block;vertical-align:middle;border-left:2px solid currentColor;padding:2px 0 2px 14px;margin-right:6px}.study-cases-tail{display:inline-block;vertical-align:middle}.ai-math-block{display:block;text-align:center;overflow-x:auto;padding:8px 4px;margin:10px 0 14px;line-height:1.8}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
     document.head.appendChild(s);
+  }
+
+  function normalizeStudentMathSource(value){
+    var s=String(value||'');
+    s=s.replace(/\s*---\s*(?=#{1,3}\s+)/g,'\n');
+    s=s.replace(/([^\n])\s+(#{1,3}\s+\d+[.)])/g,'$1\n$2');
+    s=s.replace(/([^\n])\s+((?:\*|•|-)\s+)/g,'$1\n$2');
+    s=s.replace(/^\s*---\s*$/gm,'');
+    s=s.replace(/\[object\s*Object\]/gi,'');
+    return s;
   }
 
   function fallbackMathHtml(math){
@@ -286,7 +322,7 @@
     s=s.replace(/\\left\s*|\\right\s*/g,'');
 
     // Simple "cases" fallback for equality conditions.
-    var cm=s.match(/\\begin\{cases\}([\s\S]*?)\\end\{cases\}/i);
+    var cm=s.match(/(?:\\)?begin\{cases\}([\s\S]*?)(?:\\)?end\{cases\}/i);
     if(cm){
       var rows=cm[1].split(/\\\\/).map(function(row){return String(row||'').trim()}).filter(Boolean);
       var inner=rows.map(function(row){return '<div class="study-case-row">'+fallbackMathHtml(row)+'</div>'}).join('');
@@ -347,7 +383,7 @@
     while((n=walker.nextNode()))nodes.push(n);
     nodes.forEach(function(t){
       var raw=t.nodeValue||'';
-      if(!/\$\$|\\\[|\\\(|\\frac|\\dfrac|\\sqrt|\\begin\{cases\}|\\iff|\\(?:ge|le|neq|cdot|times|pm|infty|alpha|beta|gamma|delta|theta|lambda|mu|pi|rho|sigma|tau|phi|omega)\b/.test(raw))return;
+      if(!/\$\$|\\\[|\\\(|\\frac|\\dfrac|\\sqrt|(?:\\)?begin\{cases\}|(?:\\)?(?:frac|dfrac|cdot|times|geq|leq|neq|iff|infty|mathbb)\b|\\(?:ge|le|neq|cdot|times|pm|infty|alpha|beta|gamma|delta|theta|lambda|mu|pi|rho|sigma|tau|phi|omega)\b/.test(raw))return;
       var out='',last=0,rx=/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([^$\n]+)\$/g,m;
       while((m=rx.exec(raw))){
         out+=esc(raw.slice(last,m.index));

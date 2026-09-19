@@ -76,7 +76,7 @@
         // Each new question is independent by default. Only carry a tiny context window
         // when the student clearly asks a follow-up, otherwise old/unrelated chats must never
         // contaminate a fresh VMO/math solve.
-        const followUp=/^(?:tiếp(?: tục)?|lam|làm tiếp|giải tiếp|tiếp phần|phần trên|bước trên|bước này|đoạn này|dòng này|chỗ này|vì sao(?: lại)?|tại sao(?: lại)?|giải thích(?: thêm)?|suy ra sao|suy ra như thế nào|từ đó|kết quả trên|đáp án trên|cách trên|cách đó|nó là gì|ý này|ý trên|that|this|continue|why|how so|explain)\\b/i.test(userText.trim()) || /^(?:vậy|thế|sao|rồi sao|còn|tiếp|hả|???)[?.!]*$/i.test(userText.trim());
+        const followUp=/^(?:tiếp(?: tục)?|lam|làm tiếp|giải tiếp|tiếp phần|phần trên|bước trên|bước này|đoạn này|dòng này|chỗ này|vì sao(?: lại)?|tại sao(?: lại)?|giải thích(?: thêm)?|suy ra sao|suy ra như thế nào|từ đó|kết quả trên|đáp án trên|cách trên|cách đó|nó là gì|ý này|ý trên|that|this|continue|why|how so|explain)\\b/i.test(userText.trim()) || /^(?:vậy|thế|sao|rồi sao|còn|tiếp|hả|\?\?\?)[?.!]*$/i.test(userText.trim());
         const history=followUp
           ? [...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')]
               .map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim().slice(0,2800)}))

@@ -73,6 +73,58 @@ export default async function handler(req,res){
   }
   req.body={...guarded.body,message:ingress.message,history:ingress.history};
 
+  const wantsStream=String(req?.query?.stream||'')==='1' || String(req?.headers?.accept||'').includes('text/event-stream');
+  if(wantsStream){
+    res.statusCode=200;
+    res.setHeader('Content-Type','text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control','no-cache, no-transform');
+    res.setHeader('Connection','keep-alive');
+    res.setHeader('X-Accel-Buffering','no');
+    const writeEvent=(event,payload)=>{
+      if(res.writableEnded)return;
+      try{res.write('event: '+event+'\\n'+'data: '+JSON.stringify(payload??{})+'\\n\\n');}catch{}
+    };
+    writeEvent('connected',{requestId});
+    req.__aiStage=async(stage,data={})=>writeEvent('stage',{stage,...data});
+    const heartbeat=setInterval(()=>writeEvent('ping',{t:Date.now()}),5000);
+
+    const originalEndStream=typeof res.end==='function'?res.end.bind(res):null;
+    const proxyStream={
+      ...res,
+      statusCode:200,
+      status(code){proxyStream.statusCode=code;return proxyStream;},
+      setHeader(...args){try{res.setHeader(...args)}catch{}return proxyStream;},
+      getHeader(...args){return res.getHeader?.(...args);},
+      json(payload){
+        clearInterval(heartbeat);
+        const body=JSON.stringify(payload??{});
+        const guardedResponse=guardAiResponse(body,'application/json; charset=utf-8');
+        writeEvent('result',{status:guardedResponse.ok?proxyStream.statusCode:guardedResponse.status,data:guardedResponse.ok?payload:JSON.parse(guardedResponse.body)});
+        writeEvent('done',{});
+        return originalEndStream?originalEndStream():undefined;
+      },
+      end(body){
+        clearInterval(heartbeat);
+        if(body!=null){
+          let payload=body;
+          try{payload=JSON.parse(String(body))}catch{}
+          writeEvent('result',{status:proxyStream.statusCode,data:payload});
+        }
+        writeEvent('done',{});
+        return originalEndStream?originalEndStream():undefined;
+      }
+    };
+    try{
+      await solveHandler(req,proxyStream);
+    }catch(e){
+      clearInterval(heartbeat);
+      writeEvent('error',{message:String(e?.message||e),requestId});
+      writeEvent('done',{});
+      if(!res.writableEnded&&originalEndStream)originalEndStream();
+    }
+    return;
+  }
+
   const originalEnd=typeof res.end==='function'?res.end.bind(res):null;
   try{
     const internal=req.body;

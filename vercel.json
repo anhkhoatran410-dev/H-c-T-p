@@ -5,6 +5,8 @@
   "outputDirectory": ".",
   "functions": {
     "api/solve.js": { "maxDuration": 60, "supportsCancellation": true },
+    "api/solve-job.js": { "maxDuration": 15, "supportsCancellation": true },
+    "api/solve-job-status.js": { "maxDuration": 10, "supportsCancellation": true },
     "api/generate-exam.js": { "maxDuration": 300, "supportsCancellation": true },
     "api/generate-flashcards.js": { "maxDuration": 300, "supportsCancellation": true },
     "api/support-ai.js": { "maxDuration": 60, "supportsCancellation": true },

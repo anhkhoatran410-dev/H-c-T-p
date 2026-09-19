@@ -180,6 +180,8 @@ def call_solver(item):
                     "review_skipped": bool(data.get("reviewSkipped")), "agreement_score": data.get("agreementScore"),
                     "cache_hit": bool(data.get("cacheHit")), "stages": stages,
                     "solver_latency_sec": round(float(stages.get("solverMs") or 0) / 1000, 3) if stages.get("solverMs") is not None else None,
+                    "expert_latency_sec": round(float(data.get("expertLatencyMs") or 0) / 1000, 3) if data.get("expertLatencyMs") is not None else None,
+                    "review_latency_sec": round(float(data.get("reviewLatencyMs") or 0) / 1000, 3) if data.get("reviewLatencyMs") is not None else None,
                     "audit_latency_sec": round(float(stages.get("auditMs") or 0) / 1000, 3) if stages.get("auditMs") is not None else None,
                     "latency_sec": round(time.time() - req_started, 3),
                     "total_latency_sec": round(time.time() - started, 3), "attempts": attempt + 1,

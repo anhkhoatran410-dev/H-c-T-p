@@ -23,8 +23,8 @@ async function command(parts){
     return Array.isArray(d)?d[0]?.result??null:null;
   }catch{return null}finally{clearTimeout(timer)}
 }
-export function cacheKey({message,subject,tier}){
-  const raw=JSON.stringify({v:1,message:String(message||'').trim(),subject:String(subject||''),tier:String(tier||'fast')});
+export function cacheKey({message,subject,tier,promptVersion='20260919-pipeline-v3',modelVersion='gemini-3.8/3.7'}){
+  const raw=JSON.stringify({v:2,promptVersion,modelVersion,message:String(message||'').trim(),subject:String(subject||''),tier:String(tier||'fast')});
   return 'study-th:ai:answer:'+crypto.createHash('sha256').update(raw).digest('hex');
 }
 export async function getCached(key){

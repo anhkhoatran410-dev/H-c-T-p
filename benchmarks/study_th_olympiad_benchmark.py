@@ -238,6 +238,8 @@ def summarize(rows):
         "p95_latency_sec": round(p95, 2),
         "latency": metric(rows,"total_latency_sec"),
         "solver": metric(rows,"solver_latency_sec"),
+        "expert": metric(rows,"expert_latency_sec"),
+        "review": metric(rows,"review_latency_sec"),
         "audit_latency": metric(rows,"audit_latency_sec"),
     }
 

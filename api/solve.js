@@ -12,7 +12,7 @@ import solveHandler from '../lib/solve-legacy.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
-const MAX_REQUESTS = 30;
+const MAX_REQUESTS = 60;
 
 function writeAudit(req,fields){
   try{ void persistAudit(auditRecord(req,{endpoint:'/api/solve',...fields})); }catch{}
@@ -47,10 +47,8 @@ export default async function handler(req,res){
     return;
   }
   if(!(await distributedRateLimit(req,res,{windowMs:WINDOW_MS,max:MAX_REQUESTS,keyPrefix:'ai-solve'}))){
-    // Rate limiting a normal user is already a defensive control. Do not feed
-    // legitimate rate-limit hits into the threat score, which could escalate
-    // a student into the separate anti-automation challenge path.
-    await recordShieldViolation(req,'rate-limit');
+    // The dedicated rate limiter is the control here. A normal rate-limit hit
+    // must not also increase threat/quarantine scores.
     return;
   }
 

@@ -19,7 +19,7 @@ async function loadSolveHandler(){
 
 function imageInlinePart(image){
   const s=String(image||'');
-  const m=s.match(/^data:(image\\/[\\w.+-]+);base64,(.+)$/s);
+  const m=s.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);
   return m?{inlineData:{mimeType:m[1],data:m[2]}}:null;
 }
 
@@ -133,7 +133,7 @@ export default async function handler(req,res){
     res.setHeader('X-Accel-Buffering','no');
     const writeEvent=(event,payload)=>{
       if(res.writableEnded)return;
-      try{res.write('event: '+event+'\\n'+'data: '+JSON.stringify(payload??{})+'\\n\\n');}catch{}
+      try{res.write('event: '+event+'\n'+'data: '+JSON.stringify(payload??{})+'\n\n');}catch{}
     };
     writeEvent('connected',{requestId});
     req.__aiStage=async(stage,data={})=>writeEvent('stage',{stage,...data});

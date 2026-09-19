@@ -10,6 +10,15 @@ Worker bên ngoài Vercel để xử lý job Deep/VMO nền.
 - AI_WORKER_ID (tùy chọn)
 - AI_MAX_CONCURRENCY (mặc định 1)
 - AI_JOB_LEASE_SECONDS (mặc định 120)
+- AI_JOB_MAX_SECONDS (mặc định 600)
+- AI_QUEUE_BUSY_RETRY_SECONDS (mặc định 5)
+- AI_REAP_INTERVAL_MS (mặc định 30000)
+- AI_JOB_RETENTION_DAYS (mặc định 7)
+- AI_EXPERT_TIMEOUT_MS (worker: mặc định 120000)
+- AI_REVIEW_TIMEOUT_MS (worker: mặc định 90000)
+- AI_REPAIR_TIMEOUT_MS (worker: mặc định 30000)
+- AI_EXPERT_MAX_TOKENS (worker: mặc định 16000)
+- AI_REVIEW_MAX_TOKENS (worker: mặc định 16000)
 - AI_WORKER_POLL_MS (mặc định 1500)
 
 ## Chạy

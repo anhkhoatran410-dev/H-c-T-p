@@ -1,7 +1,7 @@
 /* STUDY TH — AI chat renderer V3: Markdown + KaTeX + safe math visualizations. */
 (function(){
-  if(window.__studyAiRendererV5)return;
-  window.__studyAiRendererV5=true;
+  if(window.__studyAiRendererV6)return;
+  window.__studyAiRendererV6=true;
   var BASE='https://cdn.jsdelivr.net/npm/katex@0.18.0/dist/';
   var ready=null;
 
@@ -221,6 +221,7 @@
 
   function md(text,node){
     var visual=graphSpecFromRaw(text,node),src=String(text==null?'':text).replace(/\r/g,''),visualHtml='';
+    src=src.replace(/^[ \\t]*(?:---+|\.)[ \\t]+(?=(?:#{1,3}[ \\t]+|\\d+[.)][ \\t]+))/gm,'');
     if(visual){if(visual.explicit&&visual.rawBlock)src=src.replace(visual.rawBlock,'');if(visual.spec)visualHtml=buildGraph(visual.spec)||''}
 
     // Keep display-math delimiters together. The previous renderer split \\[ ... \\]
@@ -263,7 +264,7 @@
       if(/^---+$/.test(raw)){end();out.push('<hr>');continue}
       m=raw.match(/^#{1,3}\\s+(.+)$/);if(m){end();out.push('<h3>'+inline(m[1])+'</h3>');continue}
       m=raw.match(/^(?:[-*]|•)\\s+(.+)$/);if(m){if(!list){out.push('<ul>');list=true}out.push('<li>'+inline(m[1])+'</li>');continue}
-      m=raw.match(/^\\d+[.)]\\s+(.+)$/);if(m){end();out.push('<div class="ai-numbered"><b>'+m[0].match(/^\\d+/)[0]+'.</b> '+inline(m[1])+'</div>');continue}
+      m=raw.match(/^\\.?\\s*(\\d+)[.)]\\s+(.+)$/);if(m){end();out.push('<div class="ai-numbered"><b>'+m[1]+'.</b> '+inline(m[2])+'</div>');continue}
       end();out.push('<p>'+inline(raw)+'</p>');
       if(visualHtml&&!visualInjected){out.push(visualHtml);visualInjected=true}
     }
@@ -295,9 +296,9 @@
     }
 
     var stash=[];
+    var HOLD_OPEN=String.fromCharCode(0xE000),HOLD_CLOSE=String.fromCharCode(0xE001);
     function hold(html){
-      // Private-use Unicode markers cannot be changed by superscript/subscript regexes.
-      var k='\\uE000'+stash.length+'\\uE001';
+      var k=HOLD_OPEN+stash.length+HOLD_CLOSE;
       stash.push(html);
       return k;
     }
@@ -336,7 +337,7 @@
       .replace(/\\\^\\{([^{}]+)\\}/g,'<sup>$1</sup>').replace(/\\\^([A-Za-z0-9]+)/g,'<sup>$1</sup>')
       .replace(/_\\{([^{}]+)\\}/g,'<sub>$1</sub>').replace(/_([A-Za-z0-9]+)/g,'<sub>$1</sub>');
 
-    stash.forEach(function(v,i){s=s.split('\\uE000'+i+'\\uE001').join(v)});
+    stash.forEach(function(v,i){s=s.split(HOLD_OPEN+i+HOLD_CLOSE).join(v)});
     return s;
   }
 

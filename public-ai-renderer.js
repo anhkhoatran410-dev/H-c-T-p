@@ -247,8 +247,63 @@
   function style(){
     if(document.getElementById('study-ai-renderer-v3-style'))return;
     var s=document.createElement('style');s.id='study-ai-renderer-v3-style';
-    s.textContent='.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
+    s.textContent='.study-math-fallback{display:inline-block;font-family:Cambria,Georgia,serif;font-size:1.05em;vertical-align:middle}.study-math-block{display:block;text-align:center;margin:8px 0}.study-math-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.05;margin:0 2px}.study-math-num{padding:0 3px;border-bottom:1px solid currentColor}.study-math-den{padding:0 3px}.study-math-sqrt{display:inline-flex;align-items:center}.study-math-sqrt>span{border-top:1px solid currentColor;margin-left:1px;padding:0 2px}.study-math-fallback sup,.study-math-fallback sub{font-size:.72em;line-height:0}'+
+'.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
     document.head.appendChild(s);
+  }
+
+  function fallbackMathHtml(math){
+    var s=String(math||'').trim(),stash=[];
+    function hold(html){var k='STUDY_MATH_HOLD_'+stash.length+'_END';stash.push(html);return k}
+    s=s.replace(/\\left\\s*|\\right\\s*/g,'');
+    for(var pass=0;pass<5;pass++){
+      var before=s;
+      s=s.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g,function(_,a,b){
+        return hold('<span class="study-math-frac"><span class="study-math-num">'+esc(a)+'</span><span class="study-math-den">'+esc(b)+'</span></span>');
+      });
+      s=s.replace(/\\sqrt\{([^{}]*)\}/g,function(_,a){
+        return hold('<span class="study-math-sqrt">√<span>'+esc(a)+'</span></span>');
+      });
+      if(s===before)break;
+    }
+    s=esc(s)
+      .replace(/\\geq?/g,'≥').replace(/\\leq?/g,'≤').replace(/\\neq?/g,'≠')
+      .replace(/\\cdot/g,'·').replace(/\\times/g,'×').replace(/\\pm/g,'±').replace(/\\mp/g,'∓')
+      .replace(/\\infty/g,'∞').replace(/\\forall/g,'∀').replace(/\\exists/g,'∃')
+      .replace(/\\in/g,'∈').replace(/\\notin/g,'∉')
+      .replace(/\\Rightarrow|\\Longrightarrow/g,'⇒').replace(/\\rightarrow|\\to/g,'→')
+      .replace(/\\leftarrow/g,'←').replace(/\\leftrightarrow/g,'↔')
+      .replace(/\\approx/g,'≈').replace(/\\equiv/g,'≡')
+      .replace(/\\alpha/g,'α').replace(/\\beta/g,'β').replace(/\\gamma/g,'γ').replace(/\\delta/g,'δ')
+      .replace(/\\theta/g,'θ').replace(/\\lambda/g,'λ').replace(/\\mu/g,'μ').replace(/\\pi/g,'π')
+      .replace(/\\rho/g,'ρ').replace(/\\sigma/g,'σ').replace(/\\tau/g,'τ').replace(/\\phi/g,'φ').replace(/\\omega/g,'ω')
+      .replace(/\^\{([^{}]+)\}/g,'<sup>$1</sup>').replace(/\^([A-Za-z0-9]+)/g,'<sup>$1</sup>')
+      .replace(/_\{([^{}]+)\}/g,'<sub>$1</sub>').replace(/_([A-Za-z0-9]+)/g,'<sub>$1</sub>')
+      .replace(/\\([A-Za-z]+)/g,'$1');
+    stash.forEach(function(v,i){s=s.split('STUDY_MATH_HOLD_'+i+'_END').join(v)});
+    return s;
+  }
+
+  function applyFallbackMath(root){
+    if(!root)return;
+    var walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),nodes=[],n;
+    while((n=walker.nextNode()))nodes.push(n);
+    nodes.forEach(function(t){
+      var raw=t.nodeValue||'';
+      if(!/\$\$|\\\[|\\\(|\\frac|\\sqrt|\\(?:ge|le|neq|cdot|times|pm|infty|alpha|beta|gamma|delta|theta|lambda|mu|pi|rho|sigma|tau|phi|omega)\b/.test(raw))return;
+      var out='',last=0,rx=/\$\$([\s\S]*?)\$\$|\\\[([\s\S]*?)\\\]|\\\(([\s\S]*?)\\\)|\$([^$\n]+)\$/g,m;
+      while((m=rx.exec(raw))){
+        out+=esc(raw.slice(last,m.index));
+        var math=m[1]!=null?m[1]:(m[2]!=null?m[2]:(m[3]!=null?m[3]:m[4]));
+        out+='<span class="study-math-fallback'+((m[1]!=null||m[2]!=null)?' study-math-block':'')+'">'+fallbackMathHtml(math)+'</span>';
+        last=rx.lastIndex;
+      }
+      out+=esc(raw.slice(last));
+      if(out!==esc(raw)){
+        var wrap=document.createElement('span');wrap.innerHTML=out;
+        t.parentNode.replaceChild(wrap,t);
+      }
+    });
   }
 
   function renderOne(node,raw){
@@ -258,8 +313,14 @@
     node.dataset.aiRaw=raw;node.dataset.aiRendered='html';node.innerHTML=md(raw,node);
     loadKatex().then(function(ok){
       if(ok&&document.documentElement.contains(node)&&typeof window.renderMathInElement==='function'){
-        try{window.renderMathInElement(node,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false},{left:'$',right:'$',display:false}],throwOnError:false,strict:false,trust:false});node.dataset.aiMathRendered='1'}catch(e){console.warn('AI KaTeX',e)}
+        try{
+          window.renderMathInElement(node,{delimiters:[{left:'$$',right:'$$',display:true},{left:'\\[',right:'\\]',display:true},{left:'\\(',right:'\\)',display:false},{left:'$',right:'$',display:false}],throwOnError:false,strict:false,trust:false});
+          node.dataset.aiMathRendered='1';
+          return;
+        }catch(e){console.warn('AI KaTeX',e)}
       }
+      applyFallbackMath(node);
+      node.dataset.aiMathRendered='fallback';
     });
   }
 

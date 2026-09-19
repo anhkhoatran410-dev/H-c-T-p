@@ -1,7 +1,7 @@
 /* STUDY TH — AI chat renderer V3: Markdown + KaTeX + safe math visualizations. */
 (function(){
-  if(window.__studyAiRendererV7)return;
-  window.__studyAiRendererV7=true;
+  if(window.__studyAiRendererV8)return;
+  window.__studyAiRendererV8=true;
   var BASE='https://cdn.jsdelivr.net/npm/katex@0.18.0/dist/';
   var ready=null;
 
@@ -298,7 +298,7 @@
   }
 
   function style(){
-    if(document.getElementById('study-ai-renderer-v7-style'))return;
+    if(document.getElementById('study-ai-renderer-v8-style'))return;
     var s=document.createElement('style');s.id='study-ai-renderer-v4-style';
     s.textContent='.study-math-fallback{display:inline-block;font-family:Cambria,Georgia,serif;font-size:1.05em;vertical-align:middle}.study-math-block{display:block;text-align:center;margin:8px 0}.study-math-frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.05;margin:0 2px}.study-math-num{padding:0 3px;border-bottom:1px solid currentColor}.study-math-den{padding:0 3px}.study-math-sqrt{display:inline-flex;align-items:center}.study-math-sqrt>span{border-top:1px solid currentColor;margin-left:1px;padding:0 2px}.study-math-fallback sup,.study-math-fallback sub{font-size:.72em;line-height:0}'+
 '.study-ai-msg.bot{line-height:1.72;white-space:normal;overflow-wrap:anywhere;word-break:break-word}.study-ai-msg.bot p{margin:0 0 10px}.study-ai-msg.bot h3{margin:10px 0 7px}.study-ai-msg.bot ul{padding-left:22px;margin:5px 0 10px}.study-ai-msg.bot li{margin:3px 0}.study-ai-msg.bot .ai-numbered{margin:5px 0}.study-ai-msg.bot .katex{font-size:1.08em}.study-case-row{display:block;padding:2px 0}.study-ai-msg.bot .ai-loose-table{display:block;overflow-x:auto;margin:8px 0 14px}.study-ai-msg.bot .ai-loose-table table{border-collapse:collapse;margin:auto;min-width:70%}.study-ai-msg.bot .ai-loose-table th,.study-ai-msg.bot .ai-loose-table td{border:1px solid rgba(90,100,150,.18);padding:7px 11px;text-align:center;white-space:nowrap}.study-ai-msg.bot .ai-loose-table th{font-weight:800;background:rgba(90,100,150,.07)}.study-cases{display:inline-block;vertical-align:middle;border-left:2px solid currentColor;padding:2px 0 2px 14px;margin-right:6px}.study-cases-tail{display:inline-block;vertical-align:middle}.ai-math-block{display:block;text-align:center;overflow-x:auto;padding:8px 4px;margin:10px 0 14px;line-height:1.8}.study-ai-msg.bot .katex-display{margin:.65em 0;overflow-x:auto}.study-visual-card{margin:12px 0 16px;padding:12px 10px;border:1px solid rgba(90,100,150,.18);border-radius:16px;background:rgba(90,100,150,.035);overflow:hidden}.study-visual-title{font-weight:800;text-align:center;margin:0 0 6px}.study-visual-caption{font-size:13px;opacity:.78;text-align:center;margin:0 8px 8px;line-height:1.5}.study-graph-svg{display:block;width:100%;height:auto;max-height:520px}.study-graph-svg .gline{stroke:currentColor;opacity:.12;stroke-width:1}.study-graph-svg .axis{stroke:currentColor;opacity:.72;stroke-width:1.8}.study-graph-svg .tick{font:12px system-ui,sans-serif;fill:currentColor;opacity:.68}.study-graph-svg .axisLabel{font:700 14px system-ui,sans-serif;fill:currentColor}.study-graph-svg .fline{fill:none;stroke-width:3}.study-graph-svg .f0{stroke:#2563eb}.study-graph-svg .f1{stroke:#dc2626}.study-graph-svg .f2{stroke:#16a34a}.study-graph-svg .f3{stroke:#a855f7}.study-graph-svg .point{fill:currentColor}.study-graph-svg .geoLine{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoCircle{stroke:currentColor;stroke-width:2;fill:none}.study-graph-svg .geoPoly{fill:currentColor;opacity:.05;stroke:currentColor;stroke-width:2}.study-graph-svg .diagramArrow{stroke:currentColor;stroke-width:2;fill:none;opacity:.7}.study-graph-svg .diagramNode{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1.5}.study-graph-svg .diagramText{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .pointLabel{font:700 12px system-ui,sans-serif;fill:currentColor}.study-graph-svg .annotationLine{stroke:currentColor;stroke-width:1.2;opacity:.55}.study-graph-svg .annotationBox{fill:var(--study-visual-bg,#fff);stroke:currentColor;stroke-width:1;opacity:.94}.study-graph-svg .annotationText{font:700 11px system-ui,sans-serif;fill:currentColor}.study-visual-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:12px;margin-top:4px}.legendItem{display:inline-flex;align-items:center;gap:5px}.legendDot{width:9px;height:9px;border-radius:50%;display:inline-block}.legendDot.f0{background:#2563eb}.legendDot.f1{background:#dc2626}.legendDot.f2{background:#16a34a}.legendDot.f3{background:#a855f7}';
@@ -311,6 +311,7 @@
     s=s.replace(/([^\n])\s+(#{1,3}\s+\d+[.)])/g,'$1\n$2');
     s=s.replace(/([^\n])\s+((?:\*|•|-)\s+)/g,'$1\n$2');
     s=s.replace(/^\s*---\s*$/gm,'');
+    s=s.replace(/\s*---\s*(?=#{1,3}\s*\d+[.)])/g,'\n');
     s=s.replace(/\[object\s*Object\]/gi,'');
     return s;
   }
@@ -320,6 +321,35 @@
     // Common malformed model output should never leak into the student UI.
     s=s.replace(/\[object\s*Object\]/gi,'≥').replace(/\[objectObject\]/gi,'≥');
     s=s.replace(/\\left\s*|\\right\s*/g,'');
+
+    // Normalize common math commands even when the model dropped the leading backslash.
+    s=s.replace(/(^|[^A-Za-z])mathbb\{R\}/g,'$1ℝ')
+      .replace(/(^|[^A-Za-z])mathbb\{Z\}/g,'$1ℤ')
+      .replace(/(^|[^A-Za-z])mathbb\{Q\}/g,'$1ℚ')
+      .replace(/(^|[^A-Za-z])mathbb\{N\}/g,'$1ℕ')
+      .replace(/(^|[^A-Za-z])implies\b/g,'$1⇒')
+      .replace(/(^|[^A-Za-z])iff\b/g,'$1⟺')
+      .replace(/(^|[^A-Za-z])cdot\b/g,'$1·')
+      .replace(/(^|[^A-Za-z])times\b/g,'$1×')
+      .replace(/(^|[^A-Za-z])geq\b/g,'$1≥')
+      .replace(/(^|[^A-Za-z])leq\b/g,'$1≤')
+      .replace(/(^|[^A-Za-z])neq\b/g,'$1≠')
+      .replace(/(^|[^A-Za-z])approx\b/g,'$1≈')
+      .replace(/(^|[^A-Za-z])equiv\b/g,'$1≡')
+      .replace(/(^|[^A-Za-z])infty\b/g,'$1∞')
+      .replace(/(^|[^A-Za-z])pi\b/g,'$1π')
+      .replace(/(^|[^A-Za-z])alpha\b/g,'$1α')
+      .replace(/(^|[^A-Za-z])beta\b/g,'$1β')
+      .replace(/(^|[^A-Za-z])gamma\b/g,'$1γ')
+      .replace(/(^|[^A-Za-z])delta\b/g,'$1δ')
+      .replace(/(^|[^A-Za-z])theta\b/g,'$1θ')
+      .replace(/(^|[^A-Za-z])lambda\b/g,'$1λ')
+      .replace(/(^|[^A-Za-z])mu\b/g,'$1μ')
+      .replace(/(^|[^A-Za-z])sigma\b/g,'$1σ')
+      .replace(/(^|[^A-Za-z])omega\b/g,'$1ω')
+      .replace(/(^|[^A-Za-z])sum\b/g,'$1∑')
+      .replace(/(^|[^A-Za-z])prod\b/g,'$1∏');
+
 
     // Simple "cases" fallback for equality conditions.
     var cm=s.match(/(?:\\)?begin\{cases\}([\s\S]*?)(?:\\)?end\{cases\}/i);
@@ -370,6 +400,9 @@
       .replace(/\\/g,' ')
       .replace(/\\begin\{[^{}]+\}/g,'').replace(/\\end\{[^{}]+\}/g,'')
       .replace(/\\([A-Za-z]+)/g,'$1')
+      .replace(/\s*=>\s*/g,' ⇒ ')
+      .replace(/\s*<=\s*/g,' ≤ ')
+      .replace(/\s*>=\s*/g,' ≥ ')
       .replace(/\^\{([^{}]+)\}/g,'<sup>$1</sup>').replace(/\^([A-Za-z0-9]+)/g,'<sup>$1</sup>')
       .replace(/_\{([^{}]+)\}/g,'<sub>$1</sub>').replace(/_([A-Za-z0-9]+)/g,'<sub>$1</sub>');
 
@@ -383,7 +416,7 @@
     while((n=walker.nextNode()))nodes.push(n);
     nodes.forEach(function(t){
       var raw=t.nodeValue||'';
-      if(!/\$\$|\\\[|\\\(|\\frac|\\dfrac|\\sqrt|(?:\\)?begin\{cases\}|(?:\\)?(?:frac|dfrac|cdot|times|geq|leq|neq|iff|infty|mathbb)\b|\\(?:ge|le|neq|cdot|times|pm|infty|alpha|beta|gamma|delta|theta|lambda|mu|pi|rho|sigma|tau|phi|omega)\b/.test(raw))return;
+      if(!/\$\$|\\\[|\\\(|\\frac|\\dfrac|\\sqrt|(?:\\)?begin\{cases\}|(?:\\)?(?:frac|dfrac|cdot|times|geq|leq|neq|iff|implies|infty|mathbb|sum|prod|approx|equiv|pi|alpha|beta|gamma|delta|theta|lambda|mu|sigma|omega)\b|\\(?:ge|le|neq|cdot|times|pm|infty|alpha|beta|gamma|delta|theta|lambda|mu|pi|rho|sigma|tau|phi|omega|sum|prod)\b|\b[A-Za-z0-9)\]}]+\^[A-Za-z0-9{]/.test(raw))return;
       if(!/\$\$|\\\[|\\\(|\$[^$]+\$/.test(raw)){
         var pretty=fallbackMathHtml(raw);
         var wrapBare=document.createElement('span');wrapBare.className='study-math-fallback';wrapBare.innerHTML=pretty;

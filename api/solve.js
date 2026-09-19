@@ -8,58 +8,7 @@ import { guardAiResponse } from '../lib/api/_response-guard.js';
 import { sanitizeAiBody } from '../lib/api/_prompt-security.js';
 import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
 import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
-import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
-
-
-let solveHandlerPromise=null;
-async function loadSolveHandler(){
-  if(!solveHandlerPromise) solveHandlerPromise=import('../lib/solve-legacy.js').then(m=>m.default);
-  return solveHandlerPromise;
-}
-
-function imageInlinePart(image){
-  const s=String(image||'');
-  const m=s.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);
-  return m?{inlineData:{mimeType:m[1],data:m[2]}}:null;
-}
-
-async function directGeminiFallback(body){
-  const pool=getAiKeyPool('GEMINI');
-  const models=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash'];
-  const message=String(body?.message||'Giải bài trong ảnh.');
-  const subject=String(body?.subject||'').trim();
-  const image=String(body?.imageDataUrl||'');
-  const parts=[{text:[
-    'Bạn là STUDY TH — bộ giải học tập dự phòng.',
-    'Giải trực tiếp từ đề hiện tại; không sử dụng dữ kiện từ câu hỏi trước.',
-    'Với toán: nêu dữ kiện, mục tiêu, ý tưởng, biến đổi quan trọng, kiểm tra và kết luận.',
-    'Với bài chứng minh: không được chỉ thử số; phải chứng minh mệnh đề tổng quát.',
-    'Mọi công thức phải nằm trong \\( ... \\) hoặc \\[ ... \\].',
-    'Môn: '+(subject||'chưa chọn'),
-    'Đề/Yêu cầu:',message
-  ].join('\\n')}];
-  const img=imageInlinePart(image); if(img)parts.push(img);
-  let last=null;
-  for(const apiEntry of pool.length?pool:[{key:String(process.env.GEMINI_API_KEY||'')}]){
-    const api=String(apiEntry?.key||'').trim(); if(!api)continue;
-    for(const model of models){
-      try{
-        const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
-          method:'POST',
-          headers:{'Content-Type':'application/json','x-goog-api-key':api},
-          body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:7000,thinkingConfig:{thinkingLevel:'high'}}}),
-          signal:AbortSignal.timeout(25000)
-        });
-        const raw=await r.text(); let d={}; try{d=raw?JSON.parse(raw):{}}catch{}
-        if(!r.ok){last=new Error(String(d?.error?.message||('Gemini HTTP '+r.status)));last.status=r.status;continue;}
-        const answer=String(d?.candidates?.[0]?.content?.parts?.filter(p=>p?.text).map(p=>p.text).join('')||'').trim();
-        if(answer)return {answer,model,source:'gemini-fallback',finalized:true,degraded:false,reviewSkipped:true};
-        last=new Error('Gemini trả về rỗng.');
-      }catch(e){last=e;}
-    }
-  }
-  throw last||Object.assign(new Error('GEMINI_API_KEY chưa được cấu hình.'),{code:'AI_CONFIG_MISSING'});
-}
+import solveHandler from '../lib/solve-legacy.js';
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -133,7 +82,7 @@ export default async function handler(req,res){
     res.setHeader('X-Accel-Buffering','no');
     const writeEvent=(event,payload)=>{
       if(res.writableEnded)return;
-      try{res.write('event: '+event+'\n'+'data: '+JSON.stringify(payload??{})+'\n\n');}catch{}
+      try{res.write('event: '+event+'\\n'+'data: '+JSON.stringify(payload??{})+'\\n\\n');}catch{}
     };
     writeEvent('connected',{requestId});
     req.__aiStage=async(stage,data={})=>writeEvent('stage',{stage,...data});
@@ -166,18 +115,11 @@ export default async function handler(req,res){
       }
     };
     try{
-      const solveHandler=await loadSolveHandler();
       await solveHandler(req,proxyStream);
     }catch(e){
       clearInterval(heartbeat);
-      try{
-        const fallback=await directGeminiFallback(req.body);
-        writeEvent('result',{status:200,data:{answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true}});
-        writeEvent('done',{});
-      }catch(fallbackError){
-        writeEvent('error',{message:String(fallbackError?.message||e?.message||e),requestId,code:fallbackError?.code||'solver-failed'});
-        writeEvent('done',{});
-      }
+      writeEvent('error',{message:String(e?.message||e),requestId});
+      writeEvent('done',{});
       if(!res.writableEnded&&originalEndStream)originalEndStream();
     }
     return;
@@ -206,22 +148,10 @@ export default async function handler(req,res){
         return originalEnd(response.ok?body:response.body,...rest);
       }
     };
-    const solveHandler=await loadSolveHandler();
     await solveHandler(req,proxyRes);
     writeAudit(req,{request_id:requestId,status_code:Number(res.statusCode||200),outcome:'response_delivered',model:null,response_text:responseCaptured||'',response_length:responseCaptured?.length||0,latency_ms:Date.now()-started});
   }catch(e){
-    try{
-      const fallback=await directGeminiFallback(req.body);
-      const payload={answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true,fallback:true,requestId};
-      writeAudit(req,{request_id:requestId,status_code:200,outcome:'fallback_response',model:fallback.model,response_text:fallback.answer,response_length:fallback.answer.length,latency_ms:Date.now()-started});
-      if(!res.headersSent){
-        res.statusCode=200;
-        res.setHeader('Content-Type','application/json; charset=utf-8');
-        return res.end(JSON.stringify(payload));
-      }
-    }catch(fallbackError){
-      writeAudit(req,{request_id:requestId,status_code:502,outcome:'solver_fallback_failed',reason:String(fallbackError?.code||'fallback-failed'),response_length:0,latency_ms:Date.now()-started});
-      if(!res.headersSent)return res.status(502).json({error:'Bộ giải AI tạm thời không khả dụng.',code:String(fallbackError?.code||'solver-fallback-failed'),requestId});
-    }
+    writeAudit(req,{request_id:requestId,status_code:500,outcome:'upstream_error',reason:'solver-error',response_length:0,latency_ms:Date.now()-started});
+    if(!res.headersSent)return res.status(500).json({error:'Solver error.',requestId});
   }
 }

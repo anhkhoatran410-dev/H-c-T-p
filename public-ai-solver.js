@@ -5,8 +5,8 @@
   const MAX_IMAGE_BYTES=12*1024*1024;
   const MAX_IMAGE_EDGE=1100;
   const MAX_IMAGE_DATA_CHARS=900000;
-  const FAST_SOLVER_TIMEOUT_MS=55000;
-  const DEEP_SOLVER_TIMEOUT_MS=59000;
+  const FAST_SOLVER_TIMEOUT_MS=40000;
+  const DEEP_SOLVER_TIMEOUT_MS=42000;
   const CAMERA_RESTORE_KEY='study_ai_restore_after_camera';
 
   function openImageViewer(src,alt='Ảnh đề bài'){
@@ -86,7 +86,8 @@
           if(window.renderStudyAiMessage){try{window.renderStudyAiMessage(msg,localGraph)}catch(_e){}}
           box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;
         }
-        const thinking=document.createElement('div');thinking.className='study-ai-msg bot study-ai-thinking';thinking.dataset.studyThinking='1';thinking.setAttribute('aria-label','Đang xử lý');thinking.innerHTML='<span></span><span></span><span></span>';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
+        const thinking=document.createElement('div');thinking.className='study-ai-msg bot study-ai-thinking';thinking.dataset.studyThinking='1';thinking.setAttribute('aria-label','Đang xử lý');thinking.innerHTML='<span></span><span></span><span></span><span class="study-ai-thinking-label">Đang giải bài…</span>';box.appendChild(thinking);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='1';
+        const progressTimer=setTimeout(()=>{if(form.dataset.studyBusy==='1'&&thinking.isConnected){const label=thinking.querySelector('.study-ai-thinking-label');if(label)label.textContent=deep?'Đang kiểm tra lời giải và các bước quan trọng…':'Đang xử lý…';}},7000);
         const submit=form.querySelector('[data-study-send]');if(submit){submit.disabled=true;submit.setAttribute('aria-busy','true');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}
         try{
           const subject=(window.state&&window.state.subject)||'',message=userText+(deep?'\nHãy tự kiểm tra kỹ các bước và kết quả, tìm cách giải từ bản chất, và trình bày đầy đủ đến kết luận; không bỏ qua phần chứng minh quan trọng.':'\nHãy giải nhanh nhưng đủ bước cần thiết, tập trung vào dữ kiện, cách làm và kết quả; tránh lan man.');
@@ -143,7 +144,7 @@
           box.scrollTop=box.scrollHeight;
           box.scrollTop=box.scrollHeight;form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
         }catch(err){thinking.textContent='Lỗi: '+String(err.message||err);thinking.classList.remove('study-ai-thinking')}
-        finally{form.dataset.studyBusy='0';if(submit){submit.disabled=false;submit.removeAttribute('aria-busy');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}}
+        finally{clearTimeout(progressTimer);form.dataset.studyBusy='0';if(submit){submit.disabled=false;submit.removeAttribute('aria-busy');submit.setAttribute('aria-label','Gửi');submit.textContent='Gửi'}}
       };
       form.__studySubmit=submitQuestion;
       const sendButton=form.querySelector('[data-study-send]');

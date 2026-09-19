@@ -101,7 +101,7 @@
             if(!r.ok)throw Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:r.status});
           }catch(err){
             if(err?.name==='AbortError')throw new Error(deep?'AI kiểm tra sâu phản hồi quá lâu.':'AI phản hồi quá lâu.');
-            if(err?.status===429)throw new Error('AI đang bận hoặc đã chạm giới hạn tạm thời. Thử lại sau ít giây.');
+            if(err?.status===429)throw new Error(String(d?.error||'AI đang bận hoặc đã chạm giới hạn tạm thời. Thử lại sau ít giây.'));
             if((err?.status===502||err?.status===503||err?.status===504)&&/^ai-provider-unavailable$|^gemini-config-missing$/i.test(String(d?.code||''))){
               throw new Error(String(d?.error||'AI backend chưa sẵn sàng.'));
             }

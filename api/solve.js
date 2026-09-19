@@ -8,7 +8,19 @@ import { guardAiResponse } from '../lib/api/_response-guard.js';
 import { sanitizeAiBody } from '../lib/api/_prompt-security.js';
 import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
 import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
-import solveHandler from '../lib/solve-legacy.js';
+
+
+async function loadSolveHandler(){
+  try{
+    const mod=await import('../lib/solve-legacy.js');
+    return mod.default;
+  }catch(e){
+    console.error('[STUDY_TH][solve][module-load]',e);
+    const err=new Error('Solver module load failed: '+String(e?.message||e));
+    err.code='solver-module-load-failed';
+    throw err;
+  }
+}
 
 const MAX_AI_BODY = 1_200_000;
 const WINDOW_MS = 60_000;
@@ -115,6 +127,7 @@ export default async function handler(req,res){
       }
     };
     try{
+      const solveHandler=await loadSolveHandler();
       await solveHandler(req,proxyStream);
     }catch(e){
       clearInterval(heartbeat);
@@ -148,6 +161,7 @@ export default async function handler(req,res){
         return originalEnd(response.ok?body:response.body,...rest);
       }
     };
+    const solveHandler=await loadSolveHandler();
     await solveHandler(req,proxyRes);
     writeAudit(req,{request_id:requestId,status_code:Number(res.statusCode||200),outcome:'response_delivered',model:null,response_text:responseCaptured||'',response_length:responseCaptured?.length||0,latency_ms:Date.now()-started});
   }catch(e){

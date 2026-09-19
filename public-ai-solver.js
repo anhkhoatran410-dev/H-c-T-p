@@ -109,7 +109,7 @@
             throw err;
           }finally{clearTimeout(timer)}
           thinking.remove();const answer=String(d.answer||'Mình chưa có câu trả lời.');const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.style.whiteSpace='pre-wrap';msg.dataset.studyQuery=userText;msg.textContent=answer;box.appendChild(msg);
-          if(d.tool){const tag=document.createElement('div');tag.className='study-ai-tool-tag';tag.textContent='Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
+          if(d.tool){const tag=document.createElement('div');tag.className='study-ai-tool-tag';tag.textContent=String(d.tool).startsWith('MER')?'🧠 '+String(d.tool):'Kiểm chứng: '+String(d.tool);msg.appendChild(tag)}
           if(window.MathJax?.typesetPromise){try{await window.MathJax.typesetPromise([msg])}catch(_e){}}
           box.scrollTop=box.scrollHeight;form.__studyImageData='';const pv=form.querySelector('[data-study-image-preview]');if(pv)pv.remove();
         }catch(err){thinking.textContent='Lỗi: '+String(err.message||err);thinking.classList.remove('study-ai-thinking')}

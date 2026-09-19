@@ -63,18 +63,27 @@ def call(item):
         try:
             with urllib.request.urlopen(req,timeout=TIMEOUT) as r:
                 d=json.loads(r.read().decode()); text=str(d.get('answer',''))
-                return {'ok':True,'latency':time.time()-req_start,'total_latency':time.time()-started,'attempts':attempt+1,'pred':pred(text),'gold':gold(item['answer']),'model':d.get('model'),'group':item['group'],'question':item['question'],'text':text[:1800]}
+                stages=d.get('stages') or {}
+                return {'ok':True,'latency':time.time()-req_start,'total_latency':time.time()-started,'attempts':attempt+1,'pred':pred(text),'gold':gold(item['answer']),'model':d.get('model'),'group':item['group'],'question':item['question'],'text':text[:1800],'reasoning_tier':(d.get('reasoningTier') or {}).get('tier'),'review_skipped':bool(d.get('reviewSkipped')),'cache_hit':bool(d.get('cacheHit')),'agreement_score':d.get('agreementScore'),'solver_latency_sec':float(stages.get('solverMs') or 0)/1000 if stages.get('solverMs') is not None else None,'expert_latency_sec':float(d.get('expertLatencyMs') or 0)/1000 if d.get('expertLatencyMs') is not None else None,'review_latency_sec':float(d.get('reviewLatencyMs') or 0)/1000 if d.get('reviewLatencyMs') is not None else None}
         except Exception as e:
             last=repr(e)
             if attempt < RETRIES:
                 time.sleep(min(8, 1.5*(attempt+1)))
     return {'ok':False,'latency':time.time()-started,'total_latency':time.time()-started,'attempts':RETRIES+1,'error':last,'gold':gold(item['answer']),'group':item['group'],'question':item['question']}
 
+def percentile(values,p):
+    xs=sorted(float(v) for v in values if v is not None)
+    return round(xs[min(len(xs)-1,max(0,int((len(xs)-1)*p)))],3) if xs else 0
+
+def stage_metrics(rows,key):
+    vals=[r.get(key) for r in rows if r.get(key) is not None]
+    return {'count':len(vals),'p50_sec':percentile(vals,.50),'p95_sec':percentile(vals,.95),'avg_sec':round(sum(vals)/len(vals),3) if vals else 0}
+
 def stat(rows):
     graded=[r for r in rows if r.get('gold') is not None and r.get('pred') is not None]
     passed=sum(r['pred']==r['gold'] for r in graded)
     http=sum(bool(r.get('ok')) for r in rows)
-    return {'total':len(rows),'graded':len(graded),'passed':passed,'accuracy_percent':round(100*passed/len(graded),2) if graded else 0,'http_ok':http,'http_ok_percent':round(100*http/len(rows),2) if rows else 0}
+    return {'total':len(rows),'graded':len(graded),'passed':passed,'accuracy_percent':round(100*passed/len(graded),2) if graded else 0,'http_ok':http,'http_ok_percent':round(100*http/len(rows),2) if rows else 0,'timeouts':sum('timeout' in str(r.get('error','')).lower() for r in rows),'review_skipped':sum(bool(r.get('review_skipped')) for r in rows),'review_skipped_percent':round(100*sum(bool(r.get('review_skipped')) for r in rows)/len(rows),2) if rows else 0,'cache_hits':sum(bool(r.get('cache_hit')) for r in rows),'cache_hit_percent':round(100*sum(bool(r.get('cache_hit')) for r in rows)/len(rows),2) if rows else 0,'solver':stage_metrics(rows,'solver_latency_sec'),'expert':stage_metrics(rows,'expert_latency_sec'),'review':stage_metrics(rows,'review_latency_sec'),'latency':stage_metrics(rows,'total_latency')}
 
 def main():
     if SMOKE_ONLY:

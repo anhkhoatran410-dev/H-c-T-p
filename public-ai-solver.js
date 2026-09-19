@@ -73,7 +73,15 @@
         const box=modal.querySelector('#studyAiMessages');if(!box)return;
         const userText=text||'Giải bài trong ảnh này.',deep=!!form.querySelector('[data-study-deep]')?.checked;
         const localFastReply=(()=>{const s=userText.trim().toLowerCase().replace(/[!?.,]+$/g,'');if(/^(hi|hello|hey|chào|chao|xin chào|xin chao|alo|hí|helo)$/.test(s))return 'Chào bạn 👋 Mình đang sẵn sàng hỗ trợ học tập. Bạn gửi bài hoặc câu hỏi mình sẽ xử lý ngay.';if(/^(cảm ơn|cam on|thanks|thank you)$/.test(s))return 'Không có gì 👌 Gửi bài tiếp theo khi cần nhé.';return null})();
-        const history=[...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')].map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim().slice(0,3500)})).filter(x=>x.message).slice(-6);
+        // Each new question is independent by default. Only carry a tiny context window
+        // when the student clearly asks a follow-up, otherwise old/unrelated chats must never
+        // contaminate a fresh VMO/math solve.
+        const followUp=/^(?:tiếp(?: tục)?|lam|làm tiếp|giải tiếp|tiếp phần|phần trên|bước trên|bước này|đoạn này|dòng này|chỗ này|vì sao(?: lại)?|tại sao(?: lại)?|giải thích(?: thêm)?|suy ra sao|suy ra như thế nào|từ đó|kết quả trên|đáp án trên|cách trên|cách đó|nó là gì|ý này|ý trên|that|this|continue|why|how so|explain)\\b/i.test(userText.trim()) || /^(?:vậy|thế|sao|rồi sao|còn|tiếp|hả|???)[?.!]*$/i.test(userText.trim());
+        const history=followUp
+          ? [...box.querySelectorAll('.study-ai-msg:not([data-study-thinking])')]
+              .map(x=>({role:x.classList.contains('user')?'user':'assistant',message:x.textContent.trim().slice(0,2800)}))
+              .filter(x=>x.message).slice(-4)
+          : [];
         const userMsg=document.createElement('div');userMsg.className='study-ai-msg user';userMsg.textContent=userText+(img?' · ảnh':'');if(img)addSentImage(userMsg,img);box.appendChild(userMsg);
         if(localFastReply&&!img){
           const msg=document.createElement('div');msg.className='study-ai-msg bot';msg.textContent=localFastReply;msg.dataset.studyQuery=userText;box.appendChild(msg);box.scrollTop=box.scrollHeight;ta.value='';form.dataset.studyBusy='0';return;

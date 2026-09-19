@@ -1,9 +1,9 @@
-import './_gemini-network-guard.js';
-import { enforceBodySize, enforceJsonContentType, sameOrigin, distributedRateLimit, applySecurityHeaders, safeRequestId } from './_security.js';
-import { enforceCostChallenge } from './_adaptive-defense.js';
-import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
-import { sanitizeAiIngress } from './_ai-input-guard.js';
-import { auditRecord, persistAudit } from './_audit-log.js';
+import '../lib/api/_gemini-network-guard.js';
+import { enforceBodySize, enforceJsonContentType, sameOrigin, distributedRateLimit, applySecurityHeaders, safeRequestId } from '../lib/api/_security.js';
+import { enforceCostChallenge } from '../lib/api/_adaptive-defense.js';
+import { enforceAgentThreatDefense, recordAgentSignal } from '../lib/api/_agent-threat-defense.js';
+import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
+import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
 
 const MODELS=['gemini-3.6-flash','gemini-3.5-flash-lite'];
 

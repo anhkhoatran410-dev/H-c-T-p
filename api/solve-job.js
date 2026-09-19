@@ -1,7 +1,7 @@
-import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, rateLimit, safeRequestId } from './_security.js';
-import { sanitizeAiBody } from './_prompt-security.js';
-import { sanitizeAiIngress } from './_ai-input-guard.js';
-import { createJob } from './_ai-job-store.js';
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, rateLimit, safeRequestId } from '../lib/api/_security.js';
+import { sanitizeAiBody } from '../lib/api/_prompt-security.js';
+import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
+import { createJob } from '../lib/api/_ai-job-store.js';
 
 const MAX_BODY=1_200_000;
 const DEEP_RE=/\b(?:vmo|imo|aime|olympiad|olympic|vmop|vòng chọn đội|đội tuyển|kỳ thi olympic)\b/i;

@@ -1,6 +1,6 @@
 import { isAdminRequest } from './admin-login.js';
-import './_gemini-network-guard.js';
-import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
+import '../lib/api/_gemini-network-guard.js';
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
 import adminAssistantHandler from '../lib/admin-assistant.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();

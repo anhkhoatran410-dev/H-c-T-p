@@ -4,55 +4,148 @@
   "framework": null,
   "outputDirectory": ".",
   "functions": {
-    "api/solve.js": { "maxDuration": 60, "supportsCancellation": true },
-    "api/solve-job.js": { "maxDuration": 15, "supportsCancellation": true },
-    "api/solve-job-status.js": { "maxDuration": 10, "supportsCancellation": true },
-    "api/generate-exam.js": { "maxDuration": 300, "supportsCancellation": true },
-    "api/generate-flashcards.js": { "maxDuration": 300, "supportsCancellation": true },
-    "api/support-ai.js": { "maxDuration": 60, "supportsCancellation": true },
-    "api/admin-command.js": { "maxDuration": 60, "supportsCancellation": true },
-    "api/system-control.js": { "maxDuration": 30, "supportsCancellation": true }
+    "api/solve.js": {
+      "maxDuration": 60,
+      "supportsCancellation": true
+    },
+    "api/solve-job.js": {
+      "maxDuration": 15,
+      "supportsCancellation": true
+    },
+    "api/solve-job-status.js": {
+      "maxDuration": 10,
+      "supportsCancellation": true
+    },
+    "api/generate-exam.js": {
+      "maxDuration": 300,
+      "supportsCancellation": true
+    },
+    "api/generate-flashcards.js": {
+      "maxDuration": 300,
+      "supportsCancellation": true
+    },
+    "api/support-ai.js": {
+      "maxDuration": 60,
+      "supportsCancellation": true
+    },
+    "api/admin-command.js": {
+      "maxDuration": 60,
+      "supportsCancellation": true
+    },
+    "api/system-control.js": {
+      "maxDuration": 30,
+      "supportsCancellation": true
+    }
   },
   "headers": [
     {
       "source": "/",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate"
+        }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" },
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
-        { "key": "Cross-Origin-Resource-Policy", "value": "same-origin" },
-        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains"
+        }
       ]
     },
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     }
   ],
   "redirects": [
-    { "source": "/api/solve.js", "destination": "/api/solve", "statusCode": 307 }
+    {
+      "source": "/api/solve.js",
+      "destination": "/api/solve",
+      "statusCode": 307
+    }
   ],
   "rewrites": [
-    { "source": "/api/generate-flashcards-v3", "destination": "/api/generate-flashcards" },
-    { "source": "/api/generate-flashcards-v3.js", "destination": "/api/generate-flashcards" },
-    { "source": "/api/admin-assistant", "destination": "/api/admin-tools?route=admin-assistant" },
-    { "source": "/api/admin-command", "destination": "/api/admin-tools?route=admin-command" },
-    { "source": "/api/admin-health", "destination": "/api/admin-tools?route=admin-health" },
-    { "source": "/api/admin-delete-exam", "destination": "/api/admin-tools?route=admin-delete-exam" },
-    { "source": "/api/admin-delete-exams-bulk", "destination": "/api/admin-tools?route=admin-delete-exams-bulk" },
-    { "source": "/api/admin-update-exam", "destination": "/api/admin-tools?route=admin-update-exam" },
-    { "source": "/api/client-meta", "destination": "/api/admin-tools?route=client-meta" },
-    { "source": "/api/system-incidents", "destination": "/api/system-control?route=incidents" },
-    { "source": "/api/ai-lockdown", "destination": "/api/system-control?route=lockdown" }
+    {
+      "source": "/api/generate-flashcards-v3",
+      "destination": "/api/generate-flashcards"
+    },
+    {
+      "source": "/api/generate-flashcards-v3.js",
+      "destination": "/api/generate-flashcards"
+    },
+    {
+      "source": "/api/admin-assistant",
+      "destination": "/api/admin-tools?route=admin-assistant"
+    },
+    {
+      "source": "/api/admin-command",
+      "destination": "/api/admin-tools?route=admin-command"
+    },
+    {
+      "source": "/api/admin-health",
+      "destination": "/api/admin-tools?route=admin-health"
+    },
+    {
+      "source": "/api/admin-delete-exam",
+      "destination": "/api/admin-tools?route=admin-delete-exam"
+    },
+    {
+      "source": "/api/admin-delete-exams-bulk",
+      "destination": "/api/admin-tools?route=admin-delete-exams-bulk"
+    },
+    {
+      "source": "/api/admin-update-exam",
+      "destination": "/api/admin-tools?route=admin-update-exam"
+    },
+    {
+      "source": "/api/client-meta",
+      "destination": "/api/admin-tools?route=client-meta"
+    },
+    {
+      "source": "/api/system-incidents",
+      "destination": "/api/system-control?route=incidents"
+    },
+    {
+      "source": "/api/ai-lockdown",
+      "destination": "/api/system-control?route=lockdown"
+    },
+    {
+      "source": "/api/maintenance",
+      "destination": "/api/system-control",
+      "statusCode": 307
+    }
   ]
 }

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { classifyGeminiFailure } from '../api/_gemini-error-policy.js';
-import { internalSignature, verifyTimestamp, consumeNonce } from '../api/_internal-replay.js';
-import { inspectAiPrompt, sanitizeAiBody } from '../api/_prompt-security.js';
-import { sanitizeAiIngress, inspectSemanticConversation } from '../api/_ai-input-guard.js';
-import { safeClientError, guardAiResponse } from '../api/_response-guard.js';
+import { classifyGeminiFailure } from '../lib/api/_gemini-error-policy.js';
+import { internalSignature, verifyTimestamp, consumeNonce } from '../lib/api/_internal-replay.js';
+import { inspectAiPrompt, sanitizeAiBody } from '../lib/api/_prompt-security.js';
+import { sanitizeAiIngress, inspectSemanticConversation } from '../lib/api/_ai-input-guard.js';
+import { safeClientError, guardAiResponse } from '../lib/api/_response-guard.js';
 
 const immediate401 = classifyGeminiFailure(401);
 assert.equal(immediate401.action, 'trip-immediately');
@@ -76,7 +76,7 @@ assert.equal(guardedPem.ok, false);
 assert.equal(guardedPem.status, 502);
 
 // Replay proof uses a tightly bounded Redis TTL when available.
-assert.equal(String((await readFile(new URL('../api/_internal-replay.js', import.meta.url), 'utf8'))).includes('NONCE_TTL_MS'), true);
+assert.equal(String((await readFile(new URL('../lib/api/_internal-replay.js', import.meta.url), 'utf8'))).includes('NONCE_TTL_MS'), true);
 
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 assert.equal(vercel.functions?.['api/_ai-gateway.js'], undefined);
@@ -92,7 +92,7 @@ const [adminTools, adminAssistant, adminCommand, systemControl, aiRenderer, math
   readFile(new URL('../api/system-control.js', import.meta.url), 'utf8'),
   readFile(new URL('../public-ai-renderer.js', import.meta.url), 'utf8'),
   readFile(new URL('../math-render-final.js', import.meta.url), 'utf8'),
-  readFile(new URL('../api/_ai-input-guard.js', import.meta.url), 'utf8'),
+  readFile(new URL('../lib/api/_ai-input-guard.js', import.meta.url), 'utf8'),
 ]);
 
 for (const source of [adminTools, adminAssistant, adminCommand, systemControl]) {

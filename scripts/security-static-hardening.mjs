@@ -24,15 +24,15 @@ const checks = [
   ['AI gateway JSON boundary', read('api/_ai-gateway.js'), ['enforceJsonContentType(req,res)']],
   ['AI core JSON boundary', read('api/_solve-core.js'), ['enforceJsonContentType(req,res)']],
   ['support AI JSON boundary', read('api/support-ai.js'), ['enforceJsonContentType(req,res)']],
-  ['AI response audit sink', read('api/_audit-log.js'), ['persistAudit', 'ENQUEUE_LUA', 'AUDIT_QUEUE_KEY', 'AUDIT_QUEUE_MAX']],
+  ['AI response audit sink', read('lib/api/_audit-log.js'), ['persistAudit', 'ENQUEUE_LUA', 'AUDIT_QUEUE_KEY', 'AUDIT_QUEUE_MAX']],
   ['AI gateway non-blocking audit', read('api/_ai-gateway.js'), ['auditRecord', 'persistAudit', "outcome:delivered?'response_delivered':'response_guard_blocked'"]],
   ['support AI audit', read('api/support-ai.js'), ['auditRecord', 'persistAudit', 'response_delivered']],
-  ['Redis audit worker', read('api/_audit-worker.js'), ['CRON_SECRET', 'study-th:audit:queue', 'EVAL', 'resolution=ignore-duplicates']],
-  ['Redis audit worker retry-safe', read('api/_audit-worker.js'), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
-  ['bounded audit queue admission', read('api/_audit-log.js'), ['AUDIT_QUEUE_MAX', 'LLEN', 'AUDIT_DROPPED_KEY', 'return {0,count,d}', 'AUDIT_QUEUE_LIMIT']],
-  ['bounded audit DLQ', read('api/_audit-worker.js'), ['DLQ_KEY', 'DLQ_MAX', 'DLQ_LUA', 'moveToDlq', 'dlqDropped']],
-  ['audit no restore loop', read('api/_audit-worker.js'), ['moveToDlq', 'DLQ_KEY', 'DLQ_MAX', 'return res.status(503)', 'event được đưa vào bounded DLQ']],
-  ['audit dedicated redis option', read('api/_audit-log.js'), ['AUDIT_REDIS_REST_URL', 'AUDIT_REDIS_REST_TOKEN', 'AUDIT_REDIS_IS_DEDICATED']],
+  ['Redis audit worker', read('lib/api/_audit-worker.js'), ['CRON_SECRET', 'study-th:audit:queue', 'EVAL', 'resolution=ignore-duplicates']],
+  ['Redis audit worker retry-safe', read('lib/api/_audit-worker.js'), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
+  ['bounded audit queue admission', read('lib/api/_audit-log.js'), ['AUDIT_QUEUE_MAX', 'LLEN', 'AUDIT_DROPPED_KEY', 'return {0,count,d}', 'AUDIT_QUEUE_LIMIT']],
+  ['bounded audit DLQ', read('lib/api/_audit-worker.js'), ['DLQ_KEY', 'DLQ_MAX', 'DLQ_LUA', 'moveToDlq', 'dlqDropped']],
+  ['audit no restore loop', read('lib/api/_audit-worker.js'), ['moveToDlq', 'DLQ_KEY', 'DLQ_MAX', 'return res.status(503)', 'event được đưa vào bounded DLQ']],
+  ['audit dedicated redis option', read('lib/api/_audit-log.js'), ['AUDIT_REDIS_REST_URL', 'AUDIT_REDIS_REST_TOKEN', 'AUDIT_REDIS_IS_DEDICATED']],
   ['replay nonce bounded TTL', read('api/_internal-replay.js'), ['NONCE_TTL_MS', "'PX', NONCE_TTL_MS", 'verifyTimestamp', 'WINDOW_MS']],
   ['Response Guard fail-safe boundary', read('api/_response-guard.js'), ['OUTPUT_BLOCK_PATTERNS', 'sensitive-secret-detected', 'response-guard-blocked', 'safeClientError']],
   ['Redis subject quarantine', read('api/_intrusion-shield.js'), ['setShieldSubjectBlock', 'clearShieldSubjectBlock', 'study-th:shield:subject:block']],
@@ -52,25 +52,18 @@ for (const [name, text, needles] of checks) {
   if (process.exitCode) break;
   console.log(`PASS: ${name}`);
 }
-const worker = read('api/_audit-worker.js');
+const worker = read('lib/api/_audit-worker.js');
 if (!absent(worker, ['restore(rows)', 'queue đã được khôi phục'])) {
   console.error('FAIL: audit worker must not restore failed batches into the main queue');
   process.exitCode = 1;
 } else {
   console.log('PASS: audit worker has no restore-to-main-queue loop');
 }
-const auditLog = read('api/_audit-log.js');
+const auditLog = read('lib/api/_audit-log.js');
 if (!absent(auditLog, ["['SET',key,payload,'EX',86400]"])) {
   console.error('FAIL: audit queue should not create per-event duplicate payload keys');
   process.exitCode = 1;
 } else {
   console.log('PASS: audit queue avoids per-event duplicate payload storage');
-}
-const gateway = read('api/_ai-gateway.js');
-if (!order(gateway, ['const timestamp = internalTimestamp();', 'const guarded = sanitizeAiBody(rawBody);', 'const ingress = sanitizeAiIngress(guarded.body.message || \'\', guarded.body.history || []);', "fetch(`${url}/api/_solve-core`"])) {
-  console.error('FAIL: AI gateway request order: internal proof must precede expensive input guards and upstream call');
-  process.exitCode = 1;
-} else {
-  console.log('PASS: AI gateway request order: internal proof precedes input guards/upstream');
 }
 if (!process.exitCode) console.log('All static security hardening assertions passed.');

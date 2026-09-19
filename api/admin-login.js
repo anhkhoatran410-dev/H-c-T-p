@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, safeRequestId } from "./_security.js";
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, safeRequestId } from "../lib/api/_security.js";
 
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 8;

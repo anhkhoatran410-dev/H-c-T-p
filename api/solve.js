@@ -1,13 +1,13 @@
-import './_gemini-network-guard.js';
-import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, distributedRateLimit, safeRequestId } from './_security.js';
-import { shieldGate, recordShieldViolation } from './_intrusion-shield.js';
-import { enforceCostChallenge } from './_adaptive-defense.js';
-import { enforceAgentThreatDefense, recordAgentSignal } from './_agent-threat-defense.js';
-import { aiLockdownStatus } from './_emergency-lock.js';
-import { guardAiResponse } from './_response-guard.js';
-import { sanitizeAiBody } from './_prompt-security.js';
-import { sanitizeAiIngress } from './_ai-input-guard.js';
-import { auditRecord, persistAudit } from './_audit-log.js';
+import '../lib/api/_gemini-network-guard.js';
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, distributedRateLimit, safeRequestId } from '../lib/api/_security.js';
+import { shieldGate, recordShieldViolation } from '../lib/api/_intrusion-shield.js';
+import { enforceCostChallenge } from '../lib/api/_adaptive-defense.js';
+import { enforceAgentThreatDefense, recordAgentSignal } from '../lib/api/_agent-threat-defense.js';
+import { aiLockdownStatus } from '../lib/api/_emergency-lock.js';
+import { guardAiResponse } from '../lib/api/_response-guard.js';
+import { sanitizeAiBody } from '../lib/api/_prompt-security.js';
+import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
+import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
 import solveHandler from '../lib/solve-legacy.js';
 
 const MAX_AI_BODY = 1_200_000;

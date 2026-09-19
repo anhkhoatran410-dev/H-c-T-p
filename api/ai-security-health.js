@@ -1,6 +1,6 @@
 import { isAdminRequest } from './admin-login.js';
-import { applySecurityHeaders, enforceMethod, rateLimit, sameOrigin, safeRequestId } from './_security.js';
-import { aiPoolSnapshot } from './_ai-resilience.js';
+import { applySecurityHeaders, enforceMethod, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
+import { aiPoolSnapshot } from '../lib/api/_ai-resilience.js';
 
 export default async function handler(req,res){
   applySecurityHeaders(res);

@@ -89,12 +89,12 @@ setMockEnv(['SUPABASE_','SERVICE_ROLE_','KEY'], ['mock-','fixture']);
 setMockEnv(['GEMINI_','API_','KEY'], ['mock-','fixture']);
 void envName;
 
-const { auditRecord, persistAudit, AUDIT_QUEUE_LIMIT }=await import('../api/_audit-log.js');
-const { setShieldSubjectBlock, clearShieldSubjectBlock, shieldSubjectStatus, shieldSubjectFingerprint, shieldStatus }=await import('../api/_intrusion-shield.js');
-const { aiLockdownStatus, setAiLockdown }=await import('../api/_emergency-lock.js');
-const { warmAiKeyPool }=await import('../api/_ai-resilience.js');
-const { guardAiResponse }=await import('../api/_response-guard.js');
-const { consumeNonce }=await import('../api/_internal-replay.js');
+const { auditRecord, persistAudit, AUDIT_QUEUE_LIMIT }=await import('../lib/api/_audit-log.js');
+const { setShieldSubjectBlock, clearShieldSubjectBlock, shieldSubjectStatus, shieldSubjectFingerprint, shieldStatus }=await import('../lib/api/_intrusion-shield.js');
+const { aiLockdownStatus, setAiLockdown }=await import('../lib/api/_emergency-lock.js');
+const { warmAiKeyPool }=await import('../lib/api/_ai-resilience.js');
+const { guardAiResponse }=await import('../lib/api/_response-guard.js');
+const { consumeNonce }=await import('../lib/api/_internal-replay.js');
 
 const req={method:'POST',headers:{'x-real-ip':'203.0.113.10','user-agent':'STUDY-TH-security-local'},body:{device_id:'device-local'}};
 
@@ -136,7 +136,7 @@ const nonce=crypto.randomBytes(18).toString('hex');
 assert.equal(await consumeNonce(nonce),true);
 assert.equal(await consumeNonce(nonce),false);
 
-const worker=await readFile(new URL('../api/_audit-worker.js',import.meta.url),'utf8');
+const worker=await readFile(new URL('../lib/api/_audit-worker.js',import.meta.url),'utf8');
 assert.ok(worker.includes('DLQ_KEY'));
 assert.ok(worker.includes('DLQ_MAX'));
 assert.ok(worker.includes('moveToDlq'));

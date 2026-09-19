@@ -1,7 +1,7 @@
 import { isAdminRequest } from './admin-login.js';
-import { applySecurityHeaders, enforceBodySize, enforceMethod, enforceJsonContentType, rateLimit, sameOrigin, safeRequestId } from './_security.js';
-import { aiLockdownStatus, setAiLockdown } from './_emergency-lock.js';
-import { setShieldSubjectBlock, clearShieldSubjectBlock, shieldSubjectStatus } from './_intrusion-shield.js';
+import { applySecurityHeaders, enforceBodySize, enforceMethod, enforceJsonContentType, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
+import { aiLockdownStatus, setAiLockdown } from '../lib/api/_emergency-lock.js';
+import { setShieldSubjectBlock, clearShieldSubjectBlock, shieldSubjectStatus } from '../lib/api/_intrusion-shield.js';
 
 const URL = String(process.env.SUPABASE_URL || '').trim();
 const KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();

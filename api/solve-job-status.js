@@ -1,5 +1,5 @@
-import { applySecurityHeaders, enforceMethod, sameOrigin, rateLimit, safeRequestId } from './_security.js';
-import { getJob } from './_ai-job-store.js';
+import { applySecurityHeaders, enforceMethod, sameOrigin, rateLimit, safeRequestId } from '../lib/api/_security.js';
+import { getJob } from '../lib/api/_ai-job-store.js';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

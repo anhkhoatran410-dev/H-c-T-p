@@ -34,7 +34,11 @@
   }
 
   function inline(raw){
-    var src=String(raw==null?'':raw),stash=[];
+    var src=String(raw==null?'':raw)
+      .replace(/\\[oO]bject\\s*[oO]bject/g,'')
+      .replace(/\\[oO]bjectObject\\]/g,'')
+      .replace(/\\[oO]bject\\s*[oO]bject\\]/g,'');
+    var stash=[];
     var p=src.replace(/(\x60[^\x60]+\x60|\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\\\([\s\S]*?\\\))/g,function(m){
       var k='\uE000'+stash.length+'\uE001';stash.push(m);return k;
     });

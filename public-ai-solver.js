@@ -178,57 +178,74 @@
               throw err;
             }
           }else{
-            const controller=new AbortController();
-            const timer=setTimeout(()=>controller.abort(),FAST_SOLVER_TIMEOUT_MS);
-            try{
-              let lastErr=null;
-              const maxAttempts=2;
-              for(let attempt=0;attempt<maxAttempts;attempt++){
-                try{
-                  const r=await fetch('/api/solve?stream=1',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
-                  const contentType=String(r.headers.get('content-type')||'').toLowerCase();
-                  if(contentType.includes('text/event-stream')&&r.body){
-                    const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',streamDone=false;
-                    stageText('connected');
-                    while(!streamDone){
-                      const part=await reader.read();if(part.done)break;
-                      buffer+=decoder.decode(part.value,{stream:true});
-                      const events=buffer.split(/\n\n/);buffer=events.pop()||'';
-                      for(const block of events){
-                        let event='message',data='';
-                        for(const line of block.split(/\n/)){
-                          if(line.startsWith('event:'))event=line.slice(6).trim();
-                          else if(line.startsWith('data:'))data+=line.slice(5).trim();
-                        }
-                        if(!data)continue;
-                        let obj={};try{obj=JSON.parse(data)}catch{continue}
-                        if(event==='stage')stageText(String(obj.stage||''),obj);
-                        else if(event==='result'){
-                          const st=Number(obj.status||200),payloadData=obj.data||{};
-                          if(st>=400)throw Object.assign(new Error(String(payloadData.error||'Solver error')),{status:st,code:payloadData.code,retryable:payloadData.retryable});
-                          d=payloadData;streamDone=true;break;
-                        }else if(event==='error'){
-                          throw new Error(String(obj.message||'AI backend error'));
-                        }
+            const maxAttempts=2;
+            let lastErr=null;
+            for(let attempt=0;attempt<maxAttempts;attempt++){
+              const controller=new AbortController();
+              let idleTimer=null;
+              const armIdle=()=>{
+                clearTimeout(idleTimer);
+                idleTimer=setTimeout(()=>controller.abort(),FAST_SOLVER_TIMEOUT_MS);
+              };
+              try{
+                const r=await fetch('/api/solve?stream=1',{method:'POST',headers:{'Content-Type':'application/json','Accept':'text/event-stream'},body:payload,credentials:'same-origin',cache:'no-store',signal:controller.signal});
+                const contentType=String(r.headers.get('content-type')||'').toLowerCase();
+                if(contentType.includes('text/event-stream')&&r.body){
+                  const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='',streamDone=false;
+                  stageText('connected');
+                  armIdle();
+                  while(!streamDone){
+                    const part=await reader.read();
+                    if(part.done)break;
+                    armIdle();
+                    buffer+=decoder.decode(part.value,{stream:true});
+                    const events=buffer.split(/\n\n/);buffer=events.pop()||'';
+                    for(const block of events){
+                      let event='message',data='';
+                      for(const line of block.split(/\n/)){
+                        if(line.startsWith('event:'))event=line.slice(6).trim();
+                        else if(line.startsWith('data:'))data+=line.slice(5).trim();
+                      }
+                      if(!data)continue;
+                      let obj={};try{obj=JSON.parse(data)}catch{continue}
+                      if(event==='stage')stageText(String(obj.stage||''),obj);
+                      else if(event==='result'){
+                        const st=Number(obj.status||200),payloadData=obj.data||{};
+                        if(st>=400)throw Object.assign(new Error(String(payloadData.error||'Solver error')),{status:st,code:payloadData.code,retryable:payloadData.retryable});
+                        d=payloadData;streamDone=true;break;
+                      }else if(event==='error'){
+                        throw new Error(String(obj.message||'AI backend error'));
                       }
                     }
-                    await reader.cancel().catch(()=>{});
-                  }else{
-                    d=await r.json().catch(()=>({}));
                   }
-                  if(r.ok&&d?.answer)break;
-                  lastErr=Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:Number(d.status)||r.status,providerStatus:d.providerStatus,code:d.code,retryable:d.retryable});
-                  const retryable=r.status===408||r.status===409||r.status===425||r.status===429;
-                  if(!retryable||attempt===maxAttempts-1)throw lastErr;
-                  await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
-                }catch(fetchErr){
-                  if(fetchErr?.name==='AbortError')throw fetchErr;
-                  lastErr=fetchErr;
-                  if(fetchErr?.status===429&&attempt<maxAttempts-1){await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));continue;}
-                  throw fetchErr;
+                  clearTimeout(idleTimer);
+                  if(!streamDone&&d?.answer==null)throw Object.assign(new Error('Kết nối với Solver kết thúc trước khi nhận kết quả.'),{status:502,code:'STREAM_ENDED_EARLY',retryable:true});
+                }else{
+                  d=await r.json().catch(()=>({}));
                 }
+                if(r.ok&&d?.answer)break;
+                lastErr=Object.assign(new Error(String(d.error||('Solver HTTP '+r.status))),{status:Number(d.status)||r.status,providerStatus:d.providerStatus,code:d.code,retryable:d.retryable});
+                const retryable=r.status===408||r.status===409||r.status===425||r.status===429||r.status===502||r.status===503||r.status===504;
+                if(!retryable||attempt===maxAttempts-1)throw lastErr;
+                await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
+              }catch(fetchErr){
+                clearTimeout(idleTimer);
+                if(fetchErr?.name==='AbortError'){
+                  const timeoutErr=Object.assign(new Error('Kết nối với Solver bị gián đoạn do chờ quá lâu.'),{status:504,code:'STREAM_IDLE_TIMEOUT',retryable:true});
+                  lastErr=timeoutErr;
+                  if(attempt<maxAttempts-1){await new Promise(resolve=>setTimeout(resolve,700));continue;}
+                  throw timeoutErr;
+                }
+                lastErr=fetchErr;
+                if((fetchErr?.status===429||fetchErr?.status===502||fetchErr?.status===503||fetchErr?.status===504)&&attempt<maxAttempts-1){
+                  await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));continue;
+                }
+                throw fetchErr;
+              }finally{
+                clearTimeout(idleTimer);
               }
-            }finally{clearTimeout(timer)}
+            }
+            throw lastErr||new Error('Solver không trả về kết quả.');
           }
           thinking.remove();
           let answer=String(d.answer||'Mình chưa có câu trả lời.');

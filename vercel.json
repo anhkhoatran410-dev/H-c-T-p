@@ -9,7 +9,7 @@
       "supportsCancellation": true
     },
     "api/solve-job.js": {
-      "maxDuration": 15,
+      "maxDuration": 60,
       "supportsCancellation": true
     },
     "api/solve-job-status.js": {

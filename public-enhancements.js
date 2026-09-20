@@ -131,8 +131,44 @@
     var old=document.getElementById('study-ai-support'); if(old){old.classList.remove('hidden');old.querySelector('textarea')?.focus();return;}
     var el=document.createElement('div');el.id='study-ai-support';el.className='study-ai-modal';el.innerHTML=`<div class="study-ai-card"><div class="study-ai-head"><div><span class="support-kicker">AI STUDY</span><h2>🤖 Trợ lý học tập</h2><p>Hỏi bài, cách làm, giải thích khái niệm hoặc hỏi cách sử dụng website.</p></div><button type="button" class="theme-chip" data-ai-close>×</button></div><div class="study-ai-messages" id="studyAiMessages"><div class="study-ai-msg bot">Chào bạn 👋 Mình có thể giải thích bài học, gợi ý cách làm và hỗ trợ bạn dùng STUDY TH.</div></div><div id="studyAiForm" class="study-ai-form" role="form"><textarea rows="2" placeholder="Ví dụ: Giải thích vì sao đạo hàm của x² là 2x..." aria-label="Câu hỏi cho trợ lý học tập"></textarea><button class="composer-send" type="button" data-study-send aria-label="Gửi câu hỏi">➤</button></div></div>`;
     document.body.appendChild(el);el.querySelector('[data-ai-close]').onclick=function(){el.classList.add('hidden')};
-    // The advanced student solver owns #studyAiForm. Keep this module focused on opening the modal only.
-    // Do not attach a second submit handler here; it would race the solver and call /api/support-ai.
+
+    // Hard fallback for mobile/webview: the AI solver normally owns this button, but
+    // the modal must still send even when that script was delayed or failed to bind.
+    var fallbackButton=el.querySelector('[data-study-send]');
+    var fallbackForm=el.querySelector('#studyAiForm');
+    var fallbackInput=el.querySelector('textarea');
+    if(fallbackButton&&fallbackForm&&fallbackInput){
+      fallbackButton.addEventListener('click',async function(e){
+        if(typeof fallbackForm.__studySubmit==='function')return; // solver capture/handler owns it
+        e.preventDefault();e.stopPropagation();
+        if(fallbackForm.dataset.studyFallbackBusy==='1')return;
+        var q=fallbackInput.value.trim();
+        if(!q)return;
+        fallbackForm.dataset.studyFallbackBusy='1';
+        var box=el.querySelector('#studyAiMessages');
+        var user=document.createElement('div');user.className='study-ai-msg user';user.textContent=q;
+        box?.appendChild(user);
+        fallbackInput.value='';
+        var busy=document.createElement('div');busy.className='study-ai-msg bot';busy.textContent='Đang xử lý…';box?.appendChild(busy);
+        try{
+          var norm=q.toLowerCase().replace(/[!?.,]+$/g,'');
+          if(/^(hi|hello|hey|chào|chao|xin chào|xin chao|alo)$/.test(norm)){
+            busy.textContent='Chào bạn 👋 Mình đang sẵn sàng hỗ trợ học tập. Bạn gửi bài hoặc câu hỏi mình sẽ xử lý ngay.';
+          }else{
+            var r=await fetch('/api/solve',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',cache:'no-store',body:JSON.stringify({message:q,subject:(window.state&&window.state.subject)||'',history:[]})});
+            var d=await r.json().catch(function(){return{}});
+            if(!r.ok)throw new Error(String(d.error||('AI HTTP '+r.status))+((d.requestId)?' ['+d.requestId+']':''));
+            busy.textContent=String(d.answer||'Mình chưa nhận được câu trả lời.');
+            if(window.renderStudyAiMessage){try{window.renderStudyAiMessage(busy,busy.textContent)}catch(_){}}
+          }
+        }catch(err){
+          busy.textContent='Lỗi AI: '+String(err?.message||err);
+        }finally{
+          fallbackForm.dataset.studyFallbackBusy='0';
+          if(box)box.scrollTop=box.scrollHeight;
+        }
+      },true);
+    }
     el.querySelector('textarea').focus();
   }
 

@@ -1,0 +1,24 @@
+name: MER Total Deadline Test
+
+on:
+  push:
+    branches: [patch/mer-total-deadline]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: |
+          node --check lib/mer-engine.js
+          node --check lib/api/_gemini-network-guard.js
+          node --check scripts/mer-total-deadline-test.mjs
+      - run: node scripts/mer-total-deadline-test.mjs

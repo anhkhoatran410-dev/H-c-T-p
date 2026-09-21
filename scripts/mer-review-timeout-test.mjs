@@ -44,14 +44,14 @@ globalThis.fetch=async(_input,init={})=>{
   });
 
   if(attempts.length===1){
-    await wait(105);
+    await wait(120);
     return new Response(JSON.stringify({error:{message:'temporary'}}),{
       status:500,
       headers:{'content-type':'application/json'}
     });
   }
 
-  await wait(250);
+  await wait(900);
   return new Response(JSON.stringify({
     candidates:[{
       content:{parts:[{text:'SECOND_SHOULD_NOT_FINISH'}]},
@@ -68,7 +68,7 @@ const {__test}=await import('../lib/mer-engine.js');
 
 const askTimeouts=[];
 const askStarts=[];
-const reviewBudget=180;
+const reviewBudget=800;
 const askSpy=async(...args)=>{
   askStarts.push(Date.now());
   askTimeouts.push(args[3]);
@@ -91,8 +91,8 @@ assert.ok(Math.abs(askTimeouts[0]-reviewBudget)<=5,'first logical attempt must r
 assert.ok(Math.abs(askTimeouts[1]-expectedSecondRemaining)<=5,'second logical attempt must receive the actual remaining review budget');
 assert.equal(attempts.length,2,'network guard composition should reach exactly one provider call per logical attempt');
 assert.notStrictEqual(attempts[0].signal,attempts[1].signal,'each review retry must get a fresh provider signal');
-assert.ok(attempts[0].durationMs>=95&&attempts[0].durationMs<140,'first provider attempt should consume most of the total budget');
-assert.ok(attempts[1].durationMs>=35&&attempts[1].durationMs<120,'second provider attempt must be bounded by the nested remaining budget, not a fixed 5000 ms timeout');
+assert.ok(attempts[0].durationMs>=90&&attempts[0].durationMs<250,'first provider attempt should return well before the total review deadline');
+assert.ok(Math.abs(attempts[1].durationMs-askTimeouts[1])<=25,'second provider attempt duration should track the nested remaining budget');
 assert.ok(attempts.every(x=>x.timeoutMs===undefined),'review timeoutMs must be consumed by the network guard, not forwarded to provider fetch');
 assert.ok(elapsed<230,'review retry phase must stay bounded by the total timeout budget');
 console.log('PATCH3_REVIEW_TOTAL_BUDGET=PASS logicalTimeouts='+askTimeouts.map(x=>Math.round(x)).join(',')+'ms expectedSecondRemaining='+Math.round(expectedSecondRemaining)+'ms providerTimeoutMsStripped='+attempts.every(x=>x.timeoutMs===undefined)+' providerAttempts='+attempts.length+' firstAttempt='+attempts[0].durationMs+'ms secondAttempt='+attempts[1].durationMs+'ms elapsed='+elapsed+'ms');

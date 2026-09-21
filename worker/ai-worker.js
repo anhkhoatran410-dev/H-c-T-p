@@ -1,4 +1,5 @@
 import solverHandler from '../lib/solve-legacy.js';
+import { installAiResponseGuard } from '../lib/api/_response-guard.js';
 
 const SUPABASE_URL=String(process.env.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabase.co').trim().replace(/\/$/,'');
 const SERVICE_KEY=String(process.env.SUPABASE_SERVICE_ROLE_KEY||'').trim();
@@ -50,7 +51,12 @@ async function runSolver(payload,onStage){
     __aiWorker:true
   };
   const fake=fakeResponse();
-  await solverHandler(fakeReq,fake.res);
+  const uninstallAiResponseGuard=installAiResponseGuard(fake.res);
+  try{
+    await solverHandler(fakeReq,fake.res);
+  }finally{
+    uninstallAiResponseGuard();
+  }
   let data={};
   try{data=fake.getBody()?JSON.parse(fake.getBody()):{}}catch{}
   return {status:fake.getStatus(),data};

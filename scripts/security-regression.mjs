@@ -90,10 +90,11 @@ assert.equal(String((await readFile(new URL('../lib/api/_internal-replay.js', im
   };
   const { installAiResponseGuard } = await import('../lib/api/_response-guard.js');
   const restore = installAiResponseGuard(fake);
-  fake.json({ answer: 'AIzaSyDummyRegressionKey_12345678901234567890' });
+  const dummyKey = ['AIzaSy', 'DummyRegressionKey_12345678901234567890'].join('');
+  fake.json({ answer: dummyKey });
   restore();
   assert.equal(sent.status, 502);
-  assert.equal(sent.body.includes('AIzaSyDummyRegressionKey_12345678901234567890'), false);
+  assert.equal(sent.body.includes(dummyKey), false);
 }
 
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));

@@ -1,9 +1,8 @@
 name: Patch3 Review Deadline Test
 
 on:
-  push:
-    branches:
-      - patch/mer-review-deadline
+  pull_request:
+    types: [synchronize, opened, reopened]
 
 jobs:
   test:
@@ -14,5 +13,3 @@ jobs:
         with:
           node-version: 24
       - run: node scripts/mer-review-timeout-test.mjs
-
-# trigger test run

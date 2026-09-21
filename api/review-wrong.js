@@ -30,7 +30,7 @@ export default async function handler(req,res){
     for(const model of models){
       const entry=await acquireAiKey("GEMINI");
       if(!entry){last=new Error("Gemini key pool exhausted");continue;}
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":entry.key},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json"}),signal:AbortSignal.timeout(18_000)});
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":entry.key},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json"}}),signal:AbortSignal.timeout(18_000)});
       const raw=await r.text();let d={};try{d=JSON.parse(raw)}catch{}
       if(!r.ok){last=new Error(`Gemini ${r.status}: ${d?.error?.message||raw.slice(0,200)}`);last.status=r.status;await reportAiFailure("GEMINI",entry.id,last);if(r.status===404||r.status>=500||r.status===429)continue;throw last}
       const text=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim()||"";

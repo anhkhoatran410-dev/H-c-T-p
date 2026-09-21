@@ -10,7 +10,7 @@ if(mode==='parent'){
     ['web','retry-success','50'],
     ['web','legacy-no-timeout','50'],
     ['web','legacy-with-signal','50'],
-    ['web','edge-remaining','300'],
+    ['web','edge-remaining','5000'],
     ['worker','worker-contract','50']
   ];
   for(const [childMode,childScenario,attemptTimeoutMs] of cases){
@@ -47,7 +47,7 @@ globalThis.fetch=async(_input,init={})=>{
 
   if(scenario==='timeout'){
     await new Promise((resolve,reject)=>{
-      const timer=setTimeout(resolve,500);
+      const timer=setTimeout(resolve,6000);
       const onAbort=()=>{
         clearTimeout(timer);
         record.durationMs=Date.now()-started;
@@ -160,7 +160,7 @@ try{
     'gemini-test',
     '2+3',
     '',
-    scenario==='worker-contract'?200:scenario==='timeout'?300:scenario==='edge-remaining'?700:200,
+    scenario==='worker-contract'?200:scenario==='timeout'?300:scenario==='edge-remaining'?10000:200,
     256
   );
 }catch(e){
@@ -189,10 +189,11 @@ if(scenario==='timeout'){
   assert.equal(error.code,'ETIMEDOUT');
   assert.equal(error.status,408);
   assert.equal(attempts.length,2,'the second provider attempt must start while some budget remains');
-  assert.ok(attempts[0].durationMs>=450&&attempts[0].durationMs<560,'first attempt should consume most of the 700ms total budget');
-  assert.ok(attempts[1].durationMs>20,'second attempt should receive a real remaining budget');
-  assert.ok(attempts[1].durationMs<240,'second attempt timeout must be coed to the remaining budget, not the fixed 300ms attempt timeout');
-  assert.ok(attempts[1].durationMs<300,'second attempt must be shorter than the fixed per-attempt cap');
+  assert.ok(attempts[0].durationMs>=5900&&attempts[0].durationMs<6200,'first attempt should consume most of the 10000ms total budget');
+  assert.ok(attempts[1].durationMs>500,'second attempt should receive a real remaining budget');
+  assert.ok(attempts[1].durationMs<4500,'second attempt timeout must be coed to the remaining budget, not the fixed 5000ms attempt timeout');
+  assert.ok(attempts[1].durationMs<5000,'second attempt must be shorter than the fixed per-attempt cap');
+  console.log('PATCH2_WEB_EDGE_REMAINING=PASS total=10000ms first='+attempts[0].durationMs+'ms second='+attempts[1].durationMs+'ms');
   assert.notStrictEqual(attempts[0].signal,attempts[1].signal,'edge retry must use a fresh signal');
   assert.ok(attempts.every(x=>x.timeoutMs===undefined),'internal timeoutMs must never reach provider fetch');
 }else{

@@ -138,6 +138,7 @@ assert.equal(generationGuard.includes('inspectSemanticConversation'), true);
 assert.equal(generationGuard.includes('installAiResponseGuard'), true);
 assert.equal(solveApi.includes('guardAiResponse'), true);
 assert.equal(solveApi.includes('fallbackGuard'), true);
+assert.equal(solveApi.includes('const checked=guardAiResponse(raw'), true);
 assert.equal(reviewWrong.includes('installAiResponseGuard'), true);
 assert.equal(reviewWrong.includes('sanitizeDlpText'), true);
 assert.equal(worker.includes('installAiResponseGuard'), true);

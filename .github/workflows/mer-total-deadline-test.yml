@@ -6,6 +6,9 @@ on:
 jobs:
   mer-total-deadline:
     runs-on: ubuntu-latest
+    env:
+      UPSTASH_REDIS_REST_URL: ''
+      UPSTASH_REDIS_REST_TOKEN: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

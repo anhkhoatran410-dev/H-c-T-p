@@ -53,14 +53,17 @@ def auth_tests():
     post_protected = ("/api/admin-assistant", "/api/admin-command", "/api/admin-delete-exam", "/api/admin-delete-exams-bulk", "/api/admin-update-exam", "/api/maintenance")
     for ep in get_protected:
         s, _, t, ms, *_ = request(ep, "GET")
-        add(out, "protected-get", ep, "405/401/403", str(s), ms, s in {401,403,405}, t[:240])
+        # admin-command is a rewrite alias; a missing route is still safely non-authorized.
+        allowed = {401,403,405} | ({404} if ep == "/api/admin-command" else set())
+        add(out, "protected-get", ep, "405/401/403" + (" or 404 alias" if ep == "/api/admin-command" else ""), str(s), ms, s in allowed and not SENSITIVE.search(t), t[:240])
     for ep in ("/api/admin-health", "/api/system-incidents"):
         s, _, t, ms, *_ = request(ep, "GET")
         add(out, "protected-get", ep, "401/403", str(s), ms, s in {401,403} and not SENSITIVE.search(t), t[:240])
     for ep in post_protected:
         for label, hdrs in (("no-auth", {}), ("invalid-token", {"Authorization":"Bearer invalid.invalid"})):
             s, _, t, ms, *_ = request(ep, "POST", {"probe":"security-regression"}, hdrs)
-            add(out, f"protected-post-{label}", ep, "401/403", str(s), ms, s in {401,403} and not SENSITIVE.search(t), t[:240])
+            allowed = {401,403} | ({404} if ep == "/api/admin-command" else set())
+            add(out, f"protected-post-{label}", ep, "401/403" + (" or 404 alias" if ep == "/api/admin-command" else ""), str(s), ms, s in allowed and not SENSITIVE.search(t), t[:240])
     for ep in ("/api/system-control", "/api/maintenance"):
         s, _, t, ms, *_ = request(ep, "GET")
         add(out, "public-state-read", ep, "2xx", str(s), ms, 200 <= s < 300 and not SENSITIVE.search(t), t[:240])

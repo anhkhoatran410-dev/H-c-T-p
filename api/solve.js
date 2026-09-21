@@ -9,6 +9,7 @@ import { sanitizeAiBody } from '../lib/api/_prompt-security.js';
 import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
 import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
 import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
+import { guardAiResponse } from '../lib/api/_response-guard.js';
 
 
 let solveHandlerPromise=null;
@@ -172,7 +173,10 @@ export default async function handler(req,res){
       clearInterval(heartbeat);
       try{
         const fallback=await directGeminiFallback(req.body);
-        writeEvent('result',{status:200,data:{answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true}});
+        const fallbackPayload={answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true};
+        const fallbackGuard=guardAiResponse(JSON.stringify(fallbackPayload),'application/json; charset=utf-8');
+        if(!fallbackGuard.ok) writeEvent('result',{status:fallbackGuard.status,data:JSON.parse(fallbackGuard.body)});
+        else writeEvent('result',{status:200,data:fallbackPayload});
         writeEvent('done',{});
       }catch(fallbackError){
         writeEvent('error',{message:String(fallbackError?.message||e?.message||e),requestId,code:fallbackError?.code||'solver-failed'});
@@ -213,11 +217,14 @@ export default async function handler(req,res){
     try{
       const fallback=await directGeminiFallback(req.body);
       const payload={answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true,fallback:true,requestId};
-      writeAudit(req,{request_id:requestId,status_code:200,outcome:'fallback_response',model:fallback.model,response_text:fallback.answer,response_length:fallback.answer.length,latency_ms:Date.now()-started});
+      const fallbackGuard=guardAiResponse(JSON.stringify(payload),'application/json; charset=utf-8');
+      const safePayload=fallbackGuard.ok?payload:JSON.parse(fallbackGuard.body);
+      const safeStatus=fallbackGuard.ok?200:fallbackGuard.status;
+      writeAudit(req,{request_id:requestId,status_code:safeStatus,outcome:'fallback_response',model:fallback.model,response_text:fallbackGuard.ok?fallback.answer:'[blocked by response guard]',response_length:fallbackGuard.ok?fallback.answer.length:0,latency_ms:Date.now()-started});
       if(!res.headersSent){
-        res.statusCode=200;
+        res.statusCode=safeStatus;
         res.setHeader('Content-Type','application/json; charset=utf-8');
-        return res.end(JSON.stringify(payload));
+        return res.end(JSON.stringify(safePayload));
       }
     }catch(fallbackError){
       writeAudit(req,{request_id:requestId,status_code:502,outcome:'solver_fallback_failed',reason:String(fallbackError?.code||'fallback-failed'),response_length:0,latency_ms:Date.now()-started});

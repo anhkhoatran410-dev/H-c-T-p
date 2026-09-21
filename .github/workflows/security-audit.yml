@@ -61,7 +61,7 @@ jobs:
 
       - name: Security regression tests
         run: node scripts/security-regression.mjs
-
+\n      - name: MER review timeout regression\n        run: node scripts/mer-review-timeout-test.mjs\n
       - name: Live AI preview smoke test
         if: ${{ github.event_name == 'pull_request' }}
         env:

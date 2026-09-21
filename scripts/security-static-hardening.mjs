@@ -8,6 +8,8 @@ const order = (text, needles) => {
   return positions.every((position) => position >= 0) && positions.every((position, i) => i === 0 || position > positions[i - 1]);
 };
 const absent = (text, needles) => needles.every((needle) => !text.includes(needle));
+const AUDIT_LOG_FILE = 'lib/api/_audit-log.js';
+const AUDIT_WORKER_FILE = 'lib/api/_audit-worker.js';
 const checks = [
   ['common security headers', read('lib/api/_security.js'), ['X-DNS-Prefetch-Control', 'X-Permitted-Cross-Domain-Policies', 'X-Robots-Tag']],
   ['JSON content-type guard', read('lib/api/_security.js'), ['function enforceJsonContentType']],
@@ -22,14 +24,14 @@ const checks = [
   ['DB admin-config lockdown migration', read('supabase/migrations/20260917_security_admin_config.sql'), ['revoke insert, update, delete', 'support_accounts_write', 'support_bot_rules_write']],
   ['server-side security-state lockdown', read('supabase/migrations/20260917_security_admin_routing.sql'), ['revoke all on table public.system_control', 'revoke all on table public.system_incidents']],
   ['support AI JSON boundary', read('api/support-ai.js'), ['enforceJsonContentType(req,res)']],
-  ['AI response audit sink', read('lib/lib/api/_audit-log.js'), ['persistAudit', 'ENQUEUE_LUA', 'AUDIT_QUEUE_KEY', 'AUDIT_QUEUE_MAX']],
+  ['AI response audit sink', read(AUDIT_LOG_FILE), ['persistAudit', 'ENQUEUE_LUA', 'AUDIT_QUEUE_KEY', 'AUDIT_QUEUE_MAX']],
   ['support AI audit', read('api/support-ai.js'), ['auditRecord', 'persistAudit', 'response_delivered']],
-  ['Redis audit worker', read('lib/lib/api/_audit-worker.js'), ['CRON_SECRET', 'study-th:audit:queue', 'EVAL', 'resolution=ignore-duplicates']],
-  ['Redis audit worker retry-safe', read('lib/lib/api/_audit-worker.js'), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
-  ['bounded audit queue admission', read('lib/lib/api/_audit-log.js'), ['AUDIT_QUEUE_MAX', 'LLEN', 'AUDIT_DROPPED_KEY', 'return {0,count,d}', 'AUDIT_QUEUE_LIMIT']],
-  ['bounded audit DLQ', read('lib/lib/api/_audit-worker.js'), ['DLQ_KEY', 'DLQ_MAX', 'DLQ_LUA', 'moveToDlq', 'dlqDropped']],
-  ['audit no restore loop', read('lib/lib/api/_audit-worker.js'), ['moveToDlq', 'DLQ_KEY', 'DLQ_MAX', 'return res.status(503)', 'event được đưa vào bounded DLQ']],
-  ['audit dedicated redis option', read('lib/lib/api/_audit-log.js'), ['AUDIT_REDIS_REST_URL', 'AUDIT_REDIS_REST_TOKEN', 'AUDIT_REDIS_IS_DEDICATED']],
+  ['Redis audit worker', read(AUDIT_WORKER_FILE), ['CRON_SECRET', 'study-th:audit:queue', 'EVAL', 'resolution=ignore-duplicates']],
+  ['Redis audit worker retry-safe', read(AUDIT_WORKER_FILE), ['MAX_RETRIES', 'shouldRetry', 'retryDelay', '2 ** attempt', 'Math.random']],
+  ['bounded audit queue admission', read(AUDIT_LOG_FILE), ['AUDIT_QUEUE_MAX', 'LLEN', 'AUDIT_DROPPED_KEY', 'return {0,count,d}', 'AUDIT_QUEUE_LIMIT']],
+  ['bounded audit DLQ', read(AUDIT_WORKER_FILE), ['DLQ_KEY', 'DLQ_MAX', 'DLQ_LUA', 'moveToDlq', 'dlqDropped']],
+  ['audit no restore loop', read(AUDIT_WORKER_FILE), ['moveToDlq', 'DLQ_KEY', 'DLQ_MAX', 'return res.status(503)', 'event được đưa vào bounded DLQ']],
+  ['audit dedicated redis option', read(AUDIT_LOG_FILE), ['AUDIT_REDIS_REST_URL', 'AUDIT_REDIS_REST_TOKEN', 'AUDIT_REDIS_IS_DEDICATED']],
   ['replay nonce bounded TTL', read('lib/api/_internal-replay.js'), ['NONCE_TTL_MS', "'PX', NONCE_TTL_MS", 'verifyTimestamp', 'WINDOW_MS']],
   ['Response Guard fail-safe boundary', read('lib/api/_response-guard.js'), ['OUTPUT_BLOCK_PATTERNS', 'sensitive-secret-detected', 'response-guard-blocked', 'safeClientError']],
   ['Redis subject quarantine', read('lib/api/_intrusion-shield.js'), ['setShieldSubjectBlock', 'clearShieldSubjectBlock', 'study-th:shield:subject:block']],
@@ -49,14 +51,14 @@ for (const [name, text, needles] of checks) {
   if (process.exitCode) break;
   console.log(`PASS: ${name}`);
 }
-const worker = read('lib/lib/api/_audit-worker.js');
+const worker = read(AUDIT_WORKER_FILE);
 if (!absent(worker, ['restore(rows)', 'queue đã được khôi phục'])) {
   console.error('FAIL: audit worker must not restore failed batches into the main queue');
   process.exitCode = 1;
 } else {
   console.log('PASS: audit worker has no restore-to-main-queue loop');
 }
-const auditLog = read('lib/lib/api/_audit-log.js');
+const auditLog = read(AUDIT_LOG_FILE);
 if (!absent(auditLog, ["['SET',key,payload,'EX',86400]"])) {
   console.error('FAIL: audit queue should not create per-event duplicate payload keys');
   process.exitCode = 1;

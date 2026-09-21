@@ -130,6 +130,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Allow the Vercel production deployment triggered by this push to propagate.
+          sleep 20
           payload='{"message":"Tính 2+3. Cuối câu trả lời ghi đúng một dòng: FINAL_ANSWER: 5","subject":"Toán","history":[],"imageDataUrl":"","deep":false}'
           status=$(curl -sS --max-time 60 -o /tmp/ai-smoke.json -w '%{http_code}' -X POST "$ENDPOINT" \
             -H 'Content-Type: application/json' \

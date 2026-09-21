@@ -107,7 +107,8 @@ if(scenario==='success'){
     assert.equal(successDelta,1,mode+' provider success must be recorded exactly once');
     assert.equal(failureDelta,0,mode+' MER must not double-report provider-success output validation');
   }else{
-    assert.equal(failureDelta,1,mode+' worker output validation failure must be reported once');
+    assert.equal(failureDelta,0,mode+' output-validation failures do not trip the circuit by design');
+    assert.ok(Number(after.lastFailure||0)>Number(before.lastFailure||0),mode+' worker output validation must call reportAiFailure');
   }
 }else{
   assert.equal(failureDelta,1,mode+' '+scenario+' must report exactly once');

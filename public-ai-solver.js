@@ -223,7 +223,6 @@
             }
             if(!d?.answer)throw lastErr||new Error('Solver không trả về kết quả.');
           }
-          }
           thinking.remove();
           let answer=String(d.answer||'Mình chưa có câu trả lời.');
           if(d.degraded&&d.answer)answer+='\n\n> ⚠️ Lời giải này chưa qua bước kiểm tra kỹ. Hãy đối chiếu cẩn thận hoặc bấm Thử lại.';

@@ -73,7 +73,10 @@ def main():
 
     # 24 concurrent reads against protected/admin surfaces. These must reject without auth.
     for i in range(24):
-        items.append(("protected-burst", protected[i % len(protected)], "GET", None, {}, {401, 403, 405}))
+        endpoint = protected[i % len(protected)]
+        # admin-command is intentionally removed as a live route; 404 is the expected closed-surface result.
+        allowed = {404} if endpoint == "/api/admin-command" else {401, 403, 405}
+        items.append(("protected-burst", endpoint, "GET", None, {}, allowed))
 
     # Malformed JSON probes must terminate before any AI provider call.
     malformed = b"{" + b"x" * 64

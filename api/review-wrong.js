@@ -24,15 +24,13 @@ export default async function handler(req,res){
     );
     if(semantic.score>=1)return res.status(422).json({error:"Dữ liệu bài sửa chứa tín hiệu prompt injection bị chặn.",code:"review-prompt-injection",requestId});
     if(!getAiKeyPool("GEMINI").length)return res.status(503).json({error:"GEMINI_API_KEY chưa được cấu hình.",requestId});
-    const key=String(process.env.GEMINI_API_KEY||"").replace(/^['"`]+|['"`]+$/g,"").replace(/[\u0000-\u0020\u007f-\u009f]/g,"").trim();
-    if(!key)return res.status(500).json({error:"GEMINI_API_KEY chưa được cấu hình."});
     const prompt=`Bạn là gia sư AI. Hãy giúp học sinh sửa một câu sai.\nMôn: ${fields.subject||"tự xác định"}\nCâu hỏi: ${JSON.stringify(fields.question)}\nHọc sinh trả lời: ${JSON.stringify(fields.userAnswer)}\nĐáp án đúng: ${JSON.stringify(fields.correctAnswer)}\nGiải thích hiện có: ${JSON.stringify(fields.explanation)}\n\nHãy kiểm tra lại đáp án dựa trên câu hỏi. Nếu đáp án đúng trong dữ liệu có vẻ sai, hãy nói rõ và đưa đáp án đúng hơn. Trả JSON thuần theo cấu trúc: {"whyWrong":"...","correctAnswer":"...","explanation":"...","memoryTip":"...","practice":{"question":"...","options":["...","...","...","..."],"answer":0}}. Câu luyện tập phải tương tự kiến thức, không quá dễ, và chỉ có một đáp án đúng.`;
     const models=["gemini-3.5-flash-lite","gemini-3.6-flash"];
     let last=null;
     for(const model of models){
       const entry=await acquireAiKey("GEMINI");
       if(!entry){last=new Error("Gemini key pool exhausted");continue;}
-      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":entry.key},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json"}})});
+      const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":entry.key},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json"}),signal:AbortSignal.timeout(18_000)});
       const raw=await r.text();let d={};try{d=JSON.parse(raw)}catch{}
       if(!r.ok){last=new Error(`Gemini ${r.status}: ${d?.error?.message||raw.slice(0,200)}`);last.status=r.status;await reportAiFailure("GEMINI",entry.id,last);if(r.status===404||r.status>=500||r.status===429)continue;throw last}
       const text=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim()||"";

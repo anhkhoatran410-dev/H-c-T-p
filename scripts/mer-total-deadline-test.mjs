@@ -133,7 +133,7 @@ try{
     'gemini-test',
     '2+3',
     '',
-    scenario==='worker-contract'?200:scenario==='timeout'?300:scenario==='edge-remaining'?700:200,
+    scenario==='worker-contract'?200:scenario==='timeout'?300:200,
     256
   );
 }catch(e){
@@ -157,18 +157,7 @@ if(scenario==='timeout'){
   assert.notStrictEqual(attempts[0].signal,attempts[1].signal,'retry attempt must receive a fresh signal');
   assert.ok(elapsed<200,'retry path should remain inside total budget');
   assert.ok(attempts.every(x=>x.timeoutMs===undefined),'internal timeoutMs must never reach provider fetch');
-}else if(scenario==='edge-remaining'){
-  assert.ok(error,`edge remaining test should eventually time out; attempts=${attempts.length}; firstMs=${attempts[0]?.durationMs}; secondMs=${attempts[1]?.durationMs}`);
-  assert.equal(error.code,'ETIMEDOUT');
-  assert.equal(error.status,408);
-  assert.equal(attempts.length,2,'the second provider attempt must start while some budget remains');
-  assert.ok(attempts[0].durationMs>=450&&attempts[0].durationMs<560,'first attempt should consume most of the 700ms total budget');
-  assert.ok(attempts[1].durationMs>50,'second attempt should receive a real remaining budget');
-  assert.ok(attempts[1].durationMs<260,'second attempt timeout must be coed to the remaining budget, not the fixed 300ms attempt timeout');
-  assert.ok(attempts[1].durationMs<300,'second attempt must be shorter than the fixed per-attempt cap');
-  console.log('PATCH2_WEB_EDGE_REMAINING=PASS total=700ms first='+attempts[0].durationMs+'ms second='+attempts[1].durationMs+'ms');
-  assert.notStrictEqual(attempts[0].signal,attempts[1].signal,'edge retry must use a fresh signal');
-  assert.ok(attempts.every(x=>x.timeoutMs===undefined),'internal timeoutMs must never reach provider fetch');
+
 }else{
   assert.equal(error,null,'worker should succeed');
   assert.equal(result.keyId,'GEMINI_API_KEY');

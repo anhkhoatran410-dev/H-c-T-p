@@ -87,12 +87,25 @@ globalThis.fetch=async(_input,init={})=>{
     }
 
     await new Promise((resolve,reject)=>{
-      const onAbort=()=>{
+      const fallback=setTimeout(()=>{
         record.durationMs=Date.now()-started;
+        record.aborted=false;
+        resolve();
+      },350);
+      const onAbort=()=>{
+        clearTimeout(fallback);
+        record.durationMs=Date.now()-started;
+        record.aborted=true;
         reject(init.signal?.reason||Object.assign(new Error('aborted'),{name:'AbortError'}));
       };
       if(init.signal?.aborted)return onAbort();
-      init.signal?.addEventListener('abort',onAbort,{once:true});
+      if(!init.signal){
+        clearTimeout(fallback);
+        record.durationMs=Date.now()-started;
+        record.aborted=false;
+        return resolve();
+      }
+      init.signal.addEventListener('abort',onAbort,{once:true});
     });
   }
 

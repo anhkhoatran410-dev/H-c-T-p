@@ -107,10 +107,6 @@
       "destination": "/api/admin-tools?route=admin-assistant"
     },
     {
-      "source": "/api/admin-command",
-      "destination": "/api/admin-tools?route=admin-command"
-    },
-    {
       "source": "/api/admin-health",
       "destination": "/api/admin-tools?route=admin-health"
     },

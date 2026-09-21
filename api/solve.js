@@ -9,7 +9,6 @@ import { sanitizeAiBody } from '../lib/api/_prompt-security.js';
 import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
 import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
 import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
-import { guardAiResponse } from '../lib/api/_response-guard.js';
 
 
 let solveHandlerPromise=null;

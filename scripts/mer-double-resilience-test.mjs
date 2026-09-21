@@ -41,7 +41,7 @@ globalThis.fetch=async()=>{
   }
   if(scenario==='http-error'){
     return new Response(JSON.stringify({error:{message:'bad key'}}),{
-      status:401,
+      status:500,
       headers:{'content-type':'application/json'}
     });
   }

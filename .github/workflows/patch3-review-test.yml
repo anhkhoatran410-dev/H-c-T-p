@@ -1,0 +1,16 @@
+name: Patch3 Review Deadline Test
+
+on:
+  push:
+    branches:
+      - patch/mer-review-deadline
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/mer-review-timeout-test.mjs

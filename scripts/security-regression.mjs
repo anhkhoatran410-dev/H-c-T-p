@@ -78,6 +78,24 @@ assert.equal(guardedPem.status, 502);
 // Replay proof uses a tightly bounded Redis TTL when available.
 assert.equal(String((await readFile(new URL('../lib/api/_internal-replay.js', import.meta.url), 'utf8'))).includes('NONCE_TTL_MS'), true);
 
+// Deterministic output-guard regression: every AI response wrapper must fail closed on a dummy API-key-shaped value.
+{
+  let sent = null;
+  const fake = {
+    statusCode: 200,
+    setHeader(){},
+    getHeader(){ return 'application/json; charset=utf-8'; },
+    json(value){ sent = { status:this.statusCode, body:JSON.stringify(value) }; },
+    end(value){ sent = { status:this.statusCode, body:String(value ?? '') }; },
+  };
+  const { installAiResponseGuard } = await import('../lib/api/_response-guard.js');
+  const restore = installAiResponseGuard(fake);
+  fake.json({ answer: 'AIzaSyDummyRegressionKey_12345678901234567890' });
+  restore();
+  assert.equal(sent.status, 502);
+  assert.equal(sent.body.includes('AIzaSyDummyRegressionKey_12345678901234567890'), false);
+}
+
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 assert.equal(vercel.functions?.['api/_ai-gateway.js'], undefined);
 assert.equal(vercel.functions?.['api/_solve-core.js'], undefined);
@@ -85,13 +103,19 @@ assert.equal(vercel.rewrites.some(x => x.source === '/api/ai-lockdown'), true);
 assert.equal(vercel.rewrites.some(x => x.source === '/api/admin-assistant' && x.destination.includes('admin-tools?route=admin-assistant')), true);
 assert.equal(JSON.stringify(vercel).includes('Access-Control-Allow-Origin'), false);
 
-const [adminTools, adminAssistant , systemControl, aiRenderer, mathRenderer, aiGuard] = await Promise.all([
+const [adminTools, adminAssistant, systemControl, aiRenderer, mathRenderer, aiGuard, responseGuard, supportAi, generationGuard, solveApi, reviewWrong, worker] = await Promise.all([
   readFile(new URL('../api/admin-tools.js', import.meta.url), 'utf8'),
   readFile(new URL('../lib/admin-assistant.js', import.meta.url), 'utf8'),
   readFile(new URL('../api/system-control.js', import.meta.url), 'utf8'),
   readFile(new URL('../public-ai-renderer.js', import.meta.url), 'utf8'),
   readFile(new URL('../math-render-final.js', import.meta.url), 'utf8'),
   readFile(new URL('../lib/api/_ai-input-guard.js', import.meta.url), 'utf8'),
+  readFile(new URL('../lib/api/_response-guard.js', import.meta.url), 'utf8'),
+  readFile(new URL('../api/support-ai.js', import.meta.url), 'utf8'),
+  readFile(new URL('../lib/generation-guard.js', import.meta.url), 'utf8'),
+  readFile(new URL('../api/solve.js', import.meta.url), 'utf8'),
+  readFile(new URL('../api/review-wrong.js', import.meta.url), 'utf8'),
+  readFile(new URL('../worker/ai-worker.js', import.meta.url), 'utf8'),
 ]);
 
 for (const source of [adminTools, adminAssistant, systemControl]) {
@@ -105,6 +129,17 @@ assert.equal(adminAssistant.includes('_gemini-network-guard.js'), true);
 assert.equal(adminAssistant.includes('safeClientError'), true);
 assert.equal(aiGuard.includes('sanitizeAiIngress'), true);
 assert.equal(aiGuard.includes('semantic-risk-high'), true);
+assert.equal(responseGuard.includes('installAiResponseGuard'), true);
+assert.equal(supportAi.includes('x-goog-api-key'), true);
+assert.equal(supportAi.includes('installAiResponseGuard'), true);
+assert.equal(generationGuard.includes('sanitizeDlpText'), true);
+assert.equal(generationGuard.includes('inspectSemanticConversation'), true);
+assert.equal(generationGuard.includes('installAiResponseGuard'), true);
+assert.equal(solveApi.includes('guardAiResponse'), true);
+assert.equal(solveApi.includes('fallbackGuard'), true);
+assert.equal(reviewWrong.includes('installAiResponseGuard'), true);
+assert.equal(reviewWrong.includes('sanitizeDlpText'), true);
+assert.equal(worker.includes('installAiResponseGuard'), true);
 
 // Renderer safety: user/AI text is HTML-escaped, and KaTeX is explicitly untrusted.
 assert.equal(aiRenderer.includes("function esc(v)"), true);

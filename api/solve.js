@@ -163,9 +163,13 @@ export default async function handler(req,res){
       end(body){
         clearInterval(heartbeat);
         if(body!=null){
+          const raw=String(body);
+          const checked=guardAiResponse(raw,'application/json; charset=utf-8');
           let payload=body;
-          try{payload=JSON.parse(String(body))}catch{}
-          writeEvent('result',{status:proxyStream.statusCode,data:payload});
+          let status=proxyStream.statusCode;
+          try{payload=JSON.parse(checked.ok?raw:checked.body)}catch{payload=checked.ok?raw:JSON.parse(checked.body)}
+          if(!checked.ok)status=checked.status;
+          writeEvent('result',{status,data:payload});
         }
         writeEvent('done',{});
         return originalEndStream?originalEndStream():undefined;

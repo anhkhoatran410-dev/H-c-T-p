@@ -3,6 +3,8 @@ name: MER Double Resilience Test
 on:
   push:
     branches: [patch/mer-double-resilience]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

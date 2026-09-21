@@ -140,8 +140,7 @@
     },
     {
       "source": "/api/maintenance",
-      "destination": "/api/system-control",
-      "statusCode": 307
+      "destination": "/api/system-control"
     }
   ]
 }

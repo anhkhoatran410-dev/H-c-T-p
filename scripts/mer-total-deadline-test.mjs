@@ -10,7 +10,7 @@ if(mode==='parent'){
     ['web','retry-success','50'],
     ['web','legacy-no-timeout','50'],
     ['web','legacy-with-signal','50'],
-    ['web','edge-math','300'],
+    ['web','edge-acquire-race','50'],
     ['worker','worker-contract','50']
   ];
   for(const [childMode,childScenario,attemptTimeoutMs] of cases){
@@ -34,8 +34,24 @@ if(mode==='parent'){
   process.exit(0);
 }
 
+if(scenario==='edge-acquire-race'){
+  process.env.UPSTASH_REDIS_REST_URL='https://redis.test';
+  process.env.UPSTASH_REDIS_REST_TOKEN='test-token';
+}
+
 const attempts=[];
 globalThis.fetch=async(_input,init={})=>{
+  const url=String(_input?.url||_input||'');
+  if(scenario==='edge-acquire-race'&&url.startsWith('https://redis.test')){
+    const redisIndex=attempts.filter(x=>x.kind==='redis').length;
+    attempts.push({kind:'redis',redisIndex,body:String(init.body||'')});
+    if(redisIndex===0)await new Promise(resolve=>setTimeout(resolve,150));
+    let result=1;
+    if(redisIndex===0)result=null;
+    else if(redisIndex===1)result='OK';
+    return new Response(JSON.stringify({result}),{status:200,headers:{'content-type':'application/json'}});
+  }
+
   const started=Date.now();
   const record={
     timeoutMs:init.timeoutMs,
@@ -82,18 +98,30 @@ if(mode==='web'){
 
 const {__test}=await import('../lib/mer-engine.js');
 
-if(scenario==='edge-math'){
-  const {__test:guardTest}=await import('../lib/api/_gemini-network-guard.js');
-  const deadline=700,cap=300,now=500;
-  const remaining=deadline-now;
-  assert.equal(remaining,200);
-  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,now),200);
-  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,699),1);
-  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,700),null);
-  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,701),null);
-  console.log('PATCH2_WEB_EDGE_REMAINING=PASS deadline=700ms now=500ms remaining=200ms cap=300ms attemptTimeout=200ms');
+if(scenario==='edge-acquire-race'){
+  const started=Date.now();
+  let result=null,error=null;
+  try{
+    result=await __test.ask('gemini-test','2+3','',50,256);
+  }catch(e){
+    error=e;
+  }
+  const elapsed=Date.now()-started;
+  const providerAttempts=attempts.filter(x=>x.kind!=='redis');
+  const hadEval=attempts
+    .filter(x=>x.kind==='redis')
+    .some(x=>/\bEVAL\b/.test(x.body));
+  assert.ok(error,'late acquire must produce a timeout error');
+  assert.equal(error.code,'ETIMEDOUT','late acquire timeout must normalize to ETIMEDOUT');
+  assert.equal(error.status,408,'late acquire timeout must preserve HTTP 408');
+  assert.equal(result,null,'no provider result should be produced after the deadline');
+  assert.equal(providerAttempts.length,0,'provider fetch must not start after acquire crosses the deadline');
+  assert.equal(hadEval,false,'no AI success/failure report may be emitted for an entry never sent to the provider');
+  assert.ok(elapsed>=150,'test must actually wait for the delayed acquire path');
+  console.log('PATCH2_WEB_EDGE_ACQUIRE_RACE=PASS acquireDelay=150ms timeout=50ms providerAttempts=0 reports=0 elapsed='+elapsed+'ms');
   process.exit(0);
 }
+
 
 if(scenario==='legacy-no-timeout'){
   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent',{

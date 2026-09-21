@@ -147,7 +147,7 @@ try{
     'gemini-test',
     '2+3',
     '',
-    scenario==='worker-contract'?200:scenario==='timeout'?140:scenario==='edge-remaining'?700:200,
+    scenario==='worker-contract'?200:scenario==='timeout'?300:scenario==='edge-remaining'?700:200,
     256
   );
 }catch(e){
@@ -161,7 +161,7 @@ if(scenario==='timeout'){
   assert.equal(error.status,408,'deadline timeout should retain HTTP 408 semantics');
   assert.equal(attempts.length,3,'fresh per-attempt timeout should allow three keys within the total budget');
   assert.equal(new Set(attempts.map(x=>x.signal)).size,3,'each provider attempt must receive a fresh signal');
-  assert.ok(elapsed<350,'total elapsed time must stay bounded near the requested deadline');
+  assert.ok(elapsed<450,'total elapsed time must stay bounded near the requested deadline');
   assert.ok(attempts.every(x=>x.timeoutMs===undefined),'internal timeoutMs must never reach provider fetch');
 }else if(scenario==='retry-success'){
   assert.equal(error,null,'retry-success should not throw');

@@ -105,7 +105,11 @@ def header_tests():
 
 def rate_limit_test():
     out = []
-    synthetic_ip = "198.51.100.77"
+    # Use a per-run TEST-NET address so the benchmark never collides with
+    # rate-limit state left by a previous workflow invocation.
+    run_id = os.environ.get("GITHUB_RUN_ID", str(int(time.time() * 1000)))
+    octet = 10 + (sum(ord(ch) for ch in run_id) % 240)
+    synthetic_ip = f"198.51.100.{octet}"
     statuses = []
     for _ in range(10):
         s, _, _, _, *_ = request("/api/admin-login", "POST", {"password":"security-benchmark-invalid"}, {"X-Forwarded-For":synthetic_ip})

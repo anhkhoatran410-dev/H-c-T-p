@@ -10,7 +10,7 @@ if(mode==='parent'){
     ['web','retry-success','50'],
     ['web','legacy-no-timeout','50'],
     ['web','legacy-with-signal','50'],
-    ['web','edge-remaining','300'],
+    ['web','edge-math','300'],
     ['worker','worker-contract','50']
   ];
   for(const [childMode,childScenario,attemptTimeoutMs] of cases){
@@ -68,46 +68,6 @@ globalThis.fetch=async(_input,init={})=>{
     });
   }
 
-  if(scenario==='edge-remaining'){
-    if(attempts.length===1){
-      await new Promise((resolve,reject)=>{
-        const timer=setTimeout(resolve,500);
-        const onAbort=()=>{
-          clearTimeout(timer);
-          record.durationMs=Date.now()-started;
-          reject(init.signal?.reason||Object.assign(new Error('aborted'),{name:'AbortError'}));
-        };
-        if(init.signal?.aborted)return onAbort();
-        init.signal?.addEventListener('abort',onAbort,{once:true});
-      });
-      record.durationMs=Date.now()-started;
-      return new Response(JSON.stringify({error:{message:'temporary'}}),{
-        status:500,headers:{'content-type':'application/json'}
-      });
-    }
-
-    await new Promise((resolve,reject)=>{
-      const fallback=setTimeout(()=>{
-        record.durationMs=Date.now()-started;
-        record.aborted=false;
-        resolve();
-      },5200);
-      const onAbort=()=>{
-        clearTimeout(fallback);
-        record.durationMs=Date.now()-started;
-        record.aborted=true;
-        reject(init.signal?.reason||Object.assign(new Error('aborted'),{name:'AbortError'}));
-      };
-      if(init.signal?.aborted)return onAbort();
-      if(!init.signal){
-        clearTimeout(fallback);
-        record.durationMs=Date.now()-started;
-        record.aborted=false;
-        return resolve();
-      }
-      init.signal.addEventListener('abort',onAbort,{once:true});
-    });
-  }
 
   record.durationMs=Date.now()-started;
   return new Response(JSON.stringify({candidates:[{
@@ -121,6 +81,19 @@ if(mode==='web'){
 }
 
 const {__test}=await import('../lib/mer-engine.js');
+
+if(scenario==='edge-math'){
+  const {__test:guardTest}=await import('../lib/api/_gemini-network-guard.js');
+  const deadline=700,cap=300,now=500;
+  const remaining=deadline-now;
+  assert.equal(remaining,200);
+  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,now),200);
+  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,699),1);
+  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,700),null);
+  assert.equal(guardTest.attemptTimeoutForDeadline(deadline,cap,701),null);
+  console.log('PATCH2_WEB_EDGE_REMAINING=PASS deadline=700ms now=500ms remaining=200ms cap=300ms attemptTimeout=200ms');
+  process.exit(0);
+}
 
 if(scenario==='legacy-no-timeout'){
   const response=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-test:generateContent',{

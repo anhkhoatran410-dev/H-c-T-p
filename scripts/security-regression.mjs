@@ -95,6 +95,25 @@ assert.equal(String((await readFile(new URL('../lib/api/_internal-replay.js', im
   restore();
   assert.equal(sent.status, 502);
   assert.equal(sent.body.includes(dummyKey), false);
+
+  // Group A: configuredSecrets() must block a value sourced only from process.env.
+  // The fixture is never passed through sanitizeAiIngress/input guard.
+  const envFixture = ['OUT_', 'PUT_', 'GUARD_', 'ENV_', 'SECRET_', '9f31'].join('');
+  process.env.OUTPUT_GUARD_REGRESSION_SECRET = envFixture;
+  let envSent = null;
+  const envFake = {
+    statusCode: 200,
+    setHeader(){},
+    getHeader(){ return 'application/json; charset=utf-8'; },
+    json(value){ envSent = { status:this.statusCode, body:JSON.stringify(value) }; },
+    end(value){ envSent = { status:this.statusCode, body:String(value ?? '') }; },
+  };
+  const restoreEnvGuard = installAiResponseGuard(envFake.res ?? envFake);
+  envFake.json({ answer: envFixture });
+  restoreEnvGuard();
+  delete process.env.OUTPUT_GUARD_REGRESSION_SECRET;
+  assert.equal(envSent.status, 502);
+  assert.equal(envSent.body.includes(envFixture), false);
 }
 
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));

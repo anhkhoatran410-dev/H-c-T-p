@@ -1,0 +1,18 @@
+name: MER total deadline regression
+on:
+  push:
+    branches:
+      - patch/mer-total-deadline
+jobs:
+  mer-total-deadline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: |
+          node --check lib/api/_gemini-network-guard.js
+          node --check lib/mer-engine.js
+          node --check scripts/mer-total-deadline-test.mjs
+      - run: node scripts/mer-total-deadline-test.mjs

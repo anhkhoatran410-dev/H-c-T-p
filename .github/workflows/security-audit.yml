@@ -259,3 +259,61 @@ jobs:
             TARGET_SHA="$sha" node /tmp/mer-rtt-child.mjs
           done
 
+      - name: TEMP final MER latency split benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, time, urllib.request, urllib.error, statistics
+
+          ENDPOINT='https://hoc-va-choi.vercel.app/api/solve'
+          ORIGIN='https://hoc-va-choi.vercel.app'
+
+          def pct(values,p):
+              xs=sorted(values)
+              if not xs: return 0
+              return round(xs[min(len(xs)-1,int((len(xs)-1)*p))],3)
+
+          def call(message,subject='Toán'):
+              payload=json.dumps({'message':message,'subject':subject,'history':[],'imageDataUrl':'','deep':False}).encode()
+              req=urllib.request.Request(ENDPOINT,data=payload,headers={'Content-Type':'application/json','Origin':ORIGIN})
+              started=time.time()
+              try:
+                  with urllib.request.urlopen(req,timeout=90) as r:
+                      body=r.read().decode()
+                      elapsed=time.time()-started
+                      return {'http':r.status,'elapsed_sec':elapsed,'data':json.loads(body)}
+              except Exception as e:
+                  return {'http':0,'elapsed_sec':time.time()-started,'error':repr(e),'data':{}}
+
+          rows=[]
+          for i in range(10):
+              rows.append(('EARLY',call(f'Benchmark early-exit case {i}: Giải {i+2}+{i+3}. Cuối câu ghi FINAL_ANSWER: {2*i+5}')))
+
+          normal_cases=[
+              'Chứng minh rằng với mọi số thực x,y,z thỏa x+y+z=0 thì x^3+y^3+z^3=3xyz.',
+              'Chứng minh bất đẳng thức a^2+b^2>=2ab với mọi số thực a,b.',
+              'Chứng minh rằng tổng ba số lẻ là một số lẻ.',
+              'Chứng minh nếu n chia hết cho 6 thì n chia hết cho 2 và 3.',
+              'Chứng minh với mọi x>0 thì x+1/x>=2.'
+          ]
+          for i,statement in enumerate(normal_cases*2):
+              rows.append(('NORMAL',call(f'Benchmark normal review case {i}: {statement}','Toán Olympic')))
+
+          for group in ('EARLY','NORMAL'):
+              subset=[r for g,r in rows if g==group]
+              lat=[r['data'].get('latencyMs',r['elapsed_sec']*1000) for r in subset if r['http']==200 and r['data']]
+              timeout_fallback=sum(bool(r['data'].get('timeoutFallback')) for r in subset if r['http']==200)
+              degraded=sum(bool(r['data'].get('degraded')) for r in subset if r['http']==200)
+              skipped=sum(bool(r['data'].get('reviewSkipped')) for r in subset if r['http']==200)
+              print(json.dumps({
+                  'group':group,'requests':len(subset),
+                  'http200':sum(r['http']==200 for r in subset),
+                  'latency_p50_ms':pct(lat,.50),
+                  'latency_p95_ms':pct(lat,.95),
+                  'latency_p99_ms':pct(lat,.99),
+                  'review_skipped':skipped,
+                  'timeout_fallback':timeout_fallback,
+                  'degraded':degraded
+              },ensure_ascii=False))
+          PY

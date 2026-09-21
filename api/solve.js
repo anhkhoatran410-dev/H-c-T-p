@@ -17,6 +17,12 @@ async function loadSolveHandler(){
   return solveHandlerPromise;
 }
 
+function configuredGeminiModels(){
+  const configured=String(process.env.GEMINI_MODEL||'').trim();
+  const extra=String(process.env.GEMINI_FALLBACK_MODELS||'').split(',').map(x=>String(x||'').trim()).filter(Boolean);
+  return [...new Set([configured,...extra,'gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash','gemini-3.5-flash-lite'].filter(Boolean))];
+}
+
 function imageInlinePart(image){
   const s=String(image||'');
   const m=s.match(/^data:(image\/[\w.+-]+);base64,(.+)$/s);
@@ -25,7 +31,7 @@ function imageInlinePart(image){
 
 async function directGeminiFallback(body){
   const pool=getAiKeyPool('GEMINI');
-  const models=['gemini-3.8-flash','gemini-3.7-flash','gemini-3.6-flash'];
+  const models=configuredGeminiModels();
   const message=String(body?.message||'Giải bài trong ảnh.');
   const subject=String(body?.subject||'').trim();
   const image=String(body?.imageDataUrl||'');

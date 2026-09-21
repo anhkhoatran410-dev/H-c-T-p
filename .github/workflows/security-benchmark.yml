@@ -1,4 +1,5 @@
 name: Security Benchmark
+# Live non-destructive production security regression trigger
 
 on:
   workflow_dispatch:

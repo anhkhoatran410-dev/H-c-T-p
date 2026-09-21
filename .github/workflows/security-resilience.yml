@@ -19,6 +19,9 @@ jobs:
         run: |
           node --check lib/api/_security.js
 
+      - name: Wait for Vercel deployment propagation
+        run: sleep 20
+
       - name: Run bounded real-world resilience benchmark
         env:
           BASE_URL: https://hoc-va-choi.vercel.app

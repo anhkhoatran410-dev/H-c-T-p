@@ -150,5 +150,19 @@ jobs:
           if(!d.answer) throw new Error('AI response has no answer');
           console.log(JSON.stringify({model:d.model,source:d.source,answerPreview:String(d.answer).slice(0,120),router:d.router||null}));
           NODE
+      - name: Live cross-endpoint output guard benchmark
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        env:
+          BASE_URL: https://hoc-va-choi.vercel.app
+        run: node benchmarks/output-guard-live.mjs
+
+      - name: Upload output guard live report
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-guard-live-results
+          path: output-guard-live-results.json
+          if-no-files-found: ignore
+
       - name: Security static hardening checks
         run: node scripts/security-static-hardening.mjs

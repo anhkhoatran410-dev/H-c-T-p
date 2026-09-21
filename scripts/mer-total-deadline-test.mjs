@@ -91,7 +91,7 @@ globalThis.fetch=async(_input,init={})=>{
         record.durationMs=Date.now()-started;
         record.aborted=false;
         resolve();
-      },350);
+      },5200);
       const onAbort=()=>{
         clearTimeout(fallback);
         record.durationMs=Date.now()-started;
@@ -185,7 +185,7 @@ if(scenario==='timeout'){
   assert.ok(elapsed<200,'retry path should remain inside total budget');
   assert.ok(attempts.every(x=>x.timeoutMs===undefined),'internal timeoutMs must never reach provider fetch');
 }else if(scenario==='edge-remaining'){
-  assert.ok(error,'edge remaining test should eventually time out');
+  assert.ok(error,`edge remaining test should eventually time out; attempts=${attempts.length}; firstMs=${attempts[0]?.durationMs}; secondMs=${attempts[1]?.durationMs}`);
   assert.equal(error.code,'ETIMEDOUT');
   assert.equal(error.status,408);
   assert.equal(attempts.length,2,'the second provider attempt must start while some budget remains');

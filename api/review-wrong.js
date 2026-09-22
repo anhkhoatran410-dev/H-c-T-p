@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, sameOrigin, distributedRateLimit, safeRequestId, enforceMethod } from "../lib/api/_security.js";
 import { sanitizeDlpText, inspectSemanticConversation } from "../lib/api/_ai-input-guard.js";
 import { installAiResponseGuard } from "../lib/api/_response-guard.js";
-import { acquireAiKey, getAiKeyPool, reportAiFailure, reportAiSuccess } from "../lib/api/_ai-resilience.js";
+import { acquireAiKey, getAiKeyPool, reportAiFailureAsync, reportAiSuccessAsync } from "../lib/api/_ai-resilience.js";
 export default async function handler(req,res){
   const requestId=crypto.randomBytes(12).toString("hex");
 
@@ -32,9 +32,9 @@ export default async function handler(req,res){
       if(!entry){last=new Error("Gemini key pool exhausted");continue;}
       const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:"POST",headers:{"Content-Type":"application/json","x-goog-api-key":entry.key},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json"}}),signal:AbortSignal.timeout(18_000)});
       const raw=await r.text();let d={};try{d=JSON.parse(raw)}catch{}
-      if(!r.ok){last=new Error(`Gemini ${r.status}: ${d?.error?.message||raw.slice(0,200)}`);last.status=r.status;await reportAiFailure("GEMINI",entry.id,last);if(r.status===404||r.status>=500||r.status===429)continue;throw last}
+      if(!r.ok){last=new Error(`Gemini ${r.status}: ${d?.error?.message||raw.slice(0,200)}`);last.status=r.status;reportAiFailureAsync("GEMINI",entry.id,last);if(r.status===404||r.status>=500||r.status===429)continue;throw last}
       const text=d?.candidates?.[0]?.content?.parts?.map(p=>p.text||"").join("").trim()||"";
-      await reportAiSuccess("GEMINI",entry.id);
+      reportAiSuccessAsync("GEMINI",entry.id);
       try{return res.status(200).json(JSON.parse(text.replace(/^```json\s*/i,"").replace(/\s*```$/,"")))}catch{throw new Error("Gemini trả về JSON không hợp lệ.")}
     }
     throw last||new Error("Không gọi được Gemini.");

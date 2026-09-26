@@ -208,6 +208,73 @@ async function updateExam(req, res) {
   } catch { return res.status(500).json({ error: 'Không cập nhật được bài kiểm tra.' }); }
 }
 
+
+async function exactCount(table) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      Prefer: 'count=exact',
+      Range: '0-0',
+    },
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!r.ok) throw new Error('Count failed');
+  const range = String(r.headers.get('content-range') || '');
+  const total = range.includes('/') ? Number(range.split('/').pop()) : 0;
+  return Number.isFinite(total) ? total : 0;
+}
+
+async function adminSummary(req, res) {
+  if (!await guard(req, res)) return;
+  try {
+    const [tests, students, attempts, threadRows, recentAttempts] = await Promise.all([
+      exactCount('exams'),
+      exactCount('participants'),
+      exactCount('user_attempts'),
+      sb('support_threads?select=unread_admin&limit=1000'),
+      sb('user_attempts?select=created_at&order=created_at.desc&limit=5'),
+    ]);
+    const unread = (threadRows || []).reduce((sum, row) => sum + Number(row.unread_admin || 0), 0);
+    return res.status(200).json({
+      ok: true,
+      stats: { tests, students, attempts, unread },
+      recentActivity: Array.isArray(recentAttempts) ? recentAttempts : [],
+    });
+  } catch {
+    return res.status(502).json({ error: 'Không tải được tổng quan Admin.' });
+  }
+}
+
+async function adminParticipants(req, res) {
+  if (!await guard(req, res)) return;
+  try {
+    const [participants, attempts] = await Promise.all([
+      sb('participants?select=id,name,email,code,created_at&order=created_at.desc&limit=500'),
+      sb('user_attempts?select=id,device_id,student_code,score,created_at&order=created_at.desc&limit=1000'),
+    ]);
+    if (!Array.isArray(participants) || !Array.isArray(attempts)) {
+      return res.status(502).json({ error: 'Không tải được danh sách người tham gia.' });
+    }
+    return res.status(200).json({ ok: true, participants, attempts });
+  } catch {
+    return res.status(502).json({ error: 'Không tải được danh sách người tham gia.' });
+  }
+}
+
+async function adminAttempts(req, res) {
+  if (!await guard(req, res)) return;
+  const requestedLimit = Number(req.body?.limit);
+  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 500) : 300;
+  try {
+    const rows = await sb(`user_attempts?select=id,created_at,student_name,student_code,device_id,exam_title,score,correct,total,wrong_indexes&order=created_at.desc&limit=${limit}`);
+    if (!Array.isArray(rows)) return res.status(502).json({ error: 'Không tải được lịch sử làm bài.' });
+    return res.status(200).json({ ok: true, attempts: rows });
+  } catch {
+    return res.status(502).json({ error: 'Không tải được lịch sử làm bài.' });
+  }
+}
+
 async function clientMeta(req, res) {
   applySecurityHeaders(res);
   res.setHeader('X-Request-ID', safeRequestId());
@@ -224,6 +291,9 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
   const path = String(req.query?.route || '').replace(/^\/+|\/+$/g, '');
   if (path === 'admin-health') return health(req, res);
+  if (path === 'admin-summary') return adminSummary(req, res);
+  if (path === 'admin-participants') return adminParticipants(req, res);
+  if (path === 'admin-attempts') return adminAttempts(req, res);
   if (path === 'admin-accounts') return adminListAccounts(req, res);
   if (path === 'admin-create-account') return adminCreateAccount(req, res);
   if (path === 'admin-bot-rules') return adminListBotRules(req, res);

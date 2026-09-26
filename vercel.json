@@ -137,6 +137,14 @@
     {
       "source": "/api/maintenance",
       "destination": "/api/system-control"
+    },
+    {
+      "source": "/api/submit-attempt",
+      "destination": "/api/attempts?route=submit"
+    },
+    {
+      "source": "/api/attempt-review",
+      "destination": "/api/attempts?route=review"
     }
   ]
 }

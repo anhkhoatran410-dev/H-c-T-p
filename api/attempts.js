@@ -214,6 +214,8 @@ export default async function handler(req, res) {
   res.setHeader("X-Request-ID", requestId);
   res.setHeader("Cache-Control", "no-store");
 
+  // route is dispatch-only, not a security boundary.
+  // Each handler performs its own method/auth/ownership checks.
   const route = String(req.query?.route || "list");
   if (route === "submit") return submitAttempt(req, res, requestId);
   if (route === "review") return reviewAttempt(req, res, requestId);

@@ -221,8 +221,8 @@ async function exactCount(table) {
   });
   if (!r.ok) throw new Error('Count failed');
   const range = String(r.headers.get('content-range') || '');
-  const match = range.match(/\\/(\\d+)$/);
-  return match ? Number(match[1]) : 0;
+  const total = range.includes('/') ? Number(range.split('/').pop()) : 0;
+  return Number.isFinite(total) ? total : 0;
 }
 
 async function adminSummary(req, res) {

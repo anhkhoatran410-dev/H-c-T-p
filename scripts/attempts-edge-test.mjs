@@ -43,8 +43,8 @@ async function testSessionRaceSemantics() {
 
 async function testQuestionIndexNormalization() {
   const source = await fs.readFile(path.resolve("api/attempts.js"), "utf8");
-  assert.match(source, /const questionIndex = Number\(body\.questionIndex\);/);
-  assert.match(source, /attempt\.wrong_indexes\) ? attempt\.wrong_indexes\.map\(Number\)/);
+  assert.ok(source.includes("const questionIndex = Number(body.questionIndex);"));
+  assert.ok(source.includes("attempt.wrong_indexes.map(Number)"));
 
   const questionIndex = Number("3");
   const wrongFromNumbers = [1, 3, 5].map(Number).filter(Number.isInteger);

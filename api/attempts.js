@@ -19,18 +19,28 @@ function cleanText(value, max) {
     .slice(0, max);
 }
 
-function answerIsCorrect(q, answer) {
+// Chỉ chấp nhận số nguyên hoặc chuỗi chỉ gồm chữ số. Tuyệt đối không dùng Number(x) trực tiếp:
+// Number(null) === Number("") === Number(false) === Number([]) === 0 sẽ bị chấm đúng khi đáp án đúng là index 0.
+function toChoiceIndex(value) {
+  if (typeof value === "number") return Number.isInteger(value) && value >= 0 ? value : NaN;
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) return Number(value.trim());
+  return NaN;
+}
+
+export function answerIsCorrect(q, answer) {
   const type = String(q?.type || "mcq");
   if (type === "true_false") {
     const expected = Array.isArray(q.answers) ? q.answers : [];
     return expected.length === 4 && expected.every((v, i) => Array.isArray(answer) && answer[i] === v);
   }
   if (type === "short") {
+    const expected = String(q?.answer ?? "").trim().toLowerCase();
+    if (!expected) return false; // đề lỗi/thiếu đáp án: không bao giờ chấm đúng, kể cả khi học sinh bỏ trống
     const actual = Array.isArray(answer) ? answer.join("") : String(answer ?? "");
-    return actual.trim().toLowerCase() === String(q?.answer ?? "").trim().toLowerCase();
+    return actual.trim().toLowerCase() === expected;
   }
-  const actual = Number(answer);
-  const expected = Number(q?.a);
+  const actual = toChoiceIndex(answer);
+  const expected = toChoiceIndex(q?.a);
   return Number.isFinite(actual) && Number.isFinite(expected) && actual === expected;
 }
 
@@ -160,6 +170,39 @@ async function listAttempts(req, res, requestId) {
   return res.status(200).json({ attempts: rows.data, requestId });
 }
 
+export async function reviewAttemptCore({ attemptId, questionIndex, deviceId }, deps = {}) {
+  const request = deps.supabaseRequest || supabaseRequest;
+
+  const lookup = await request(
+    `user_attempts?id=eq.${encodeURIComponent(attemptId)}&select=id,device_id,wrong_indexes,reviewed_indexes&limit=1`,
+    { method: "GET" }
+  );
+  const attempt = Array.isArray(lookup.data) ? lookup.data[0] : null;
+  if (!lookup.ok || !attempt || String(attempt.device_id) !== String(deviceId)) {
+    return { status: 404, body: { error: "Không tìm thấy lượt làm bài." } };
+  }
+
+  const wrong = Array.isArray(attempt.wrong_indexes) ? attempt.wrong_indexes.map(Number).filter(Number.isInteger) : [];
+  if (!wrong.includes(questionIndex)) {
+    return { status: 400, body: { error: "Câu này không thuộc danh sách câu sai." } };
+  }
+
+  const previous = Array.isArray(attempt.reviewed_indexes) ? attempt.reviewed_indexes.map(Number).filter(Number.isInteger) : [];
+  const reviewedIndexes = [...new Set([...previous, questionIndex])];
+
+  const updated = await request(
+    `user_attempts?id=eq.${encodeURIComponent(attemptId)}&device_id=eq.${encodeURIComponent(deviceId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ reviewed_indexes: reviewedIndexes }),
+    }
+  );
+  if (!updated.ok) return { status: 502, body: { error: "Không lưu được trạng thái ôn tập." } };
+
+  return { status: 200, body: { ok: true, reviewed_indexes: reviewedIndexes } };
+}
+
 async function reviewAttempt(req, res, requestId) {
   if (!enforceMethod(req, res, ["POST"])) return;
   if (!enforceBodySize(req, res, 20_000)) return;
@@ -178,34 +221,8 @@ async function reviewAttempt(req, res, requestId) {
     return res.status(400).json({ error: "Dữ liệu ôn tập không hợp lệ.", requestId });
   }
 
-  const lookup = await supabaseRequest(
-    `user_attempts?id=eq.${encodeURIComponent(attemptId)}&select=id,device_id,wrong_indexes,reviewed_indexes&limit=1`,
-    { method: "GET" }
-  );
-  const attempt = Array.isArray(lookup.data) ? lookup.data[0] : null;
-  if (!lookup.ok || !attempt || String(attempt.device_id) !== String(session.deviceId)) {
-    return res.status(404).json({ error: "Không tìm thấy lượt làm bài.", requestId });
-  }
-
-  const wrong = Array.isArray(attempt.wrong_indexes) ? attempt.wrong_indexes.map(Number).filter(Number.isInteger) : [];
-  if (!wrong.includes(questionIndex)) {
-    return res.status(400).json({ error: "Câu này không thuộc danh sách câu sai.", requestId });
-  }
-
-  const previous = Array.isArray(attempt.reviewed_indexes) ? attempt.reviewed_indexes.map(Number).filter(Number.isInteger) : [];
-  const reviewedIndexes = [...new Set([...previous, questionIndex])];
-
-  const updated = await supabaseRequest(
-    `user_attempts?id=eq.${encodeURIComponent(attemptId)}&device_id=eq.${encodeURIComponent(session.deviceId)}`,
-    {
-      method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ reviewed_indexes: reviewedIndexes }),
-    }
-  );
-  if (!updated.ok) return res.status(502).json({ error: "Không lưu được trạng thái ôn tập.", requestId });
-
-  return res.status(200).json({ ok: true, reviewed_indexes: reviewedIndexes, requestId });
+  const result = await reviewAttemptCore({ attemptId, questionIndex, deviceId: session.deviceId });
+  return res.status(result.status).json({ ...result.body, requestId });
 }
 
 export default async function handler(req, res) {

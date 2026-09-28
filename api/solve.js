@@ -8,8 +8,6 @@ import { guardAiResponse } from '../lib/api/_response-guard.js';
 import { sanitizeAiBody } from '../lib/api/_prompt-security.js';
 import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
 import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
-import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
-
 
 let solveHandlerPromise=null;
 async function loadSolveHandler(){
@@ -30,8 +28,8 @@ function imageInlinePart(image){
 }
 
 async function directGeminiFallback(body){
-  const pool=getAiKeyPool('GEMINI');
   const models=configuredGeminiModels();
+  const fallbackDeadline=Date.now()+25000;
   const message=String(body?.message||'Giải bài trong ảnh.');
   const subject=String(body?.subject||'').trim();
   const image=String(body?.imageDataUrl||'');
@@ -46,23 +44,23 @@ async function directGeminiFallback(body){
   ].join('\\n')}];
   const img=imageInlinePart(image); if(img)parts.push(img);
   let last=null;
-  for(const apiEntry of pool.length?pool:[{key:String(process.env.GEMINI_API_KEY||'')}]){
-    const api=String(apiEntry?.key||'').trim(); if(!api)continue;
-    for(const model of models){
-      try{
-        const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
-          method:'POST',
-          headers:{'Content-Type':'application/json','x-goog-api-key':api},
-          body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:7000,thinkingConfig:{thinkingLevel:'high'}}}),
-          signal:AbortSignal.timeout(25000)
-        });
-        const raw=await r.text(); let d={}; try{d=raw?JSON.parse(raw):{}}catch{}
-        if(!r.ok){last=new Error(String(d?.error?.message||('Gemini HTTP '+r.status)));last.status=r.status;continue;}
-        const answer=String(d?.candidates?.[0]?.content?.parts?.filter(p=>p?.text).map(p=>p.text).join('')||'').trim();
-        if(answer)return {answer,model,source:'gemini-fallback',finalized:true,degraded:false,reviewSkipped:true};
-        last=new Error('Gemini trả về rỗng.');
-      }catch(e){last=e;}
-    }
+  for(const model of models){
+    const remaining=fallbackDeadline-Date.now();
+    if(remaining<=0)break;
+    try{
+      const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{maxOutputTokens:7000,thinkingConfig:{thinkingLevel:'high'}}}),
+        signal:AbortSignal.timeout(remaining),
+        timeoutMs:remaining
+      });
+      const raw=await r.text(); let d={}; try{d=raw?JSON.parse(raw):{}}catch{}
+      if(!r.ok){last=new Error(String(d?.error?.message||('Gemini HTTP '+r.status)));last.status=r.status;continue;}
+      const answer=String(d?.candidates?.[0]?.content?.parts?.filter(p=>p?.text).map(p=>p.text).join('')||'').trim();
+      if(answer)return {answer,model,source:'gemini-fallback',finalized:true,degraded:false,reviewSkipped:true};
+      last=new Error('Gemini trả về rỗng.');
+    }catch(e){last=e;}
   }
   throw last||Object.assign(new Error('GEMINI_API_KEY chưa được cấu hình.'),{code:'AI_CONFIG_MISSING'});
 }

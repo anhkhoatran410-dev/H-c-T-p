@@ -23,8 +23,18 @@ jobs:
       - name: Run hard benchmark
         env:
           SMOKE_ONLY: ${{ github.event_name == 'pull_request' && '1' || '0' }}
-          SMOKE_ENDPOINT: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app/api/solve
-        run: python3 benchmarks/study_th_hard_benchmark.py
+          GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$SMOKE_ONLY" = "1" ]; then
+            slug=$(printf '%s' "$GITHUB_BRANCH" | tr '[:upper:]' '[:lower:]' | tr '/' '-')
+            export SMOKE_ENDPOINT="https://hoc-va-choi-git-${slug}-study-boots.vercel.app/api/solve"
+          else
+            export SMOKE_ENDPOINT="https://hoc-va-choi.vercel.app/api/solve"
+          fi
+          echo "Benchmark endpoint: $SMOKE_ENDPOINT"
+          python3 benchmarks/study_th_hard_benchmark.py
       - name: Publish result
         uses: actions/upload-artifact@v4
         with:

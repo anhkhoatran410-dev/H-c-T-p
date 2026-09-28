@@ -5,8 +5,21 @@ const source=fs.readFileSync(new URL('../lib/solve-legacy.js',import.meta.url),'
 const solveSource=fs.readFileSync(new URL('../api/solve.js',import.meta.url),'utf8');
 assert.equal(solveSource.includes("import { getAiKeyPool } from '../lib/api/_ai-resilience.js';"),false,'api/solve fallback must not acquire its own Gemini key when the network guard owns requests');
 assert.equal((solveSource.match(/x-goog-api-key/g)||[]).length,0,'api/solve must not inject a Gemini API key directly');
-assert.match(solveSource,/const fallbackDeadline=Date\.now\(\)\+25000/,'solve fallback must enforce one total 25s budget across fallback models');
+assert.match(solveSource,/const fallbackDeadline=Date\.now\(\)\+Math\.max\(1000,Math\.min\(25000/,'solve fallback must enforce one total 25s budget across fallback models');
 assert.match(solveSource,/timeoutMs:remaining/,'solve fallback must pass its remaining deadline to the Gemini network guard');
+const supportAiSource=fs.readFileSync(new URL('../api/support-ai.js',import.meta.url),'utf8');
+const adminToolsSource=fs.readFileSync(new URL('../api/admin-tools.js',import.meta.url),'utf8');
+const adminAssistantSource=fs.readFileSync(new URL('../lib/admin-assistant.js',import.meta.url),'utf8');
+for(const item of [['support-ai',supportAiSource],['admin-tools',adminToolsSource],['admin-assistant',adminAssistantSource]]){
+  const name=item[0],sourceValue=item[1];
+  assert.match(sourceValue,/_gemini-network-guard\\.js/,name+' must import the Gemini network guard');
+  assert.equal((sourceValue.match(/x-goog-api-key/g)||[]).length,0,name+' must not inject Gemini keys directly');
+}
+assert.match(supportAiSource,/timeoutMs:18000/,'support-ai must pass its total Gemini timeout to the guard');
+assert.match(adminToolsSource,/timeoutMs: 7000/,'admin health must pass its total Gemini timeout to the guard');
+assert.match(adminAssistantSource,/const assistantDeadline = Date\\.now\\(\\) \+ 27_000/,'Admin Copilot must have one total request budget');
+assert.match(adminAssistantSource,/timeoutMs: remaining/,'Admin Copilot must pass its remaining budget to the guard');
+
 
 
 assert.ok(source.includes('function usingGeminiNetworkGuard(){return globalThis.__STUDY_TH_GEMINI_GUARD__===true;}'));

@@ -1,5 +1,6 @@
 
 /* UI redesign hotfix: responsive drawer state + light/dark consistency. */
+body.redesign-pending #app{visibility:visible}
 .rt-mobile-backdrop{display:none!important}
 @media(max-width:900px){
   body.rt-menu-open .rt-mobile-backdrop{display:block!important;position:fixed;inset:0;background:rgba(10,22,43,.35);z-index:45}

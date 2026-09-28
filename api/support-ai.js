@@ -4,7 +4,7 @@ import { enforceCostChallenge } from '../lib/api/_adaptive-defense.js';
 import { enforceAgentThreatDefense, recordAgentSignal } from '../lib/api/_agent-threat-defense.js';
 import { sanitizeAiIngress } from '../lib/api/_ai-input-guard.js';
 import { auditRecord, persistAudit } from '../lib/api/_audit-log.js';
-import { acquireAiKey, getAiKeyPool, reportAiFailureAsync, reportAiSuccessAsync } from '../lib/api/_ai-resilience.js';
+import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
 import { installAiResponseGuard } from '../lib/api/_response-guard.js';
 
 const MODELS=['gemini-3.6-flash','gemini-3.5-flash-lite'];
@@ -59,8 +59,6 @@ QUY TẮC ĐỊNH DẠNG TOÁN:
     if(!getAiKeyPool('GEMINI').length){
       return res.status(503).json({error:'AI hỗ trợ chưa được cấu hình Gemini.',requestId});
     }
-    const usingNetworkGuard = globalThis.__STUDY_TH_GEMINI_GUARD__ === true;
-
     for(const model of MODELS){
       let apiEntry=null;
       try{
@@ -71,24 +69,19 @@ QUY TẮC ĐỊNH DẠNG TOÁN:
             ...(model!=='gemini-3.5-flash-lite'?{thinkingConfig:{thinkingLevel:'low'}}:{})
           }
         };
-        if(!usingNetworkGuard){
-          apiEntry=await acquireAiKey('GEMINI');
-          if(!apiEntry){last='Gemini key pool exhausted';continue;}
-        }
         const headers={'Content-Type':'application/json'};
-        if(apiEntry)headers['x-goog-api-key']=apiEntry.key;
 
         const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+model+':generateContent',{
           method:'POST',
           headers,
           body:JSON.stringify(body),
-          signal:AbortSignal.timeout(18000)
+          signal:AbortSignal.timeout(18000),
+          timeoutMs:18000
         });
         const raw=await r.text();
         let data={};
         try{data=raw?JSON.parse(raw):{}}catch{}
         if(r.ok){
-          if(!usingNetworkGuard)reportAiSuccessAsync('GEMINI',apiEntry.id);
           const answer=data?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('').trim()||'';
           if(answer){
             writeAudit(req,{request_id:requestId,status_code:200,outcome:'response_delivered',model,response_text:answer,response_length:answer.length,latency_ms:Date.now()-started});
@@ -97,7 +90,6 @@ QUY TẮC ĐỊNH DẠNG TOÁN:
           last=model+': AI trả về rỗng.';
         }else{
           const err=Object.assign(new Error(providerMessage(data,r.status)),{status:r.status,providerMessage:providerMessage(data,r.status)});
-          if(!usingNetworkGuard)reportAiFailureAsync('GEMINI',apiEntry.id,err);
           last=providerMessage(data,r.status);
           if(![400,404,429,500,502,503].includes(r.status))break;
         }

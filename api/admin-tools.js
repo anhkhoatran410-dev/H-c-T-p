@@ -1,5 +1,6 @@
 import { isAdminRequest } from './admin-login.js';
 import '../lib/api/_gemini-network-guard.js';
+import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
 import adminAssistantHandler from '../lib/admin-assistant.js';
 
@@ -54,18 +55,19 @@ async function health(req, res) {
   if (!isAdminRequest(req)) return res.status(401).json({ error: 'Admin session required' });
   if (!SERVICE_KEY || !SUPABASE_URL) return res.status(500).json({ error: 'Supabase server credentials chưa được cấu hình.' });
 
-  const gemini = String(process.env.GEMINI_API_KEY || '').replace(/^['"`]+|['"`]+$/g, '').replace(/[\u0000-\u0020\u007f-\u009f]/g, '').trim();
-  const checks = { GEMINI_API_KEY: !!gemini, Gemini_generateContent: false, SUPABASE_SERVICE_ROLE_KEY: !!SERVICE_KEY, Supabase_database: false };
+  const geminiConfigured = getAiKeyPool('GEMINI').length > 0;
+  const checks = { GEMINI_API_KEY: geminiConfigured, Gemini_generateContent: false, SUPABASE_SERVICE_ROLE_KEY: !!SERVICE_KEY, Supabase_database: false };
   const details = {};
 
-  if (gemini) {
+  if (geminiConfigured) {
     for (const model of GEMINI_MODELS) {
       try {
         const r = await fetch(`https://generativelanguage.googleapis.com/v1/models/${model}:generateContent`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': gemini },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Reply with exactly OK.' }] }], generationConfig: { maxOutputTokens: 8 } }),
-          signal: AbortSignal.timeout(7000)
+          signal: AbortSignal.timeout(7000),
+          timeoutMs: 7000
         });
         const raw = await r.text();
         let data = {};

@@ -12,12 +12,12 @@ const adminToolsSource=fs.readFileSync(new URL('../api/admin-tools.js',import.me
 const adminAssistantSource=fs.readFileSync(new URL('../lib/admin-assistant.js',import.meta.url),'utf8');
 for(const item of [['support-ai',supportAiSource],['admin-tools',adminToolsSource],['admin-assistant',adminAssistantSource]]){
   const name=item[0],sourceValue=item[1];
-  assert.match(sourceValue,/_gemini-network-guard\\.js/,name+' must import the Gemini network guard');
+  assert.match(sourceValue,/_gemini-network-guard\.js/,name+' must import the Gemini network guard');
   assert.equal((sourceValue.match(/x-goog-api-key/g)||[]).length,0,name+' must not inject Gemini keys directly');
 }
 assert.match(supportAiSource,/timeoutMs:18000/,'support-ai must pass its total Gemini timeout to the guard');
 assert.match(adminToolsSource,/timeoutMs: 7000/,'admin health must pass its total Gemini timeout to the guard');
-assert.match(adminAssistantSource,/const assistantDeadline = Date\\.now\\(\\) \+ 27_000/,'Admin Copilot must have one total request budget');
+assert.match(adminAssistantSource,/const assistantDeadline = Date\.now\(\) \+ 27_000/,'Admin Copilot must have one total request budget');
 assert.match(adminAssistantSource,/timeoutMs: remaining/,'Admin Copilot must pass its remaining budget to the guard');
 
 

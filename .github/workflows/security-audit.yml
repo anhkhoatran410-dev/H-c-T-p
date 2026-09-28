@@ -68,11 +68,20 @@ jobs:
       - name: Live AI preview smoke test
         if: ${{ github.event_name == 'pull_request' }}
         env:
-          ENDPOINT: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app/api/solve
-          ORIGIN: https://hoc-va-choi-git-ai-speed-stability-20260918-study-boots.vercel.app
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_HEAD_REF: ${{ github.head_ref }}
         shell: bash
         run: |
           set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            slug=$(printf '%s' "$GITHUB_HEAD_REF" | tr '[:upper:]' '[:lower:]' | tr '/' '-')
+            ENDPOINT="https://hoc-va-choi-git-${slug}-study-boots.vercel.app/api/solve"
+          else
+            ENDPOINT="https://hoc-va-choi.vercel.app/api/solve"
+          fi
+          ORIGIN="${ENDPOINT%/api/solve}"
+          echo "AI smoke endpoint: $ENDPOINT"
 
           smoke_request() {
             local body="$1"

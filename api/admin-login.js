@@ -3,9 +3,7 @@ import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceM
 
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 8;
-const attempts = new Map();
 const SESSION_MS = 60 * 60 * 1000;
-const MAX_TRACKED_IPS = 10_000;
 const COOKIE_NAME = "study_admin_session_v3";
 const LEGACY_COOKIE_NAME = "study_admin_session_v2";
 const MFA_STEP_SECONDS = 30;

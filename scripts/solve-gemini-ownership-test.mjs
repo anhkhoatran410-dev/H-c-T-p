@@ -9,4 +9,12 @@ assert.equal((source.match(/if\(usingGuard\)requestInit\.timeoutMs=/g)||[]).leng
 assert.equal((source.match(/if\(!usingGuard&&apiEntry\)reportAi(?:Success|Failure)/g)||[]).length,7,'direct key/report ownership must be gated behind !usingGuard');
 assert.equal((source.match(/await\s+reportAi(?:Success|Failure)\s*\(/g)||[]).length,0,'solver should not await resilience reporting');
 assert.equal((source.match(/headers:\s*\{\s*'Content-Type':\s*'application\/json',\s*'x-goog-api-key':\s*api\s*\}/g)||[]).length,0,'solver must not force a key while the network guard owns Gemini requests');
+assert.match(source,/if\(audit\?\.verdict==='FAIL'\)/,'Olympiad audit FAIL must enter the repair engine');
+assert.match(source,/repair\(\{message,subject,image,cas,candidate,audit,attempt:1,codeExecutionTools\}/,'Repair Engine must be invoked on an audit FAIL');
+assert.match(source,/repairCount=1;/,'Successful repair must increment repairCount');
+assert.match(source,/tool:repairCount>0\?'Repair Engine'/,'Response must expose Repair Engine when repair is used');
+const hardWorkflow=fs.readFileSync(new URL('../.github/workflows/study-th-hard-benchmark.yml',import.meta.url),'utf8');
+assert.equal(hardWorkflow.includes('ai-speed-stability-20260918'),false,'hard benchmark must not use the retired preview endpoint');
+const securityWorkflow=fs.readFileSync(new URL('../.github/workflows/security-audit.yml',import.meta.url),'utf8');
+assert.equal(securityWorkflow.includes('ai-speed-stability-20260918'),false,'security smoke must not use the retired preview endpoint');
 console.log('SOLVE_GEMINI_GUARD_OWNERSHIP=PASS');

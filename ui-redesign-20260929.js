@@ -202,7 +202,7 @@
         const ex=e.find(x=>String(x.id)===String(r.exam_id||r.examId));
         return ex&&String(ex.subject||'')===s;
       });
-      const score=related.length?Math.round(related.reduce((a,r)=>a+Number(r.score||0),0)/related.length):Math.min(98,60+Math.min(20,tests*4));
+      const score=related.length?Math.round(related.reduce((a,r)=>a+Number(r.score||0),0)/related.length):null;
       const icons=['📐','🇬🇧','📖','🧠','🧪','💻'];
       return {name:s,tests,score,icon:icons[i%icons.length]};
     });
@@ -220,7 +220,7 @@
         statCard('🔥',stats.streak+' ngày','Chuỗi học',stats.streak?'Đang duy trì':'Bắt đầu chuỗi mới')
       +'</div>'+
       '<div class="rt-grid rt-two" style="margin-top:16px">'+
-        '<article class="rt-card rt-card-pad"><div class="rt-card-head"><div><h3>Môn học của bạn</h3><p>Đi thẳng vào nơi bạn đang cần học.</p></div><button class="rt-ghost-link" type="button" onclick="studyRoute(\'tests\')">Xem đề →</button></div><div class="rt-subject-grid">'+subs.slice(0,3).map(x=>'<button class="rt-subject" type="button" onclick="filterTestsSubject(\''+escAttr(x.name)+'\')"><span class="rt-subject-icon">'+x.icon+'</span><span><b>'+escapeHtml(x.name)+'</b><small>'+x.tests+' bài kiểm tra · '+x.score+'% gần đây</small></span><strong>→</strong></button>').join('')+'</div></article>'+
+        '<article class="rt-card rt-card-pad"><div class="rt-card-head"><div><h3>Môn học của bạn</h3><p>Đi thẳng vào nơi bạn đang cần học.</p></div><button class="rt-ghost-link" type="button" onclick="studyRoute(\'tests\')">Xem đề →</button></div><div class="rt-subject-grid">'+subs.slice(0,3).map(x=>'<button class="rt-subject" type="button" onclick="filterTestsSubject(\''+escAttr(x.name)+'\')"><span class="rt-subject-icon">'+x.icon+'</span><span><b>'+escapeHtml(x.name)+'</b><small>'+x.tests+' bài kiểm tra · '+(x.score==null?'Chưa có điểm':x.score+'% gần đây')+'</small></span><strong>→</strong></button>').join('')+'</div></article>'+
         '<article class="rt-card rt-card-pad"><div class="rt-card-head"><div><h3>Tiến độ tuần này</h3><p>Dựa trên các lượt làm bài gần đây.</p></div><b style="font-size:20px;color:#3e5fc9">'+progress+'%</b></div><div class="rt-progress-wrap"><div class="rt-progress-track"><div class="rt-progress-bar" style="width:'+progress+'%"></div></div><div class="rt-progress-meta"><span>'+stats.recent7+' lượt làm trong 7 ngày</span><span>Mục tiêu 5 lượt</span></div></div><div style="margin-top:18px" class="rt-alert">Mẹo: sau mỗi đề, bạn có thể vào <b>Thống kê</b> hoặc <b>Lịch sử</b> để xem chỗ cần cải thiện.</div></article>'+
       '</div>'+
       '<div class="rt-grid rt-two" style="margin-top:16px">'+
@@ -350,7 +350,7 @@
     }
   }
 
-  function filterTestsSubject(s){testFilter=s;generatorMode='library';renderRedesign()}
+  function filterTestsSubject(s){testFilter=s;generatorMode='library';if(S())S().page='tests';renderRedesign()}
   function setGeneratorMode(mode){generatorMode=mode;renderRedesign();if(mode==='new')setTimeout(setupGenerator,0)}
 
   function aiPage(){
@@ -381,15 +381,27 @@
   }
   function useAiSuggestion(text){const input=document.getElementById('rtAiInput');if(input){input.value=text;input.focus();}}
 
+  function subjectDonutGradient(subs){
+    const colors=['#4169e8','#61a8ee','#7a72e8','#59b990','#e0a34b','#df6b86'];
+    const vals=subs.slice(0,4).map(x=>Number(x.score||0));
+    const total=vals.reduce((a,b)=>a+b,0)||1;
+    let cursor=0;const parts=[];
+    vals.forEach((v,i)=>{const next=cursor+(v/total)*100;parts.push(colors[i]+' '+cursor.toFixed(2)+'% '+next.toFixed(2)+'%');cursor=next});
+    return parts.length?'conic-gradient('+parts.join(',')+')':'#e9eef5';
+  }
+
   function statsPage(){
-    const h=(S()?.history||[]).slice(0,30);const st=computeStats(h);const vals=h.slice(-7).reverse().map(r=>Number(r.score||0)).filter(Number.isFinite);
-    const max=Math.max(10,...vals,100);const points=vals.length?vals.map((v,i)=>{const x=12+i*(336/Math.max(1,vals.length-1));const y=188-(v/max)*158;return x+','+y}).join(' '):'12,188 70,170 128,177 186,140 244,128 302,112 348,86';
+    const h=(S()?.history||[]).slice(0,30);
+    const st=computeStats(h);
+    const vals=h.slice(-7).reverse().map(r=>Number(r.score||0)).filter(Number.isFinite);
+    const points=vals.length?vals.map((v,i)=>{const x=12+i*(336/Math.max(1,vals.length-1));const y=188-(v/100)*158;return x+','+y}).join(' '):'';
+    const chartNote=vals.length?'':'Chưa có đủ dữ liệu để vẽ biểu đồ.';
     const subs=subjectStats();
-    return '<section class="rt-page"><div class="rt-page-head"><div><span class="rt-page-eyebrow">THỐNG KÊ</span><h2>Tiến độ & hiệu quả học tập</h2><p>Biểu đồ được tạo từ dữ liệu bài làm hiện tại của bạn.</p></div><button class="rt-button light" onclick="studyRoute(\'history2\')">Xem lịch sử →</button></div>'+
+    return '<section class="rt-page"><div class="rt-page-head"><div><span class="rt-page-eyebrow">THỐNG KÊ</span><h2>Tiến độ & hiệu quả học tập</h2><p>Biểu đồ được tạo từ dữ liệu bài làm hiện tại của bạn.</p></div><button class="rt-button light" onclick="studyRoute(\\'history2\\')">Xem lịch sử →</button></div>'+
       '<div class="rt-grid rt-stats">'+statCard('◎',st.avg+'%','Điểm trung bình',st.avg?'':'—')+statCard('★',st.best+'%','Điểm cao nhất',st.best?'':'—')+statCard('◷',st.hours.toFixed(1)+'h','Thời gian học',st.hours?'':'—')+statCard('🔥',st.streak+' ngày','Chuỗi hiện tại',st.streak?'':'—')+'</div>'+
       '<div class="rt-grid rt-two" style="margin-top:16px">'+
-        '<article class="rt-card rt-card-pad"><div class="rt-card-head"><div><h3>Điểm theo thời gian</h3><p>7 lượt gần nhất</p></div></div><div class="rt-chart"><svg viewBox="0 0 360 220" preserveAspectRatio="none"><line class="gridline" x1="0" y1="45" x2="360" y2="45"/><line class="gridline" x1="0" y1="90" x2="360" y2="90"/><line class="gridline" x1="0" y1="135" x2="360" y2="135"/><line class="axis" x1="0" y1="200" x2="360" y2="200"/><polyline class="line" points="'+points+'"/>'+points.split(' ').map(p=>{const a=p.split(',');return '<circle class="dot" cx="'+a[0]+'" cy="'+a[1]+'" r="4"/>'}).join('')+'</svg></div></article>'+
-        '<article class="rt-card rt-card-pad"><div class="rt-card-head"><div><h3>Tỷ lệ theo môn</h3><p>Dữ liệu đã có trong lịch sử</p></div></div><div class="rt-donut"></div><div class="rt-legend">'+subs.slice(0,4).map((x,i)=>'<div class="rt-legend-item"><span><i class="rt-dot" style="background:'+['#4169e8','#61a8ee','#7a72e8','#59b990'][i]+'"></i>'+escapeHtml(x.name)+'</span><b>'+x.score+'%</b></div>').join('')+'</div></article>'+
+        '<article class="rt-card rt-card-pad"><div class="rt-card-head"><div><h3>Điểm theo thời gian</h3><p>7 lượt gần nhất</p></div></div><div class="rt-chart"><svg viewBox="0 0 360 220" preserveAspectRatio="none"><line class="gridline" x1="0" y1="45" x2="360" y2="45"/><line class="gridline" x1="0" y1="90" x2="360" y2="90"/><line class="gridline" x1="0" y1="135" x2="360" y2="135"/><line class="axis" x1="0" y1="200" x2="360" y2="200"/>'+(points?'<polyline class="line" points="'+points+'"/>'+points.split(' ').map(p=>{const a=p.split(',');return '<circle class="dot" cx="'+a[0]+'" cy="'+a[1]+'" r="4"/>'}).join(''):'')+'</svg><div style="text-align:center;color:#8793a6;font-size:11px;margin-top:-8px">'+chartNote+'</div></div></article>'+
+        '<article class="rt-card rt-card-pad"><div class="rt-card-head"><div><h3>Tỷ lệ theo môn</h3><p>Dữ liệu đã có trong lịch sử</p></div></div><div class="rt-donut" style="background:'+subjectDonutGradient(subs)+'"></div><div class="rt-legend">'+subs.slice(0,4).map((x,i)=>'<div class="rt-legend-item"><span><i class="rt-dot" style="background:'+['#4169e8','#61a8ee','#7a72e8','#59b990'][i]+'"></i>'+escapeHtml(x.name)+'</span><b>'+(x.score==null?'—':x.score+'%')+'</b></div>').join('')+'</div></article>'+
       '</div>'+
       '<article class="rt-card rt-card-pad" style="margin-top:16px"><div class="rt-card-head"><div><h3>Tiến độ học tập</h3><p>Tóm tắt các chỉ số quan trọng.</p></div></div><div class="rt-grid rt-three"><div class="rt-alert"><b>'+st.recent7+'</b> lượt làm trong 7 ngày gần nhất.</div><div class="rt-alert"><b>'+st.count+'</b> lượt làm đã có trong phiên hiện tại.</div><div class="rt-alert"><b>'+st.best+'%</b> là điểm cao nhất đang ghi nhận.</div></div></article>'+
     '</section>';

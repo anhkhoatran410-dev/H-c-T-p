@@ -1,11 +1,9 @@
 import crypto from "node:crypto";
-import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, safeRequestId } from "../lib/api/_security.js";
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, sameOrigin, safeRequestId, distributedRateLimit } from "../lib/api/_security.js";
 
 const WINDOW_MS = 60_000;
 const MAX_ATTEMPTS = 8;
-const attempts = new Map();
 const SESSION_MS = 60 * 60 * 1000;
-const MAX_TRACKED_IPS = 10_000;
 const COOKIE_NAME = "study_admin_session_v3";
 const LEGACY_COOKIE_NAME = "study_admin_session_v2";
 const MFA_STEP_SECONDS = 30;
@@ -118,19 +116,12 @@ export default async function handler(req,res){
   }
   if(!enforceJsonContentType(req,res)) return;
 
-  const ip = String(req.headers?.["x-real-ip"] || req.headers?.["x-forwarded-for"] || req.socket?.remoteAddress || "unknown").split(",")[0].trim();
-  const now = Date.now();
-  if(attempts.size >= MAX_TRACKED_IPS && !attempts.has(ip)){
-    for(const [k,v] of attempts){ if(now-v.start > WINDOW_MS) attempts.delete(k); if(attempts.size < MAX_TRACKED_IPS) break; }
-  }
-  const entry = attempts.get(ip) || {start:now,count:0};
-  if(now-entry.start > WINDOW_MS){entry.start=now;entry.count=0;}
-  entry.count += 1;
-  attempts.set(ip,entry);
-  if(entry.count > MAX_ATTEMPTS){
-    res.setHeader("Retry-After","60");
-    return res.status(429).json({error:"Thử đăng nhập quá nhiều lần. Hãy đợi một phút.",requestId});
-  }
+  const limited = await distributedRateLimit(req,res,{
+    windowMs:WINDOW_MS,
+    max:MAX_ATTEMPTS,
+    keyPrefix:"admin-login"
+  });
+  if(!limited)return;
 
   const body = readBody(req);
   const password = String(body.password || "");

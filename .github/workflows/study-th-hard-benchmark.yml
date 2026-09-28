@@ -1,9 +1,8 @@
 name: STUDY TH Hard Math Benchmark
 
 on:
-  pull_request:
-    branches: [main]
   push:
+    branches: [main]
     paths:
       - 'benchmarks/study_th_hard_benchmark.py'
       - 'lib/solve-legacy.js'
@@ -21,18 +20,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
       - name: Run hard benchmark
-        env:
-          SMOKE_ONLY: ${{ github.event_name == 'pull_request' && '1' || '0' }}
-          GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ "$SMOKE_ONLY" = "1" ]; then
-            slug=$(printf '%s' "$GITHUB_BRANCH" | tr '[:upper:]' '[:lower:]' | tr '/' '-')
-            export SMOKE_ENDPOINT="https://hoc-va-choi-git-${slug}-study-boots.vercel.app/api/solve"
-          else
-            export SMOKE_ENDPOINT="https://hoc-va-choi.vercel.app/api/solve"
-          fi
+          export SMOKE_ONLY=0
+          export SMOKE_ENDPOINT="https://hoc-va-choi.vercel.app/api/solve"
           echo "Benchmark endpoint: $SMOKE_ENDPOINT"
           python3 benchmarks/study_th_hard_benchmark.py
       - name: Publish result

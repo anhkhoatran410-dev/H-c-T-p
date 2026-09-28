@@ -179,8 +179,9 @@ export default async function handler(req,res){
     }catch(e){
       clearInterval(heartbeat);
       try{
-        const fallbackBudgetMs=Math.min(25000,Math.max(1000,55000-(Date.now()-started)));
-        if(fallbackBudgetMs<1000)throw e;
+        const remainingBudgetMs=55000-(Date.now()-started);
+        if(remainingBudgetMs<=1000)throw e;
+        const fallbackBudgetMs=Math.min(25000,remainingBudgetMs);
         const fallback=await directGeminiFallback(req.body,fallbackBudgetMs);
         const fallbackPayload={answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true};
         const fallbackGuard=guardAiResponse(JSON.stringify(fallbackPayload),'application/json; charset=utf-8');
@@ -224,8 +225,9 @@ export default async function handler(req,res){
     writeAudit(req,{request_id:requestId,status_code:Number(res.statusCode||200),outcome:'response_delivered',model:null,response_text:responseCaptured||'',response_length:responseCaptured?.length||0,latency_ms:Date.now()-started});
   }catch(e){
     try{
-      const fallbackBudgetMs=Math.min(25000,Math.max(1000,55000-(Date.now()-started)));
-      if(fallbackBudgetMs<1000)throw e;
+      const remainingBudgetMs=55000-(Date.now()-started);
+      if(remainingBudgetMs<=1000)throw e;
+      const fallbackBudgetMs=Math.min(25000,remainingBudgetMs);
       const fallback=await directGeminiFallback(req.body,fallbackBudgetMs);
       const payload={answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true,fallback:true,requestId};
       const fallbackGuard=guardAiResponse(JSON.stringify(payload),'application/json; charset=utf-8');

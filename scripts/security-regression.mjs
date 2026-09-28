@@ -116,6 +116,10 @@ assert.equal(String((await readFile(new URL('../lib/api/_internal-replay.js', im
   assert.equal(envSent.body.includes(envFixture), false);
 }
 
+const adminLoginSource = await readFile(new URL('../api/admin-login.js', import.meta.url), 'utf8');
+assert.equal(adminLoginSource.includes('distributedRateLimit'), true);
+assert.equal(adminLoginSource.includes('const attempts = new Map();'), false);
+
 const vercel = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
 assert.equal(vercel.functions?.['api/_ai-gateway.js'], undefined);
 assert.equal(vercel.functions?.['api/_solve-core.js'], undefined);

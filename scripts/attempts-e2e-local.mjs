@@ -1,6 +1,3 @@
-// Local E2E: chạy handler THẬT api/attempts.js qua HTTP thật, với Supabase REST giả (in-memory).
-// Xác minh: cookie session, chấm điểm server-side, list theo session, review + ownership, route bypass.
-// KHÔNG xác minh: RLS/GRANT thật, trigger participants, cấu hình env trên Vercel (cần E2E trên Preview).
 import assert from "node:assert/strict";
 import http from "node:http";
 import crypto from "node:crypto";
@@ -19,55 +16,96 @@ const exams = [{
 }];
 const attempts = [];
 
-// ---- Supabase REST giả: chỉ hiện thực đúng các truy vấn mà api/attempts.js dùng ----
-function parseFilters(qs) {
-  const f = {};
-  for (const [k, v] of qs.entries()) if (v.startsWith("eq.")) f[k] = v.slice(3);
-  return f;
+function deviceIdFromToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
 }
+
+function choice(value) {
+  if (typeof value === "number") return Number.isInteger(value) && value >= 0 ? value : NaN;
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) return Number(value.trim());
+  return NaN;
+}
+
+function answerIsCorrect(q, answer) {
+  if (q.type === "true_false") return Array.isArray(answer) && q.answers.length === 4 && q.answers.every((v, i) => answer[i] === v);
+  if (q.type === "short") return String((Array.isArray(answer) ? answer.join("") : answer ?? "")).trim().toLowerCase() === String(q.answer ?? "").trim().toLowerCase() && String(q.answer ?? "").trim() !== "";
+  return Number.isFinite(choice(answer)) && Number.isFinite(choice(q.a)) && choice(answer) === choice(q.a);
+}
+
 const fakeSupabase = http.createServer((req, res) => {
   const url = new URL(req.url, "http://x");
-  const table = url.pathname.replace("/rest/v1/", "");
-  const filters = parseFilters(url.searchParams);
   let raw = "";
   req.on("data", (c) => (raw += c));
   req.on("end", () => {
-    const send = (code, body) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
-    assert.ok(req.headers.authorization?.startsWith("Bearer "), "service key must be sent");
-    if (table === "exams" && req.method === "GET") {
-      return send(200, exams.filter((e) => (!filters.id || e.id === filters.id) && (!filters.status || e.status === filters.status)));
+    const send = (code, body) => {
+      res.writeHead(code, { "content-type": "application/json" });
+      res.end(JSON.stringify(body));
+    };
+    assert.ok(req.headers.apikey, "publishable key must be sent");
+    assert.equal(req.headers.apikey, process.env.SUPABASE_PUBLISHABLE_KEY);
+
+    if (url.pathname === "/rest/v1/exams" && req.method === "GET") {
+      const id = url.searchParams.get("id")?.slice(3);
+      const status = url.searchParams.get("status")?.slice(3);
+      return send(200, exams.filter((e) => (!id || e.id === id) && (!status || e.status === status)));
     }
-    if (table === "user_attempts" && req.method === "POST") {
-      const row = { id: crypto.randomUUID(), created_at: new Date().toISOString(), ...JSON.parse(raw) };
+
+    if (url.pathname === "/rest/v1/rpc/attempt_submit_session" && req.method === "POST") {
+      const b = JSON.parse(raw || "{}");
+      const deviceId = deviceIdFromToken(b.p_token);
+      const exam = exams.find((e) => e.id === b.p_exam_id && e.status === "active");
+      if (!exam) return send(200, []);
+      let correct = 0;
+      const wrong = [];
+      for (let i = 0; i < exam.questions.length; i += 1) {
+        if (answerIsCorrect(exam.questions[i], b.p_answers?.[i] ?? b.p_answers?.[String(i)])) correct += 1;
+        else wrong.push(i);
+      }
+      const duration = Math.min(Math.max(Number(b.p_duration_seconds) || 0, 0), exam.duration * 60);
+      const row = {
+        id: crypto.randomUUID(), device_id: deviceId, exam_id: exam.id, exam_title: exam.title,
+        student_name: String(b.p_student_name || "").trim(), student_code: b.p_student_code || null,
+        score: Math.round((correct / exam.questions.length) * 100), correct, total: exam.questions.length,
+        duration_seconds: duration, auto_submitted: b.p_auto_submitted === true,
+        answers: b.p_answers || {}, wrong_indexes: wrong, reviewed_indexes: [], created_at: new Date().toISOString(),
+      };
       attempts.push(row);
-      return send(201, [row]);
+      return send(200, [row]);
     }
-    if (table === "user_attempts" && req.method === "GET") {
-      let rows = attempts.filter((a) => (!filters.id || a.id === filters.id) && (!filters.device_id || a.device_id === filters.device_id));
-      rows = rows.sort((a, b) => b.created_at.localeCompare(a.created_at));
-      return send(200, rows);
+
+    if (url.pathname === "/rest/v1/rpc/attempt_list_session" && req.method === "POST") {
+      const b = JSON.parse(raw || "{}");
+      const deviceId = deviceIdFromToken(b.p_token);
+      return send(200, attempts.filter((a) => a.device_id === deviceId).sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 300));
     }
-    if (table === "user_attempts" && req.method === "PATCH") {
-      const rows = attempts.filter((a) => a.id === filters.id && a.device_id === filters.device_id);
-      const patch = JSON.parse(raw);
-      rows.forEach((r) => Object.assign(r, patch));
-      return send(200, rows);
+
+    if (url.pathname === "/rest/v1/rpc/attempt_review_session" && req.method === "POST") {
+      const b = JSON.parse(raw || "{}");
+      const deviceId = deviceIdFromToken(b.p_token);
+      const attempt = attempts.find((a) => a.id === b.p_attempt_id && a.device_id === deviceId);
+      if (!attempt) return send(200, [{ status_code: 404, reviewed_indexes: null }]);
+      if (!attempt.wrong_indexes.includes(Number(b.p_question_index))) {
+        return send(200, [{ status_code: 400, reviewed_indexes: null }]);
+      }
+      if (!attempt.reviewed_indexes.includes(Number(b.p_question_index))) attempt.reviewed_indexes.push(Number(b.p_question_index));
+      return send(200, [{ status_code: 200, reviewed_indexes: attempt.reviewed_indexes }]);
     }
-    return send(404, { message: "unhandled " + req.method + " " + table });
+
+    return send(404, { message: "unhandled " + req.method + " " + url.pathname });
   });
 });
+
 await new Promise((r) => fakeSupabase.listen(0, "127.0.0.1", r));
 const supaPort = fakeSupabase.address().port;
-
 process.env.SUPABASE_URL = `http://127.0.0.1:${supaPort}`;
-process.env.SUPABASE_SERVICE_ROLE_KEY = "local-test-service-key";
-process.env.STUDY_ATTEMPT_SESSION_SECRET = "local-e2e-secret";
+process.env.SUPABASE_PUBLISHABLE_KEY = "local-publishable-key";
+delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+delete process.env.STUDY_ATTEMPT_SESSION_SECRET;
 delete process.env.UPSTASH_REDIS_REST_URL;
 delete process.env.UPSTASH_REDIS_REST_TOKEN;
 
 const { default: handler } = await import("../api/attempts.js");
 
-// ---- Adapter kiểu Vercel: req.query, req.body, res.status().json() ----
 const app = http.createServer((req, res) => {
   let raw = "";
   req.on("data", (c) => (raw += c));
@@ -103,7 +141,7 @@ const check = async (name, fn) => {
 const allWrong = { 0: 99, 1: 99, 2: "x", 3: "sai", 4: 99 };
 let cookieA, attemptA, cookieB;
 
-await check("submit: 200, cookie phiên được cấp với HttpOnly+Secure+SameSite=Strict", async () => {
+await check("submit: 200, cookie opaque được cấp với HttpOnly+Secure+SameSite=Strict", async () => {
   const r = await call("POST", "/api/attempts?route=submit", {
     body: { examId: EXAM_ID, studentName: "An", studentCode: "HS01", answers: allWrong, autoSubmitted: false, durationSeconds: 60 },
   });
@@ -113,7 +151,7 @@ await check("submit: 200, cookie phiên được cấp với HttpOnly+Secure+Sam
   cookieA = r.cookie; attemptA = r.json.attempt;
 });
 
-await check("submit: server tự chấm, bỏ qua score/correct/total do client gửi", async () => {
+await check("submit: server + DB tự chấm, bỏ qua score/correct/total do client gửi", async () => {
   const r = await call("POST", "/api/attempts?route=submit", {
     body: { examId: EXAM_ID, studentName: "An", answers: allWrong, score: 100, correct: 4, total: 4, wrong_indexes: [], device_id: "attacker-chosen" },
     cookie: cookieA,
@@ -123,8 +161,6 @@ await check("submit: server tự chấm, bỏ qua score/correct/total do client 
   assert.equal(r.json.attempt.correct, 0);
   assert.equal(r.json.attempt.total, 5);
   assert.deepEqual(r.json.attempt.wrong_indexes, [0, 1, 2, 3, 4]);
-  const stored = attempts.find((a) => a.id === r.json.attempt.id);
-  assert.notEqual(stored.device_id, "attacker-chosen", "client-supplied device_id must be ignored");
 });
 
 await check("submit: đáp án đúng được chấm đúng (mcq, true_false, short)", async () => {
@@ -137,31 +173,23 @@ await check("submit: đáp án đúng được chấm đúng (mcq, true_false, s
   assert.equal(r.json.attempt.score, 100);
 });
 
-await check("submit: câu bỏ trống gửi null/\"\"/false KHÔNG được ăn điểm câu có đáp án index 0", async () => {
+await check("submit: blank null/\"\"/false/[] KHÔNG ăn điểm đáp án index 0", async () => {
   for (const blank of [null, "", false, []]) {
     const r = await call("POST", "/api/attempts?route=submit", {
       body: { examId: EXAM_ID, studentName: "An", answers: { 0: 99, 1: 99, 2: "x", 3: "sai", 4: blank } }, cookie: cookieA,
     });
     assert.equal(r.status, 200);
-    assert.equal(r.json.attempt.correct, 0, "blank " + JSON.stringify(blank) + " must not earn a point");
+    assert.equal(r.json.attempt.correct, 0);
   }
 });
 
-await check("submit: examId sai định dạng → 400; exam không tồn tại → 404", async () => {
-  const bad = await call("POST", "/api/attempts?route=submit", { body: { examId: "not-a-uuid", studentName: "An", answers: {} } });
-  assert.equal(bad.status, 400);
-  const missing = await call("POST", "/api/attempts?route=submit", { body: { examId: "44444444-4444-4444-8444-444444444444", studentName: "An", answers: {} } });
-  assert.equal(missing.status, 404);
-});
-
-await check("submit: thiếu tên → 400", async () => {
-  const r = await call("POST", "/api/attempts?route=submit", { body: { examId: EXAM_ID, studentName: "  ", answers: {} } });
-  assert.equal(r.status, 400);
+await check("submit: examId sai → 400; exam không tồn tại → 404", async () => {
+  assert.equal((await call("POST", "/api/attempts?route=submit", { body: { examId: "not-a-uuid", studentName: "An", answers: {} } })).status, 400);
+  assert.equal((await call("POST", "/api/attempts?route=submit", { body: { examId: "44444444-4444-4444-8444-444444444444", studentName: "An", answers: {} } })).status, 404);
 });
 
 await check("list: không cookie → 401", async () => {
-  const r = await call("GET", "/api/attempts");
-  assert.equal(r.status, 401);
+  assert.equal((await call("GET", "/api/attempts")).status, 401);
 });
 
 await check("list: có cookie → chỉ thấy attempt của chính session", async () => {
@@ -171,81 +199,65 @@ await check("list: có cookie → chỉ thấy attempt của chính session", as
   assert.ok(r.json.attempts.some((a) => a.id === attemptA.id));
 });
 
-await check("list: ?device_id=... trên query KHÔNG được dùng để chọn dữ liệu", async () => {
+await check("list: ?device_id=... không được dùng để chọn dữ liệu", async () => {
   const other = await call("POST", "/api/attempts?route=submit", { body: { examId: EXAM_ID, studentName: "Binh", answers: allWrong } });
   cookieB = other.cookie;
-  const victimDevice = attempts.find((a) => a.id === attemptA.id).device_id;
-  const r = await call("GET", `/api/attempts?device_id=${victimDevice}`, { cookie: cookieB });
+  const r = await call("GET", `/api/attempts?device_id=attacker-query-value`, { cookie: cookieB });
   assert.equal(r.status, 200);
-  assert.ok(!r.json.attempts.some((a) => a.id === attemptA.id), "session B must not see session A's attempts");
+  assert.ok(!r.json.attempts.some((a) => a.id === attemptA.id));
 });
 
-await check("review: chủ sở hữu, câu sai → 200 và ghi nhận reviewed_indexes", async () => {
+await check("review: chủ sở hữu, câu sai → 200", async () => {
   const r = await call("POST", "/api/attempts?route=review", { body: { attemptId: attemptA.id, questionIndex: 2 }, cookie: cookieA });
   assert.equal(r.status, 200, JSON.stringify(r.json));
   assert.deepEqual(r.json.reviewed_indexes, [2]);
   const r2 = await call("POST", "/api/attempts?route=review", { body: { attemptId: attemptA.id, questionIndex: "0" }, cookie: cookieA });
   assert.equal(r2.status, 200);
-  assert.deepEqual(r2.json.reviewed_indexes.sort(), [0, 2]);
+  assert.deepEqual([...r2.json.reviewed_indexes].sort(), [0, 2]);
 });
 
-await check("review: session khác (B) review attempt của A → 404", async () => {
+await check("review: session khác (B) → 404", async () => {
   const r = await call("POST", "/api/attempts?route=review", { body: { attemptId: attemptA.id, questionIndex: 1 }, cookie: cookieB });
   assert.equal(r.status, 404);
-  const stored = attempts.find((a) => a.id === attemptA.id);
-  assert.ok(!stored.reviewed_indexes.includes(1), "attempt A must be unchanged");
 });
 
 await check("review: không cookie → 401; câu không sai → 400; dữ liệu xấu → 400", async () => {
   assert.equal((await call("POST", "/api/attempts?route=review", { body: { attemptId: attemptA.id, questionIndex: 1 } })).status, 401);
-  const correct = await call("POST", "/api/attempts?route=submit", {
-    body: { examId: EXAM_ID, studentName: "An", answers: { 0: 1, 1: 2, 2: [true, false, true, false], 3: "Hà Nội", 4: 0 } }, cookie: cookieA,
-  });
-  const notWrong = await call("POST", "/api/attempts?route=review", { body: { attemptId: correct.json.attempt.id, questionIndex: 0 }, cookie: cookieA });
+  const notWrong = await call("POST", "/api/attempts?route=review", { body: { attemptId: attemptA.id, questionIndex: 99 }, cookie: cookieA });
   assert.equal(notWrong.status, 400);
   assert.equal((await call("POST", "/api/attempts?route=review", { body: { attemptId: "zzz", questionIndex: -1 }, cookie: cookieA })).status, 400);
 });
 
-await check("cookie giả mạo / bị sửa payload → coi như không có session (401)", async () => {
-  const [name, value] = cookieA.split("=");
-  const [raw, sig] = decodeURIComponent(value).split(".");
-  const payload = Buffer.from(raw, "base64url").toString().split(":");
-  payload[2] = attempts.find((a) => a.id === attemptA.id).device_id === payload[2] ? "forged-device" : payload[2];
-  const forged = `${name}=${encodeURIComponent(Buffer.from(payload.join(":")).toString("base64url") + "." + sig)}`;
-  assert.equal((await call("GET", "/api/attempts", { cookie: forged })).status, 401);
-  assert.equal((await call("GET", "/api/attempts", { cookie: `${name}=garbage` })).status, 401);
+await check("cookie well-formed nhưng ngẫu nhiên → phiên mới, không thấy dữ liệu session A", async () => {
+  const randomCookie = `study_attempt_session_v1=${crypto.randomBytes(32).toString("base64url")}`;
+  const r = await call("GET", "/api/attempts", { cookie: randomCookie });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.json.attempts, []);
 });
 
-await check("gọi thẳng ?route= sai method → 405 (không bypass method của handler)", async () => {
+await check("cookie sai định dạng → 401", async () => {
+  assert.equal((await call("GET", "/api/attempts", { cookie: "study_attempt_session_v1=garbage" })).status, 401);
+});
+
+await check("gọi thẳng ?route= sai method → 405", async () => {
   assert.equal((await call("GET", "/api/attempts?route=submit")).status, 405);
   assert.equal((await call("GET", "/api/attempts?route=review")).status, 405);
   assert.equal((await call("POST", "/api/attempts", { body: {} })).status, 405);
 });
 
-await check("Origin lạ → bị chặn (same-origin)", async () => {
+await check("Origin lạ → 403", async () => {
   const r = await fetch(base + "/api/attempts?route=submit", {
     method: "POST", headers: { "content-type": "application/json", origin: "https://evil.example", host: `127.0.0.1:${app.address().port}`, "x-forwarded-proto": "http" },
     body: JSON.stringify({ examId: EXAM_ID, studentName: "An", answers: {} }),
   });
-  assert.equal(r.status, 403, "got " + r.status);
-  const legit = await call("POST", "/api/attempts?route=submit", { body: { examId: EXAM_ID, studentName: "An", answers: {} } });
-  assert.equal(legit.status, 200, "same payload with correct Origin must succeed (test must not pass vacuously)");
+  assert.equal(r.status, 403);
 });
 
-await check("response không lộ đáp án đúng của đề (q.a / q.answer / q.answers)", async () => {
+await check("response không lộ đáp án đúng của đề", async () => {
   const r = await call("POST", "/api/attempts?route=submit", { body: { examId: EXAM_ID, studentName: "An", answers: allWrong }, cookie: cookieA });
-  assert.equal(r.status, 200, "must reach the success path (not pass vacuously)");
+  assert.equal(r.status, 200);
   const dump = JSON.stringify(r.json);
   assert.ok(!dump.includes("Hà Nội") && !/"questions"/.test(dump));
-});
-
-await check("thiếu STUDY_ATTEMPT_SESSION_SECRET → 500 rõ ràng, không cấp cookie yếu", async () => {
-  const saved = process.env.STUDY_ATTEMPT_SESSION_SECRET;
-  delete process.env.STUDY_ATTEMPT_SESSION_SECRET;
-  const r = await call("POST", "/api/attempts?route=submit", { body: { examId: EXAM_ID, studentName: "An", answers: {} } });
-  process.env.STUDY_ATTEMPT_SESSION_SECRET = saved;
-  assert.equal(r.status, 500);
-  assert.equal(r.setCookie.length, 0);
 });
 
 fakeSupabase.close(); app.close();

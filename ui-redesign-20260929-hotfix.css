@@ -1,0 +1,22 @@
+
+/* UI redesign hotfix: responsive drawer state + light/dark consistency. */
+.rt-mobile-backdrop{display:none!important}
+@media(max-width:900px){
+  body.rt-menu-open .rt-mobile-backdrop{display:block!important;position:fixed;inset:0;background:rgba(10,22,43,.35);z-index:45}
+}
+.study-dark .rt-topbar{background:rgba(15,27,47,.90);border-bottom-color:#263754}
+.study-dark .rt-main{background:#0f192b}
+.study-dark .rt-page,.study-dark .rt-page p{color:#d8e1f0}
+.study-dark .rt-card,.study-dark .rt-stat-card,.study-dark .rt-test-item,.study-dark .rt-user-chip,.study-dark .rt-icon-button,.study-dark .rt-login-frame{background:#111d32;border-color:#2a3a57;color:#edf3ff}
+.study-dark .rt-card p,.study-dark .rt-card-head p,.study-dark .rt-stat-card small,.study-dark .rt-test-item small,.study-dark .rt-subject small,.study-dark .rt-page-head p{color:#a6b3c7}
+.study-dark .rt-subject,.study-dark .rt-quick,.study-dark .rt-alert,.study-dark .rt-dropzone,.study-dark .rt-ai-context,.study-dark .rt-ai-messages,.study-dark .rt-ai-composer,.study-dark .rt-question-card,.study-dark .rt-result-stat{background:#14223a;border-color:#2a3a57;color:#edf3ff}
+.study-dark .rt-input,.study-dark .rt-ai-composer textarea{background:#101b2d!important;color:#edf3ff!important;border-color:#30425f!important}
+.study-dark .rt-tabs{background:#1a2942}
+.study-dark .rt-tab.active{background:#243654;color:#cdd9ff}
+.study-dark .rt-option{background:#122039;border-color:#2a3b58;color:#edf3ff}
+.study-dark .rt-option.selected{background:#1a2e55;border-color:#526fc1}
+.study-dark .rt-history-item,.study-dark .rt-table td,.study-dark .rt-table th{border-color:#263651}
+.study-dark .rt-donut:after{background:#111d32}
+.study-dark .rt-nav-item.active{background:rgba(65,105,232,.35)}
+.study-dark .rt-bottom-nav{background:rgba(17,29,50,.95);border-color:#2a3a57}
+.study-dark .rt-bottom-item{color:#aab8ca}.study-dark .rt-bottom-item.active{background:#1d2f54;color:#dce5ff}

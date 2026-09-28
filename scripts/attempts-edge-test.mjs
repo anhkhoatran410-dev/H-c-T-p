@@ -3,7 +3,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { getOrCreateAttemptSession, getAttemptSession } from "../lib/api/_attempt-session.js";
 
-process.env.STUDY_ATTEMPT_SESSION_SECRET = "test-only-study-attempt-secret";
 
 function responseMock() {
   const headers = new Map();
@@ -30,13 +29,15 @@ async function testSessionRaceSemantics() {
   ]);
 
   assert.notEqual(a.deviceId, b.deviceId, "two cookie-less concurrent requests intentionally create two session identities");
+  assert.match(a.token, /^[A-Za-z0-9_-]{43,64}$/);
+  assert.match(b.token, /^[A-Za-z0-9_-]{43,64}$/);
 
   const firstResponse = responseMock();
   const first = getOrCreateAttemptSession({ headers: {} }, firstResponse);
   const cookie = cookieFrom(firstResponse);
   const resumed = getAttemptSession({ headers: { cookie } });
 
-  assert.deepEqual(resumed, first, "a later request carrying the issued cookie must reuse the same identity");
+  assert.deepEqual(resumed, first, "a later request carrying the issued cookie must reuse the same opaque identity");
 
   console.log("PASS session race semantics: cookie-less overlap creates distinct sessions by design; issued cookie resumes the original session.");
 }

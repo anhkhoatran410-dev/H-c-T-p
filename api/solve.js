@@ -27,9 +27,9 @@ function imageInlinePart(image){
   return m?{inlineData:{mimeType:m[1],data:m[2]}}:null;
 }
 
-async function directGeminiFallback(body){
+async function directGeminiFallback(body,budgetMs=25000){
   const models=configuredGeminiModels();
-  const fallbackDeadline=Date.now()+25000;
+  const fallbackDeadline=Date.now()+Math.max(1000,Math.min(25000,Number(budgetMs)||25000));
   const message=String(body?.message||'Giải bài trong ảnh.');
   const subject=String(body?.subject||'').trim();
   const image=String(body?.imageDataUrl||'');
@@ -179,7 +179,9 @@ export default async function handler(req,res){
     }catch(e){
       clearInterval(heartbeat);
       try{
-        const fallback=await directGeminiFallback(req.body);
+        const fallbackBudgetMs=Math.min(25000,Math.max(1000,55000-(Date.now()-started)));
+        if(fallbackBudgetMs<1000)throw e;
+        const fallback=await directGeminiFallback(req.body,fallbackBudgetMs);
         const fallbackPayload={answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true};
         const fallbackGuard=guardAiResponse(JSON.stringify(fallbackPayload),'application/json; charset=utf-8');
         if(!fallbackGuard.ok) writeEvent('result',{status:fallbackGuard.status,data:JSON.parse(fallbackGuard.body)});
@@ -222,7 +224,9 @@ export default async function handler(req,res){
     writeAudit(req,{request_id:requestId,status_code:Number(res.statusCode||200),outcome:'response_delivered',model:null,response_text:responseCaptured||'',response_length:responseCaptured?.length||0,latency_ms:Date.now()-started});
   }catch(e){
     try{
-      const fallback=await directGeminiFallback(req.body);
+      const fallbackBudgetMs=Math.min(25000,Math.max(1000,55000-(Date.now()-started)));
+      if(fallbackBudgetMs<1000)throw e;
+      const fallback=await directGeminiFallback(req.body,fallbackBudgetMs);
       const payload={answer:fallback.answer,model:fallback.model,source:fallback.source,finalized:true,degraded:true,reviewSkipped:true,fallback:true,requestId};
       const fallbackGuard=guardAiResponse(JSON.stringify(payload),'application/json; charset=utf-8');
       const safePayload=fallbackGuard.ok?payload:JSON.parse(fallbackGuard.body);

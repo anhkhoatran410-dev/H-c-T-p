@@ -52,47 +52,38 @@ async function testQuestionIndexNormalization() {
   // Giả lập PostgREST trả wrong_indexes dưới dạng mảng string, đúng dạng dữ liệu thật
   // có thể gặp tùy kiểu cột — đây chính là ca đã gây nghi ngờ "3" !== 3 trước đây.
   const fakeSupabaseRequest = async (path, init) => {
-    calls.push({ path, method: init?.method });
-    if (init?.method === "GET") {
-      return {
-        ok: true,
-        data: [{
-          id: attemptId,
-          device_id: deviceId,
-          wrong_indexes: ["1", "3", "5"],
-          reviewed_indexes: [],
-        }],
-      };
-    }
-    if (init?.method === "PATCH") {
+    calls.push({ path, method: init?.method, body: JSON.parse(init?.body || "{}") });
+    if (path === "rpc/attempt_review_session" && init?.method === "POST") {
       const body = JSON.parse(init.body);
-      return { ok: true, data: [{ id: attemptId, reviewed_indexes: body.reviewed_indexes }] };
+      if (body.p_token !== "token-A") return { ok: true, data: [{ status_code: 404, reviewed_indexes: null }] };
+      if (body.p_question_index === 2) return { ok: true, data: [{ status_code: 400, reviewed_indexes: null }] };
+      return { ok: true, data: [{ status_code: 200, reviewed_indexes: [3] }] };
     }
-    throw new Error("unexpected call: " + init?.method);
+    throw new Error("unexpected call: " + path + " " + init?.method);
   };
 
   // Client gửi questionIndex dưới dạng số 3 (JSON number thật, như body đã qua JSON.parse ở tầng HTTP thật)
   const result = await reviewAttemptCore(
-    { attemptId, questionIndex: 3, deviceId },
+    { attemptId, questionIndex: 3, token: "token-A" },
     { supabaseRequest: fakeSupabaseRequest }
   );
 
   assert.equal(result.status, 200, "expected review to succeed against string-typed wrong_indexes from PostgREST");
   assert.deepEqual(result.body.reviewed_indexes, [3]);
-  assert.equal(calls.length, 2, "expected exactly one lookup and one patch call");
-  assert.equal(calls[0].method, "GET");
-  assert.equal(calls[1].method, "PATCH");
+  assert.equal(calls.length, 1, "expected exactly one RPC call");
+  assert.equal(calls[0].path, "rpc/attempt_review_session");
+  assert.equal(calls[0].method, "POST");
 
   // Ownership: deviceId khác phải bị từ chối (404), dù wrong_indexes/questionIndex giống hệt.
   const otherDeviceResult = await reviewAttemptCore(
-    { attemptId, questionIndex: 3, deviceId: "99999999-9999-4999-8999-999999999999" },
+    { attemptId, questionIndex: 3, token: "token-B" },
     { supabaseRequest: fakeSupabaseRequest }
   );
   assert.equal(otherDeviceResult.status, 404, "a mismatched deviceId must not be able to review someone else's attempt");
 
   // questionIndex không thuộc wrong_indexes phải bị từ chối (400), không âm thầm chấp nhận.
   const notWrongResult = await reviewAttemptCore(
-    { attemptId, questionIndex: 2, deviceId },
+    { attemptId, questionIndex: 2, token: "token-A" },
     { supabaseRequest: fakeSupabaseRequest }
   );
   assert.equal(notWrongResult.status, 400);

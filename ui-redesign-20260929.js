@@ -40,6 +40,7 @@ if(!has()){if(s.page!=='login'&&s.page!=='landing')s.page='landing';root.innerHT
 if(s.page==='landing'||s.page==='login')s.page='home';
 root.innerHTML='<div class="student-app-shell">'+sidebar()+'<main class="student-workspace">'+topbar()+'<section class="student-workspace-content">'+content()+'</section></main><div class="student-sidebar-backdrop" onclick="toggleStudentSidebar()"></div></div>';
 ready();
+var hp=root.querySelector('.home-primary');if(hp)hp.onclick=function(){studentGo('tests')};
 if(s.page==='support'&&typeof window.startSupportLive==='function'){try{await window.startSupportLive()}catch(_){}}
 if(s.page==='ai'){setTimeout(function(){if(typeof window.openSupportAI==='function')window.openSupportAI()},80)}
 if(s.page==='exam'&&typeof window.updateTimer==='function')setTimeout(window.updateTimer,0);
@@ -63,7 +64,7 @@ async function ui(p){if(!S())return;if(p==='login'||p==='landing'){S().page=p;re
 function install(){
 if(!S())return;
 document.body.classList.toggle('study-dark',localStorage.getItem('study_public_theme')==='dark');
-window.studentUi=ui;window.studentGo=go;window.studentLogout=logout;window.toggleStudentSidebar=toggleStudentSidebar;window.toggleStudentTheme=toggleStudentTheme;window.render=render;
+window.studentUi=ui;window.studentGo=go;window.studentLogout=logout;window.toggleStudentSidebar=toggleStudentSidebar;window.toggleStudentTheme=toggleStudentTheme;window.render=render;window.go=go;
 if(!has())S().page=(S().page==='login'?'login':'landing');else{S().candidate=name();S().code=code();if(S().page==='landing'||S().page==='login')S().page='home'}
 render();
 }

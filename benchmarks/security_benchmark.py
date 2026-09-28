@@ -132,6 +132,10 @@ def static_secret_scan():
             try: text = open(path, encoding="utf-8", errors="ignore").read()
             except OSError: continue
             for n, line in enumerate(text.splitlines(), 1):
+                # This repository intentionally contains deterministic test fixtures such as
+                # GEMINI_API_KEY='support-ai-test-key'. Exclude only that exact fixture.
+                if path.replace('\\\\', '/') == "./scripts/support-ai-resilience-test.mjs" and "support-ai-test-key" in line:
+                    continue
                 if any(p.search(line) for p in patterns): hits.append(f"{path}:{n}")
     return [Finding("static-secret-scan", "PASS" if not hits else "FAIL", "repo", "no obvious hard-coded secrets", str(len(hits)), 0, ", ".join(hits[:10]))]
 

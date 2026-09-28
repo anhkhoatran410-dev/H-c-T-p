@@ -61,6 +61,9 @@ jobs:
 
       - name: Security regression tests
         run: node scripts/security-regression.mjs
+      - name: Solver Gemini guard ownership regression
+        run: node scripts/solve-gemini-ownership-test.mjs
+
 
       - name: Live AI preview smoke test
         if: ${{ github.event_name == 'pull_request' }}

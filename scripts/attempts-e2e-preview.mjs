@@ -1,4 +1,4 @@
-// E2E trên deployment THẬT (Preview). Cần: đủ 3 env trên Vercel + 1 exam đang active.
+// E2E trên deployment THẬT (Preview). Chỉ cần BASE_URL + EXAM_ID; attempt path dùng publishable Supabase key.
 //
 //   BASE_URL=https://<preview>.vercel.app EXAM_ID=<uuid exam active> node scripts/attempts-e2e-preview.mjs
 //
@@ -97,7 +97,7 @@ if (!LOCKDOWN) {
     assert.equal(r.status, 403);
   });
 
-  // Trigger participants: chỉ kiểm được nếu có service key (chạy local, KHÔNG dán key vào CI công khai).
+  // Trigger participants: tùy chọn, chỉ chạy khi caller có service key an toàn.
   if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     await check("[sau migration] trigger: participants có dòng theo code, và tên KHÔNG bị ghi đè khi code trùng", async () => {
       const code = RUN.replace(/\s/g, "-") + "-T";
@@ -140,7 +140,7 @@ if (!LOCKDOWN) {
     const r = await fetch(`${SB}/rest/v1/rpc/sync_participant_from_attempt`, { method: "POST", headers: h, body: "{}" });
     assert.ok(denied(r) || r.status === 404, `got ${r.status}`);
   });
-  console.log("\n(ghi chú) exams vẫn còn INSERT public (P1 chưa xử lý) — không được kiểm ở đây.");
+  console.log("\n(ghi chú) các bảng khác ngoài P0 attempts/participants không được kiểm ở đây.");
 }
 
 let failed = 0;

@@ -1,6 +1,16 @@
 name: Attempts E2E
 
 on:
+  push:
+    branches:
+      - "fix/p0-attempts-session"
+    paths:
+      - "api/attempts.js"
+      - "lib/api/_attempt-session.js"
+      - "lib/api/_supabase-service.js"
+      - "lib/api/_security.js"
+      - "scripts/attempts-*.mjs"
+      - ".github/workflows/attempts-e2e.yml"
   pull_request:
     paths:
       - "api/attempts.js"

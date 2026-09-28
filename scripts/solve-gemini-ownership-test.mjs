@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const source=fs.readFileSync(new URL('../lib/solve-legacy.js',import.meta.url),'utf8');
+const solveSource=fs.readFileSync(new URL('../api/solve.js',import.meta.url),'utf8');
+assert.equal(solveSource.includes("import { getAiKeyPool } from '../lib/api/_ai-resilience.js';"),false,'api/solve fallback must not acquire its own Gemini key when the network guard owns requests');
+assert.equal((solveSource.match(/x-goog-api-key/g)||[]).length,0,'api/solve must not inject a Gemini API key directly');
+assert.match(solveSource,/const fallbackDeadline=Date\.now\(\)\+25000/,'solve fallback must enforce one total 25s budget across fallback models');
+assert.match(solveSource,/timeoutMs:remaining/,'solve fallback must pass its remaining deadline to the Gemini network guard');
+
 
 assert.ok(source.includes('function usingGeminiNetworkGuard(){return globalThis.__STUDY_TH_GEMINI_GUARD__===true;}'));
 assert.equal((source.match(/const usingGuard=usingGeminiNetworkGuard\(\)/g)||[]).length,3,'analyzeRoute/gemini/verify must all use the network-guard ownership contract');

@@ -67,7 +67,7 @@ if (!LOCKDOWN) {
     assert.ok(r.json.attempts.some((a) => a.id === attemptA.id));
   });
   await check("review qua /api/attempt-review: câu sai → 200; câu không sai → 400", async () => {
-    if (!attemptA.wrong_indexes.length) return;
+    assert.ok(attemptA.wrong_indexes.length > 0, "test attempt must contain at least one wrong answer");
     const wrong = attemptA.wrong_indexes[0];
     const ok = await call("POST", "/api/attempt-review", { body: { attemptId: attemptA.id, questionIndex: wrong }, cookie: cookieA });
     assert.equal(ok.status, 200, ok.text.slice(0, 200));

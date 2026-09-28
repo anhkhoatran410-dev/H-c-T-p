@@ -1,6 +1,6 @@
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, distributedRateLimit, sameOrigin, safeRequestId } from "../lib/api/_security.js";
 import { getAttemptSession, getOrCreateAttemptSession } from "../lib/api/_attempt-session.js";
-import { supabaseReady, supabaseRequest } from "../lib/api/_supabase-service.js";
+import { supabasePublicReady, supabasePublicRequest } from "../lib/api/_supabase-public.js";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -19,8 +19,6 @@ function cleanText(value, max) {
     .slice(0, max);
 }
 
-// Chỉ chấp nhận số nguyên hoặc chuỗi chỉ gồm chữ số. Tuyệt đối không dùng Number(x) trực tiếp:
-// Number(null) === Number("") === Number(false) === Number([]) === 0 sẽ bị chấm đúng khi đáp án đúng là index 0.
 function toChoiceIndex(value) {
   if (typeof value === "number") return Number.isInteger(value) && value >= 0 ? value : NaN;
   if (typeof value === "string" && /^\d+$/.test(value.trim())) return Number(value.trim());
@@ -35,7 +33,7 @@ export function answerIsCorrect(q, answer) {
   }
   if (type === "short") {
     const expected = String(q?.answer ?? "").trim().toLowerCase();
-    if (!expected) return false; // đề lỗi/thiếu đáp án: không bao giờ chấm đúng, kể cả khi học sinh bỏ trống
+    if (!expected) return false;
     const actual = Array.isArray(answer) ? answer.join("") : String(answer ?? "");
     return actual.trim().toLowerCase() === expected;
   }
@@ -44,21 +42,41 @@ export function answerIsCorrect(q, answer) {
   return Number.isFinite(actual) && Number.isFinite(expected) && actual === expected;
 }
 
+async function activeExam(examId) {
+  return supabasePublicRequest(
+    `exams?id=eq.${encodeURIComponent(examId)}&status=eq.active&select=id,title,subject,duration,questions,open_at,close_at,question_count&limit=1`,
+    { method: "GET" }
+  );
+}
+
+function responseAttempt(attempt) {
+  return {
+    id: attempt.id,
+    exam_id: attempt.exam_id,
+    exam_title: attempt.exam_title,
+    student_name: attempt.student_name,
+    student_code: attempt.student_code,
+    score: attempt.score,
+    correct: attempt.correct,
+    total: attempt.total,
+    duration_seconds: attempt.duration_seconds,
+    auto_submitted: attempt.auto_submitted,
+    answers: attempt.answers,
+    wrong_indexes: attempt.wrong_indexes,
+    reviewed_indexes: attempt.reviewed_indexes || [],
+    created_at: attempt.created_at,
+  };
+}
+
 async function submitAttempt(req, res, requestId) {
   if (!enforceMethod(req, res, ["POST"])) return;
   if (!enforceBodySize(req, res, 900 * 1024)) return;
   if (!enforceJsonContentType(req, res)) return;
   if (!sameOrigin(req, res)) return;
   if (!await distributedRateLimit(req, res, { max: 20, windowMs: 60_000, keyPrefix: "submit-attempt" })) return;
-  if (!supabaseReady()) return res.status(500).json({ error: "Supabase server credentials chưa được cấu hình.", requestId });
+  if (!supabasePublicReady()) return res.status(500).json({ error: "Supabase public credentials chưa được cấu hình.", requestId });
 
-  let session;
-  try {
-    session = getOrCreateAttemptSession(req, res);
-  } catch (e) {
-    return res.status(500).json({ error: e.message || "Không tạo được attempt session.", requestId });
-  }
-
+  const session = getOrCreateAttemptSession(req, res);
   const body = requestBody(req);
   const examId = cleanText(body.examId, 64);
   const studentName = cleanText(body.studentName, 200);
@@ -72,10 +90,7 @@ async function submitAttempt(req, res, requestId) {
   if (!studentName) return res.status(400).json({ error: "Thiếu họ và tên.", requestId });
   if (Object.keys(answers).length > 1000) return res.status(413).json({ error: "Dữ liệu đáp án quá lớn.", requestId });
 
-  const exam = await supabaseRequest(
-    `exams?id=eq.${encodeURIComponent(examId)}&status=eq.active&select=id,title,subject,duration,questions,open_at,close_at,question_count&limit=1`,
-    { method: "GET" }
-  );
+  const exam = await activeExam(examId);
   const examRow = Array.isArray(exam.data) ? exam.data[0] : null;
   if (!exam.ok || !examRow) return res.status(404).json({ error: "Không tìm thấy bài kiểm tra đang hoạt động.", requestId });
 
@@ -94,6 +109,7 @@ async function submitAttempt(req, res, requestId) {
     return res.status(409).json({ error: "Bài kiểm tra không có cấu trúc câu hỏi hợp lệ.", requestId });
   }
 
+  // Chấm lại ở đây để giữ response nhất quán; DB RPC cũng tự chấm lại trước khi INSERT.
   let correct = 0;
   const wrongIndexes = [];
   for (let i = 0; i < questions.length; i += 1) {
@@ -101,54 +117,32 @@ async function submitAttempt(req, res, requestId) {
     else wrongIndexes.push(i);
   }
 
-  const total = questions.length;
-  const score = total ? Math.round((correct / total) * 100) : 0;
-  const maxDuration = Number(examRow.duration || 0) > 0 ? Number(examRow.duration) * 60 : Number.MAX_SAFE_INTEGER;
-  const boundedDuration = Math.min(durationSeconds, maxDuration);
-
-  const inserted = await supabaseRequest("user_attempts", {
+  const inserted = await supabasePublicRequest("rpc/attempt_submit_session", {
     method: "POST",
-    headers: { Prefer: "return=representation" },
     body: JSON.stringify({
-      device_id: session.deviceId,
-      exam_id: examRow.id,
-      exam_title: examRow.title,
-      student_name: studentName,
-      student_code: studentCode || null,
-      score,
-      correct,
-      total,
-      duration_seconds: boundedDuration,
-      auto_submitted: autoSubmitted,
-      answers,
-      wrong_indexes: wrongIndexes,
-      reviewed_indexes: [],
+      p_token: session.token,
+      p_exam_id: examRow.id,
+      p_student_name: studentName,
+      p_student_code: studentCode || null,
+      p_duration_seconds: durationSeconds,
+      p_auto_submitted: autoSubmitted,
+      p_answers: answers,
     }),
   });
+
   if (!inserted.ok) return res.status(502).json({ error: "Không lưu được lượt làm bài.", requestId });
 
   const attempt = Array.isArray(inserted.data) ? inserted.data[0] : null;
   if (!attempt?.id) return res.status(502).json({ error: "Không nhận được mã lượt làm bài.", requestId });
 
+  if (Number(attempt.correct) !== correct || Number(attempt.total) !== questions.length) {
+    return res.status(502).json({ error: "Kết quả chấm máy không nhất quán.", requestId });
+  }
+
   return res.status(200).json({
     ok: true,
     requestId,
-    attempt: {
-      id: attempt.id,
-      exam_id: attempt.exam_id,
-      exam_title: attempt.exam_title,
-      student_name: attempt.student_name,
-      student_code: attempt.student_code,
-      score: attempt.score,
-      correct: attempt.correct,
-      total: attempt.total,
-      duration_seconds: attempt.duration_seconds,
-      auto_submitted: attempt.auto_submitted,
-      answers: attempt.answers,
-      wrong_indexes: attempt.wrong_indexes,
-      reviewed_indexes: attempt.reviewed_indexes || [],
-      created_at: attempt.created_at,
-    },
+    attempt: responseAttempt(attempt),
   });
 }
 
@@ -156,51 +150,44 @@ async function listAttempts(req, res, requestId) {
   if (!enforceMethod(req, res, ["GET"])) return;
   if (!sameOrigin(req, res)) return;
   if (!await distributedRateLimit(req, res, { max: 40, windowMs: 60_000, keyPrefix: "attempts" })) return;
-  if (!supabaseReady()) return res.status(500).json({ error: "Supabase server credentials chưa được cấu hình.", requestId });
+  if (!supabasePublicReady()) return res.status(500).json({ error: "Supabase public credentials chưa được cấu hình.", requestId });
 
   const session = getAttemptSession(req);
   if (!session) return res.status(401).json({ error: "Attempt session required.", code: "ATTEMPT_SESSION_REQUIRED", requestId });
 
-  const rows = await supabaseRequest(
-    `user_attempts?device_id=eq.${encodeURIComponent(session.deviceId)}&select=id,exam_id,exam_title,student_name,student_code,score,correct,total,duration_seconds,auto_submitted,answers,wrong_indexes,reviewed_indexes,created_at&order=created_at.desc&limit=300`,
-    { method: "GET" }
-  );
+  const rows = await supabasePublicRequest("rpc/attempt_list_session", {
+    method: "POST",
+    body: JSON.stringify({ p_token: session.token }),
+  });
   if (!rows.ok || !Array.isArray(rows.data)) return res.status(502).json({ error: "Không tải được lịch sử làm bài.", requestId });
 
-  return res.status(200).json({ attempts: rows.data, requestId });
+  return res.status(200).json({ attempts: rows.data.map(responseAttempt), requestId });
 }
 
-export async function reviewAttemptCore({ attemptId, questionIndex, deviceId }, deps = {}) {
-  const request = deps.supabaseRequest || supabaseRequest;
+export async function reviewAttemptCore({ attemptId, questionIndex, token }, deps = {}) {
+  const request = deps.supabaseRequest || supabasePublicRequest;
+  const result = await request("rpc/attempt_review_session", {
+    method: "POST",
+    body: JSON.stringify({
+      p_token: token,
+      p_attempt_id: attemptId,
+      p_question_index: questionIndex,
+    }),
+  });
 
-  const lookup = await request(
-    `user_attempts?id=eq.${encodeURIComponent(attemptId)}&select=id,device_id,wrong_indexes,reviewed_indexes&limit=1`,
-    { method: "GET" }
-  );
-  const attempt = Array.isArray(lookup.data) ? lookup.data[0] : null;
-  if (!lookup.ok || !attempt || String(attempt.device_id) !== String(deviceId)) {
+  if (!result.ok || !Array.isArray(result.data)) {
+    return { status: 502, body: { error: "Không lưu được trạng thái ôn tập." } };
+  }
+
+  const row = result.data[0];
+  if (!row) return { status: 404, body: { error: "Không tìm thấy lượt làm bài." } };
+  const code = Number(row.status_code);
+  if (code === 400) return { status: 400, body: { error: "Câu này không thuộc danh sách câu sai." } };
+  if (code !== 200 || !Array.isArray(row.reviewed_indexes)) {
     return { status: 404, body: { error: "Không tìm thấy lượt làm bài." } };
   }
 
-  const wrong = Array.isArray(attempt.wrong_indexes) ? attempt.wrong_indexes.map(Number).filter(Number.isInteger) : [];
-  if (!wrong.includes(questionIndex)) {
-    return { status: 400, body: { error: "Câu này không thuộc danh sách câu sai." } };
-  }
-
-  const previous = Array.isArray(attempt.reviewed_indexes) ? attempt.reviewed_indexes.map(Number).filter(Number.isInteger) : [];
-  const reviewedIndexes = [...new Set([...previous, questionIndex])];
-
-  const updated = await request(
-    `user_attempts?id=eq.${encodeURIComponent(attemptId)}&device_id=eq.${encodeURIComponent(deviceId)}`,
-    {
-      method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify({ reviewed_indexes: reviewedIndexes }),
-    }
-  );
-  if (!updated.ok) return { status: 502, body: { error: "Không lưu được trạng thái ôn tập." } };
-
-  return { status: 200, body: { ok: true, reviewed_indexes: reviewedIndexes } };
+  return { status: 200, body: { ok: true, reviewed_indexes: row.reviewed_indexes } };
 }
 
 async function reviewAttempt(req, res, requestId) {
@@ -209,7 +196,7 @@ async function reviewAttempt(req, res, requestId) {
   if (!enforceJsonContentType(req, res)) return;
   if (!sameOrigin(req, res)) return;
   if (!await distributedRateLimit(req, res, { max: 60, windowMs: 60_000, keyPrefix: "attempt-review" })) return;
-  if (!supabaseReady()) return res.status(500).json({ error: "Supabase server credentials chưa được cấu hình.", requestId });
+  if (!supabasePublicReady()) return res.status(500).json({ error: "Supabase public credentials chưa được cấu hình.", requestId });
 
   const session = getAttemptSession(req);
   if (!session) return res.status(401).json({ error: "Attempt session required.", code: "ATTEMPT_SESSION_REQUIRED", requestId });
@@ -221,7 +208,7 @@ async function reviewAttempt(req, res, requestId) {
     return res.status(400).json({ error: "Dữ liệu ôn tập không hợp lệ.", requestId });
   }
 
-  const result = await reviewAttemptCore({ attemptId, questionIndex, deviceId: session.deviceId });
+  const result = await reviewAttemptCore({ attemptId, questionIndex, token: session.token });
   return res.status(result.status).json({ ...result.body, requestId });
 }
 

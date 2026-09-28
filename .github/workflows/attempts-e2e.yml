@@ -1,0 +1,43 @@
+name: Attempts E2E
+
+on:
+  push:
+    branches:
+      - "fix/p0-attempts-session"
+    paths:
+      - "api/attempts.js"
+      - "lib/api/_attempt-session.js"
+      - "lib/api/_supabase-service.js"
+      - "lib/api/_security.js"
+      - "scripts/attempts-*.mjs"
+      - ".github/workflows/attempts-e2e.yml"
+  pull_request:
+    paths:
+      - "api/attempts.js"
+      - "lib/api/_attempt-session.js"
+      - "lib/api/_supabase-service.js"
+      - "lib/api/_security.js"
+      - "scripts/attempts-*.mjs"
+      - ".github/workflows/attempts-e2e.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  attempts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Edge test
+        run: node scripts/attempts-edge-test.mjs
+
+      - name: Local E2E
+        run: node scripts/attempts-e2e-local.mjs

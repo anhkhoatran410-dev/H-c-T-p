@@ -42,20 +42,84 @@ async function testSessionRaceSemantics() {
 }
 
 async function testQuestionIndexNormalization() {
-  const source = await fs.readFile(path.resolve("api/attempts.js"), "utf8");
-  assert.ok(source.includes("const questionIndex = Number(body.questionIndex);"));
-  assert.ok(source.includes("attempt.wrong_indexes.map(Number)"));
+  const { reviewAttemptCore } = await import("../api/attempts.js");
 
-  const questionIndex = Number("3");
-  const wrongFromNumbers = [1, 3, 5].map(Number).filter(Number.isInteger);
-  const wrongFromStrings = ["1", "3", "5"].map(Number).filter(Number.isInteger);
+  const deviceId = "11111111-1111-4111-8111-111111111111";
+  const attemptId = "22222222-2222-4222-8222-222222222222";
+  const calls = [];
 
-  assert.ok(wrongFromNumbers.includes(questionIndex));
-  assert.ok(wrongFromStrings.includes(questionIndex));
-  assert.ok(![1, 2, 4].map(Number).includes(questionIndex));
+  // Giả lập PostgREST trả wrong_indexes dưới dạng mảng string, đúng dạng dữ liệu thật
+  // có thể gặp tùy kiểu cột — đây chính là ca đã gây nghi ngờ "3" !== 3 trước đây.
+  const fakeSupabaseRequest = async (path, init) => {
+    calls.push({ path, method: init?.method });
+    if (init?.method === "GET") {
+      return {
+        ok: true,
+        data: [{
+          id: attemptId,
+          device_id: deviceId,
+          wrong_indexes: ["1", "3", "5"],
+          reviewed_indexes: [],
+        }],
+      };
+    }
+    if (init?.method === "PATCH") {
+      const body = JSON.parse(init.body);
+      return { ok: true, data: [{ id: attemptId, reviewed_indexes: body.reviewed_indexes }] };
+    }
+    throw new Error("unexpected call: " + init?.method);
+  };
 
-  console.log("PASS questionIndex type normalization: string/number JSON representations both compare correctly.");
+  // Client gửi questionIndex dưới dạng số 3 (JSON number thật, như body đã qua JSON.parse ở tầng HTTP thật)
+  const result = await reviewAttemptCore(
+    { attemptId, questionIndex: 3, deviceId },
+    { supabaseRequest: fakeSupabaseRequest }
+  );
+
+  assert.equal(result.status, 200, "expected review to succeed against string-typed wrong_indexes from PostgREST");
+  assert.deepEqual(result.body.reviewed_indexes, [3]);
+  assert.equal(calls.length, 2, "expected exactly one lookup and one patch call");
+  assert.equal(calls[0].method, "GET");
+  assert.equal(calls[1].method, "PATCH");
+
+  // Ownership: deviceId khác phải bị từ chối (404), dù wrong_indexes/questionIndex giống hệt.
+  const otherDeviceResult = await reviewAttemptCore(
+    { attemptId, questionIndex: 3, deviceId: "99999999-9999-4999-8999-999999999999" },
+    { supabaseRequest: fakeSupabaseRequest }
+  );
+  assert.equal(otherDeviceResult.status, 404, "a mismatched deviceId must not be able to review someone else's attempt");
+
+  // questionIndex không thuộc wrong_indexes phải bị từ chối (400), không âm thầm chấp nhận.
+  const notWrongResult = await reviewAttemptCore(
+    { attemptId, questionIndex: 2, deviceId },
+    { supabaseRequest: fakeSupabaseRequest }
+  );
+  assert.equal(notWrongResult.status, 400);
+
+  console.log("PASS questionIndex type normalization: reviewAttemptCore correctly matches string-typed wrong_indexes, enforces ownership, and rejects non-wrong questionIndex.");
+}
+
+async function testScoringRejectsFalsyCoercion() {
+  const { answerIsCorrect } = await import("../api/attempts.js");
+  const q0 = { type: "mcq", a: 0 };
+  // Number(null) === Number("") === Number(false) === Number([]) === 0: không được chấm đúng.
+  for (const blank of [undefined, null, "", false, [], {}, "abc", -1, 0.5, NaN, "0.5", " "]) {
+    assert.equal(answerIsCorrect(q0, blank), false, `blank/invalid answer ${JSON.stringify(blank)} must not be graded correct`);
+  }
+  assert.equal(answerIsCorrect(q0, 0), true);
+  assert.equal(answerIsCorrect(q0, "0"), true);
+  assert.equal(answerIsCorrect({ type: "mcq", a: 2 }, "2"), true);
+  assert.equal(answerIsCorrect({ type: "mcq", a: 2 }, 1), false);
+  // Đề lỗi (thiếu đáp án) không được chấm đúng cho bất kỳ câu trả lời nào.
+  assert.equal(answerIsCorrect({ type: "mcq", a: null }, 0), false);
+  assert.equal(answerIsCorrect({ type: "mcq" }, 0), false);
+  assert.equal(answerIsCorrect({ type: "short", answer: "" }, null), false);
+  assert.equal(answerIsCorrect({ type: "short", answer: "Hà Nội" }, " hà nội "), true);
+  assert.equal(answerIsCorrect({ type: "true_false", answers: [true, false, true, false] }, [true, false, true, false]), true);
+  assert.equal(answerIsCorrect({ type: "true_false", answers: [true, false, true, false] }, null), false);
+  console.log("PASS scoring: null/''/false/[] are never graded correct for choice index 0; malformed exams never award points.");
 }
 
 await testSessionRaceSemantics();
 await testQuestionIndexNormalization();
+await testScoringRejectsFalsyCoercion();

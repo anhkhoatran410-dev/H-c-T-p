@@ -23,7 +23,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          export SMOKE_ONLY=0
+          if [ "${{ github.event_name }}" = "push" ]; then
+            export SMOKE_ONLY=1
+          else
+            export SMOKE_ONLY=0
+          fi
           export SMOKE_ENDPOINT="https://hoc-va-choi.vercel.app/api/solve"
           echo "Benchmark endpoint: $SMOKE_ENDPOINT"
           python3 benchmarks/study_th_hard_benchmark.py

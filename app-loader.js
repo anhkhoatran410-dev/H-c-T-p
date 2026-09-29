@@ -45,7 +45,7 @@
   }
 
   function bridgeRuntime(source) {
-    source = source.replace(/function render\(\)\{const app=document\.getElementById\("app"\);/, 'function render(){if(window.__studyThFinalUi)return;const app=document.getElementById("app");');
+    source = source.replace(/(?:async\s+)?function render\(\)\{const app=document\.getElementById\("app"\);/, 'function render(){if(window.__studyThFinalUi||window.__studyThFinalUiPending)return;const app=document.getElementById("app");');
     return source + '\n;window.state=state;window.exams=exams;window.db=db;window.__studyLoadSupabase=loadSupabase;window.loadSupabase=async function(){var value=await window.__studyLoadSupabase();window.db=db;return value;};window.__studyAppReady=true;if(window.__studyThFinalUi&&window.__studyThFinalRender){window.render=window.__studyThFinalRender;window.__studyThFinalRender();}';
   }
 

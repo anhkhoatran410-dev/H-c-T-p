@@ -22,6 +22,10 @@
         studentUser=null;
         return false;
       }
+      if(existing?.preview){
+        studentUser={id:'preview',full_name:existing.candidate,student_code:'',preview:true};
+        return true;
+      }
       const db=window.loadSupabase?await window.loadSupabase():null;
       if(!db) return false;
       const {data,error}=await db.rpc('lookup_student_login',{
@@ -55,8 +59,8 @@
   }
   function userName(){ return getSession()?.candidate || state()?.candidate || localStorage.getItem('study_candidate') || 'Người học'; }
   function userCode(){ return getSession()?.code || state()?.code || localStorage.getItem('study_code') || ''; }
-  function saveSession(name, code){
-    const v = {candidate:name, code:code || '', auth:true, at:new Date().toISOString()};
+  function saveSession(name, code, preview=false){
+    const v = {candidate:name, code:code || '', preview:!!preview, auth:true, at:new Date().toISOString()};
     localStorage.setItem(SESSION_KEY, JSON.stringify(v));
     localStorage.setItem('study_candidate', name);
     localStorage.setItem('study_code', code || '');
@@ -476,8 +480,8 @@
     err.className='fx-error';
 
     if(!n){err.textContent='Hãy nhập họ và tên.';return;}
-    if(!register && !c){err.textContent='Hãy nhập mã học sinh.';return;}
-    if(!register && !/^\d{6}$/.test(c)){err.textContent='Mã học sinh gồm đúng 6 chữ số.';return;}
+    if(!register && !c){err.textContent='Hãy nhập mã học sinh hoặc mã dự phòng kiểm tra.';return;}
+    if(!register && !/^\d{6}$/.test(c) && !/^\d{8}$/.test(c)){err.textContent='Mã học sinh gồm 6 chữ số; mã dự phòng kiểm tra gồm 8 chữ số.';return;}
     if(register && !email){err.textContent='Hãy nhập email để tạo tài khoản.';return;}
     if(register && password.length<8){err.textContent='Mật khẩu đăng ký phải có ít nhất 8 ký tự.';return;}
 
@@ -536,6 +540,27 @@
 
       const db=window.loadSupabase?await window.loadSupabase():null;
       if(!db)throw new Error('Hệ thống tài khoản chưa sẵn sàng.');
+
+      // 8-digit global preview code: intentionally does not impersonate a real account.
+      // It only opens the app in preview/test mode with the supplied display name.
+      if(/^\d{8}$/.test(c)){
+        const {data:previewOk,error:previewError}=await db.rpc('validate_preview_access',{p_code:c});
+        if(previewError)throw previewError;
+        if(!previewOk)throw new Error('Mã dự phòng kiểm tra không đúng.');
+        studentUser={id:'preview',full_name:n,student_code:'',preview:true};
+        saveSession(n,'',true);
+        if(state()){
+          state().page='home';
+          state().candidate=n;
+          state().code='';
+          state().preview=true;
+        }
+        try{await window.loadExams?.();}catch(_){}
+        try{await window.loadHistory?.();}catch(_){}
+        renderFinal();
+        return;
+      }
+
       const {data,error}=await db.rpc('lookup_student_login',{
         p_name:n,
         p_code:c
@@ -549,7 +574,7 @@
       }
 
       studentUser=data.user;
-      saveSession(data.user.full_name||n,data.user.student_code||c);
+      saveSession(data.user.full_name||n,data.user.student_code||c,false);
       if(state()){
         state().page='home';
         state().candidate=data.user.full_name||n;

@@ -266,18 +266,54 @@
   }
 
   function learning(){
-    const s=subjects();
     return `
-      <div class="fx-page-head"><div><span class="fx-eyebrow">HỌC TẬP</span><h2>Chọn môn và bắt đầu</h2><p>Tập trung vào môn bạn đang học, sau đó chọn đề phù hợp.</p></div></div>
-      <div class="fx-learn-grid"><article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Môn học</h3><p>Danh sách được lấy từ các đề đang có.</p></div></div><div class="fx-learn-subjects">${s.map(x=>`<button class="fx-learn-subject" data-subject="${esc(x.name)}"><span>${x.icon}</span><div><b>${esc(x.name)}</b><small>${x.count} bài kiểm tra</small></div><strong>→</strong></button>`).join('')}</div></article>
-      <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>✨ Tạo đề từ tài liệu</h3><p>Giữ nguyên luồng AI tạo đề hiện có.</p></div></div><div class="fx-upload"><span>＋</span><b>Kéo file vào đây</b><small>PDF, DOCX, TXT, hình ảnh...</small><input id="fxFile" type="file" accept=".pdf,.doc,.docx,.txt,.md,.csv,image/*" hidden><button class="fx-btn fx-primary" data-action="choose-file">Chọn file</button></div><div class="fx-form-grid"><label>Môn học<select id="fxSubject"><option>Toán</option><option>Tiếng Anh</option><option>Ngữ Văn</option></select></label><label>Mức độ<select id="fxLevel"><option>Dễ</option><option selected>Trung bình</option><option>Khó</option></select></label><label>Số câu<select id="fxCount"><option>10</option><option selected>20</option><option>30</option></select></label><label>Thời gian<input id="fxDuration" type="number" min="5" value="45"></label></div><button class="fx-btn fx-primary fx-wide" data-action="generate">Tạo đề bằng AI ✨</button><div id="fxGenMsg" class="fx-message"></div></article></div>`;
+      <div class="fx-page-head">
+        <div>
+          <span class="fx-eyebrow">HỌC TẬP</span>
+          <h2>Không gian học tập</h2>
+          <p>Khu vực học tập sẽ được mở rộng ở phiên bản tiếp theo.</p>
+        </div>
+      </div>
+      <section class="fx-learning-coming">
+        <article class="fx-card fx-learning-main">
+          <div class="fx-learning-icon">📚</div>
+          <span class="fx-eyebrow">ĐANG PHÁT TRIỂN</span>
+          <h3>Khu vực học tập riêng của bạn</h3>
+          <p>Phần này dành cho các nội dung học, tài liệu và lộ trình cá nhân. Hiện tại chưa đưa chức năng tạo bài kiểm tra vào đây để tránh trùng với khu vực quản trị.</p>
+          <div class="fx-learning-actions">
+            <button class="fx-btn fx-primary" data-nav="tests">Vào Thi thử →</button>
+            <button class="fx-btn fx-secondary" data-nav="ai">Hỏi AI trợ lý</button>
+          </div>
+        </article>
+        <article class="fx-card fx-learning-side">
+          <span class="fx-eyebrow">DỮ LIỆU HIỆN TẠI</span>
+          <h3>Tiến độ của bạn</h3>
+          <div class="fx-learning-stat"><b>${metrics().total}</b><span>lượt làm bài</span></div>
+          <div class="fx-learning-stat"><b>${metrics().avg}%</b><span>điểm trung bình</span></div>
+          <div class="fx-learning-stat"><b>${metrics().streak}</b><span>ngày liên tiếp</span></div>
+          <button class="fx-link-btn" data-nav="stats">Xem thống kê →</button>
+        </article>
+      </section>`;
   }
-
   function tests(){
     const list=exams();
-    return `<div class="fx-page-head"><div><span class="fx-eyebrow">THI THỬ</span><h2>Thư viện bài kiểm tra</h2><p>Chọn môn, xem thông tin đề và bắt đầu làm bằng engine hiện tại.</p></div></div>
-      <div class="fx-filters"><button class="active" data-filter="">Tất cả</button>${subjects().map(s=>`<button data-filter="${esc(s.name)}">${esc(s.name)}</button>`).join('')}</div>
-      <article class="fx-card fx-pad"><div id="fxExamList" class="fx-exams">${list.length?list.map(examRow).join(''):'<div class="fx-empty"><span>📝</span><b>Chưa có bài kiểm tra</b><small>Hãy tạo đề hoặc quay lại sau.</small></div>'}</div></article>`;
+    const activeSubjects=Array.from(new Set(list.map(e=>String(e.subject||'').trim()).filter(Boolean)));
+    const filterSubjects=activeSubjects.length?activeSubjects:['Toán','Tiếng Anh','Ngữ Văn'];
+    return `
+      <div class="fx-page-head">
+        <div>
+          <span class="fx-eyebrow">THI THỬ</span>
+          <h2>Thư viện bài kiểm tra</h2>
+          <p>Chọn môn, xem nhanh số câu, thời gian và mức độ rồi bắt đầu làm bài.</p>
+        </div>
+        <div class="fx-test-count"><b>${list.length}</b><span>đề đang có</span></div>
+      </div>
+      <div class="fx-filters"><button class="active" data-filter="">Tất cả</button>${filterSubjects.map(s=>`<button data-filter="${esc(s)}">${esc(s)}</button>`).join('')}</div>
+      <article class="fx-card fx-pad">
+        <div id="fxExamList" class="fx-exams">
+          ${list.length?list.map(examRow).join(''):'<div class="fx-empty"><span>📝</span><b>Chưa có bài kiểm tra</b><small>Admin chưa phát hành đề nào cho người học.</small></div>'}
+        </div>
+      </article>`;
   }
   function examRow(e){
     const n=Array.isArray(e.questions)?e.questions.length:Number(e.question_count||0);

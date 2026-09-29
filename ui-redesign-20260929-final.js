@@ -379,6 +379,7 @@
     root().querySelectorAll('[data-action="public"]').forEach(b=>b.onclick=()=>{state().page='login';renderFinal();});
     root().querySelectorAll('[data-auth-mode]').forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
     root().querySelector('#fxLoginForm')?.addEventListener('submit',submitAuth);
+    setAuthMode('login');
   }
   function setAuthMode(mode){
     const register=mode==='register';

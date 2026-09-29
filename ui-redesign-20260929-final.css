@@ -105,3 +105,12 @@ html.fx-final-booting body.redesign-pending #app{visibility:hidden}
   body.fx-menu-open{overflow:hidden}
   body.fx-menu-open .fx-menu-backdrop{opacity:1;pointer-events:auto}
 }
+
+/* Registration entry — deliberately prominent on every login view */
+.fx-register-box{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:12px 13px;border:1px solid #dfe5f1;background:linear-gradient(135deg,#f8faff,#f3f6ff);border-radius:13px}
+.fx-register-box>div{min-width:0}.fx-register-box b{display:block;color:#273650;font-size:10px}.fx-register-box small{display:block;color:#7c889b;font-size:8px;line-height:1.45;margin-top:3px}
+.fx-register-btn{flex:0 0 auto;border:1px solid #cfdbff;background:#eaf0ff;color:#4663bd;border-radius:10px;padding:9px 11px;font-size:9px;font-weight:900;cursor:pointer;white-space:nowrap}
+.fx-register-btn:hover{background:#dfe8ff;transform:translateY(-1px)}
+.fx-login-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:-4px 0 12px;padding:4px;background:#f3f5fb;border-radius:12px}
+.fx-login-tabs .fx-auth-tab{padding:9px;border-radius:9px}.fx-login-tabs .fx-auth-tab.active{background:#fff;box-shadow:0 2px 8px rgba(30,50,90,.08);color:#4960bc}
+@media(max-width:560px){.fx-register-box{align-items:flex-start;flex-direction:column}.fx-register-btn{width:100%}}

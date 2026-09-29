@@ -46,6 +46,85 @@ async function sb(path, options = {}) {
   return data;
 }
 
+async function authAdmin(path, options = {}) {
+  const r = await fetch(`${SUPABASE_URL.replace(/\\\/$/, '')}/auth/v1/admin/${path}`, {
+    ...options,
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+    signal: options.signal || AbortSignal.timeout(9000),
+  });
+  const text = await r.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch {}
+  if (!r.ok) throw new Error(data?.msg || data?.message || data?.error_description || 'Supabase Auth request failed.');
+  return data;
+}
+
+async function adminUsers(req, res) {
+  if (!await guard(req, res)) return;
+  const action = String(req.body?.action || 'list');
+  try {
+    if (action === 'list') {
+      const page = Math.max(1, Math.trunc(Number(req.body?.page || 1)));
+      const perPage = Math.min(100, Math.max(1, Math.trunc(Number(req.body?.perPage || 100))));
+      const data = await authAdmin(`users?page=${page}&per_page=${perPage}`);
+      const users = Array.isArray(data?.users) ? data.users : [];
+      const ids = users.map(u => u.id).filter(id => /^[0-9a-f-]{36}$/i.test(String(id)));
+      let profiles = [];
+      if (ids.length) profiles = await sb(`profiles?select=id,full_name,student_code,role,status,created_at,updated_at&id=in.(${ids.join(',')})&order=created_at.desc`);
+      const byId = new Map((profiles || []).map(p => [String(p.id), p]));
+      return res.status(200).json({
+        ok: true,
+        total: Number(data?.total || users.length),
+        users: users.map(u => {
+          const p = byId.get(String(u.id)) || {};
+          return {
+            id: u.id,
+            email: u.email || '',
+            full_name: p.full_name || u.user_metadata?.full_name || '',
+            student_code: p.student_code || u.user_metadata?.student_code || '',
+            role: p.role || u.app_metadata?.role || 'student',
+            status: p.status || 'active',
+            email_confirmed: !!u.email_confirmed_at,
+            last_sign_in_at: u.last_sign_in_at || null,
+            created_at: u.created_at || null,
+            updated_at: p.updated_at || u.updated_at || null,
+          };
+        }),
+      });
+    }
+
+    const id = String(req.body?.id || '').trim();
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'User ID không hợp lệ.' });
+
+    if (action === 'update') {
+      const full_name = String(req.body?.full_name ?? '').trim().slice(0, 120);
+      const student_code = String(req.body?.student_code ?? '').trim().slice(0, 50) || null;
+      const status = req.body?.status === 'suspended' ? 'suspended' : 'active';
+      const password = String(req.body?.password || '');
+      if (password && password.length < 8) return res.status(400).json({ error: 'Mật khẩu mới tối thiểu 8 ký tự.' });
+      await sb(`profiles?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ full_name, student_code, status, updated_at: new Date().toISOString() }),
+      });
+      await authAdmin(`users/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ ban_duration: status === 'suspended' ? '876000h' : 'none', ...(password ? { password } : {}) }),
+      });
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: 'Thao tác tài khoản không hợp lệ.' });
+  } catch (e) {
+    return res.status(502).json({ error: e.message || 'Không quản lý được tài khoản.' });
+  }
+}
+
 async function health(req, res) {
   applySecurityHeaders(res);
   res.setHeader('X-Request-ID', safeRequestId());
@@ -294,6 +373,7 @@ export default async function handler(req, res) {
   const path = String(req.query?.route || '').replace(/^\/+|\/+$/g, '');
   if (path === 'admin-health') return health(req, res);
   if (path === 'admin-summary') return adminSummary(req, res);
+  if (path === 'admin-users') return adminUsers(req, res);
   if (path === 'admin-participants') return adminParticipants(req, res);
   if (path === 'admin-attempts') return adminAttempts(req, res);
   if (path === 'admin-accounts') return adminListAccounts(req, res);

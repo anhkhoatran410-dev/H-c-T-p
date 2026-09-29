@@ -606,6 +606,7 @@
     document.documentElement.classList.remove('fx-final-booting');
   }
 
+  window.__studyThFinalRender = renderFinal;
   window.render=renderFinal;
   window.go=go;
   window.studentGoV2=go;

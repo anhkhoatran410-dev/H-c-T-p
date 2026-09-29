@@ -9,7 +9,7 @@
   const LOADERS={dashboard:'loadDashboard',support:'startSupportLive',participants:'loadParticipants',history:'loadHistory',tests:'renderTests',accounts:'loadAccounts',bot:'loadBotRules',assistant:'loadAssistant'};
   const $=id=>document.getElementById(id);
   const loaded=new Map();
-  const EXAM_BUILDER_SCRIPT='exam-builder-v3.js?v=20260930-1';
+  const EXAM_BUILDER_SCRIPT='exam-builder-v3.js?v=20260930-2';
   const moduleMap={tests:[EXAM_BUILDER_SCRIPT],support:[],participants:[],history:[],accounts:[],bot:[],assistant:[]};
 
   function injectMobileUX(){if($('study-mobile-ux'))return;const s=document.createElement('style');s.id='study-mobile-ux';s.textContent=`

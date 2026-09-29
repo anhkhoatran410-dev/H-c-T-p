@@ -46,7 +46,7 @@
 
   function bridgeRuntime(source) {
     source = source.replace(/(?:async\s+)?function render\(\)\{const app=document\.getElementById\("app"\);/, 'function render(){if(window.__studyThFinalUi||window.__studyThFinalUiPending)return;const app=document.getElementById("app");');
-    return source + '\n;window.state=state;window.exams=exams;window.db=db;window.__studyLoadSupabase=loadSupabase;window.loadSupabase=async function(){var value=await window.__studyLoadSupabase();window.db=db;return value;};window.__studyAppReady=true;if(window.__studyThFinalUi&&window.__studyThFinalRender){window.render=window.__studyThFinalRender;window.__studyThFinalRender();}';
+    return source + '\n;window.state=state;window.exams=exams;window.db=db;window.__studyLoadSupabase=loadSupabase;window.loadSupabase=async function(){var value=await window.__studyLoadSupabase();window.db=db;return value;};window.loadExams=async function(){var value=await loadExams();window.exams=exams;return value;};window.loadHistory=loadHistory;window.loadSupportAccounts=loadSupportAccounts;window.startSupportLive=startSupportLive;window.stopSupportLive=stopSupportLive;window.__studyAppReady=true;if(window.__studyThFinalUi&&window.__studyThFinalRender){window.render=window.__studyThFinalRender;window.__studyThFinalRender();}';
   }
 
   fetch(APP_URL, { cache: "no-store" })

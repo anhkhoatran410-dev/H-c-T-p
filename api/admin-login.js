@@ -19,6 +19,7 @@ function secret(){
     .update(adminPassword)
     .digest("hex");
 }
+function recoveryCode(){ return configuredSecret("ADMIN_RECOVERY_CODE"); }
 function mfaSecret(){ return configuredSecret("ADMIN_MFA_TOTP_SECRET"); }
 function digest(value){ return crypto.createHash("sha256").update(String(value)).digest(); }
 function sign(payload){ return crypto.createHmac("sha256", secret()).update(payload).digest("base64url"); }
@@ -130,11 +131,20 @@ export default async function handler(req,res){
 
   const body = readBody(req);
   const password = String(body.password || "");
+  const recovery = String(body.recoveryCode || "");
   const configured = configuredSecret("ADMIN_PASSWORD");
   if(!configured) return res.status(500).json({error:"ADMIN_PASSWORD chưa được cấu hình trên Vercel.",requestId});
 
-  const ok = crypto.timingSafeEqual(digest(password), digest(configured));
-  if(!ok) return res.status(401).json({error:"Mật khẩu Admin không đúng.",requestId});
+  const passwordOk = password.length > 0 &&
+    crypto.timingSafeEqual(digest(password), digest(configured));
+  const configuredRecovery = recoveryCode();
+  const recoveryOk = recovery.length > 0 && configuredRecovery.length > 0 &&
+    crypto.timingSafeEqual(digest(recovery), digest(configuredRecovery));
+
+  if(!passwordOk && !recoveryOk){
+    if(recovery && !configuredRecovery) return res.status(503).json({error:"Mã dự phòng chưa được cấu hình trên Vercel.",requestId});
+    return res.status(401).json({error:"Mật khẩu hoặc mã dự phòng Admin không đúng.",requestId});
+  }
 
   const mfaEnabled=Boolean(mfaSecret());
   if(mfaEnabled && !validTotp(body.otp || body.mfaCode)){

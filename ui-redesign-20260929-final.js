@@ -17,14 +17,24 @@
   }
   async function restoreStudentSession(){
     try{
-      const r=await fetch('/api/student-login',{method:'GET',credentials:'same-origin',cache:'no-store'});
-      const data=await r.json().catch(()=>({}));
-      if(!r.ok || !data?.user){
+      const existing=getSession();
+      if(!existing?.candidate || !existing?.code) {
         studentUser=null;
         return false;
       }
+      const db=window.loadSupabase?await window.loadSupabase():null;
+      if(!db) return false;
+      const {data,error}=await db.rpc('lookup_student_login',{
+        p_name:existing.candidate,
+        p_code:existing.code
+      });
+      if(error || !data?.ok || !data?.user){
+        studentUser=null;
+        clearSession();
+        return false;
+      }
       studentUser=data.user;
-      saveSession(data.user.full_name || 'Người học', data.user.student_code || '');
+      saveSession(data.user.full_name||existing.candidate,data.user.student_code||existing.code);
       return true;
     }catch(e){
       console.warn('[STUDY student session]',e);
@@ -442,7 +452,7 @@
           password,
           options:{
             data:{full_name:n,student_code:c},
-            emailRedirectTo:'https://hoc-va-choi.vercel.app/'
+            emailRedirectTo:'https://hoc-va-choi.vercel.app/?email_confirmed=1'
           }
         });
         if(error)throw error;
@@ -460,15 +470,19 @@
         root().querySelector('#fxLoginForm')?.reset();
         setAuthMode('login');
       }else{
-        const r=await fetch('/api/student-login',{
-          method:'POST',
-          credentials:'same-origin',
-          cache:'no-store',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({name:n,code:c})
+        const db=window.loadSupabase?await window.loadSupabase():null;
+        if(!db)throw new Error('Hệ thống tài khoản chưa sẵn sàng.');
+        const {data,error}=await db.rpc('lookup_student_login',{
+          p_name:n,
+          p_code:c
         });
-        const data=await r.json().catch(()=>({}));
-        if(!r.ok)throw new Error(data.error||('HTTP '+r.status));
+        if(error)throw error;
+        if(!data?.ok){
+          const reason=String(data?.reason||'');
+          if(reason==='unconfirmed')throw new Error('Tài khoản chưa xác minh email. Hãy mở email xác nhận trước khi đăng nhập.');
+          if(reason==='ambiguous')throw new Error('Có nhiều tài khoản trùng họ tên và mã học sinh. Hãy nhờ Admin kiểm tra lại.');
+          throw new Error('Họ tên hoặc mã học sinh không đúng.');
+        }
 
         studentUser=data.user;
         saveSession(data.user.full_name||n,data.user.student_code||c);
@@ -542,20 +556,12 @@
   }
   function applyTheme(){document.body.classList.toggle('fx-dark',localStorage.getItem('study_final_theme')==='dark');}
   async function logout(){
-    try{
-      await fetch('/api/student-login',{
-        method:'POST',
-        credentials:'same-origin',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'logout'})
-      });
-    }catch(_){}
+    studentUser=null;
+    clearSession();
     try{
       const db=window.loadSupabase?await window.loadSupabase():null;
       if(db?.auth)await db.auth.signOut();
     }catch(_){}
-    studentUser=null;
-    clearSession();
     if(state())state().page='login';
     renderFinal();
   }

@@ -4,6 +4,7 @@
 
   if (window.__studyThFinalUi) return;
   window.__studyThFinalUi = true;
+  try{ window.dispatchEvent(new Event('study-final-ui-ready')); }catch(_){}
 
   const SESSION_KEY = 'study_student_session_v3';
   let authUser = null;

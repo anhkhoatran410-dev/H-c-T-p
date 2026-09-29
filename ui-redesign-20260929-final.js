@@ -183,6 +183,7 @@
           <nav class="fx-nav">${systemNav}<button class="fx-nav-item" data-action="admin"><span>⚑</span><b>Admin</b><small>↗</small></button></nav>
           <div class="fx-side-bottom"><button class="fx-nav-item fx-danger" data-action="logout"><span>⇥</span><b>Đăng xuất</b></button></div>
         </aside>
+        <div class="fx-menu-backdrop" data-action="menu-close" aria-hidden="true"></div>
         <main class="fx-main">
           <header class="fx-top">
             <div class="fx-top-left">
@@ -415,6 +416,7 @@
       await go(target);
     });
     root().querySelectorAll('[data-action="menu"]').forEach(b=>b.onclick=toggleMenu);
+    root().querySelectorAll('[data-action="menu-close"]').forEach(b=>b.onclick=closeMenu);
     root().querySelectorAll('[data-action="theme"]').forEach(b=>b.onclick=toggleTheme);
     root().querySelectorAll('[data-action="profile"]').forEach(b=>b.onclick=openProfile);
     root().querySelectorAll('[data-action="logout"]').forEach(b=>b.onclick=logout);

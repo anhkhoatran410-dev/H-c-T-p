@@ -146,6 +146,10 @@
             <label>Mật khẩu<input id="fxPassword" type="password" autocomplete="current-password" minlength="8" placeholder="Ít nhất 8 ký tự" required></label>
             <div id="fxLoginError" class="fx-error"></div>
             <button class="fx-btn fx-primary fx-wide" type="submit" id="fxAuthSubmit">Đăng nhập →</button>
+            <div class="fx-register-box" id="fxRegisterBox">
+              <div><b>Chưa có tài khoản?</b><small>Tạo tài khoản riêng để lưu tiến độ, lịch sử và hồ sơ học tập.</small></div>
+              <button class="fx-register-btn" type="button" data-auth-mode="register">Đăng ký ngay →</button>
+            </div>
             <button class="fx-link" type="button" data-action="public">← Quay lại trang chủ</button>
           </form>
         </div>
@@ -377,6 +381,8 @@
     if(desc)desc.textContent=register?'Tài khoản sẽ được lưu trong hệ thống để bạn dùng lại trên các thiết bị.':'Dùng email và mật khẩu của tài khoản STUDY TH.';
     if(eyebrow)eyebrow.textContent=register?'ĐĂNG KÝ':'ĐĂNG NHẬP';
     if(submit)submit.textContent=register?'Đăng ký tài khoản →':'Đăng nhập →';
+    const registerBox=root().querySelector('#fxRegisterBox');
+    if(registerBox)registerBox.style.display=register?'none':'flex';
     if(password)password.autocomplete=register?'new-password':'current-password';
   }
   async function submitAuth(e){

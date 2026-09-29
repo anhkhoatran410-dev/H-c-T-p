@@ -147,18 +147,27 @@ async function submitAttempt(req, res, requestId) {
 }
 
 async function listAttempts(req, res, requestId) {
+
   if (!enforceMethod(req, res, ["GET"])) return;
   if (!sameOrigin(req, res)) return;
   if (!await distributedRateLimit(req, res, { max: 40, windowMs: 60_000, keyPrefix: "attempts" })) return;
   if (!supabasePublicReady()) return res.status(500).json({ error: "Supabase public credentials chưa được cấu hình.", requestId });
 
-  const session = getAttemptSession(req);
-  if (!session) return res.status(401).json({ error: "Attempt session required.", code: "ATTEMPT_SESSION_REQUIRED", requestId });
-
-  const rows = await supabasePublicRequest("rpc/attempt_list_session", {
-    method: "POST",
-    body: JSON.stringify({ p_token: session.token }),
-  });
+  const studentCode = cleanText(req.query?.studentCode, 32);
+  let rows;
+  if (studentCode) {
+    rows = await supabasePublicRequest("rpc/attempt_list_student", {
+      method: "POST",
+      body: JSON.stringify({ p_student_code: studentCode }),
+    });
+  } else {
+    const session = getAttemptSession(req);
+    if (!session) return res.status(401).json({ error: "Attempt session required.", code: "ATTEMPT_SESSION_REQUIRED", requestId });
+    rows = await supabasePublicRequest("rpc/attempt_list_session", {
+      method: "POST",
+      body: JSON.stringify({ p_token: session.token }),
+    });
+  }
   if (!rows.ok || !Array.isArray(rows.data)) return res.status(502).json({ error: "Không tải được lịch sử làm bài.", requestId });
 
   return res.status(200).json({ attempts: rows.data.map(responseAttempt), requestId });
@@ -198,17 +207,19 @@ async function reviewAttempt(req, res, requestId) {
   if (!await distributedRateLimit(req, res, { max: 60, windowMs: 60_000, keyPrefix: "attempt-review" })) return;
   if (!supabasePublicReady()) return res.status(500).json({ error: "Supabase public credentials chưa được cấu hình.", requestId });
 
-  const session = getAttemptSession(req);
-  if (!session) return res.status(401).json({ error: "Attempt session required.", code: "ATTEMPT_SESSION_REQUIRED", requestId });
-
   const body = requestBody(req);
+  const studentCode = cleanText(body.studentCode, 32);
+  const session = studentCode ? null : getAttemptSession(req);
+  if (!studentCode && !session) return res.status(401).json({ error: "Attempt session required.", code: "ATTEMPT_SESSION_REQUIRED", requestId });
   const attemptId = String(body.attemptId || "").trim();
   const questionIndex = Number(body.questionIndex);
   if (!UUID_RE.test(attemptId) || !Number.isInteger(questionIndex) || questionIndex < 0 || questionIndex > 500) {
     return res.status(400).json({ error: "Dữ liệu ôn tập không hợp lệ.", requestId });
   }
 
-  const result = await reviewAttemptCore({ attemptId, questionIndex, token: session.token });
+  const result = studentCode
+    ? await reviewStudentCore({ attemptId, questionIndex, studentCode })
+    : await reviewAttemptCore({ attemptId, questionIndex, token: session.token });
   return res.status(result.status).json({ ...result.body, requestId });
 }
 

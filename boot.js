@@ -51,45 +51,23 @@
   }
 
   async function recover() {
-    if (recoveryStarted) return;
-    recoveryStarted = true;
-
-    await sleep(1200);
+    // The final UI owns rendering. Never call the legacy window.render() here:
+    // doing so races the final login shell and causes the mobile login -> legacy
+    // navbar -> blank-screen jump.
     const app = document.getElementById("app");
     if (!app) return;
 
-    fixPublicTitle();
+    await sleep(9000);
 
-    if (typeof render === "function") {
-      try {
-        await render();
-      } catch (_) {
-        // The main app will remain usable if render throws; the watchdog below
-        // will expose a retry action instead of trapping the browser in loading.
-      }
-    }
+    if (window.__studyThFinalUi || window.__studyAppReady) return;
 
-    fixPublicTitle();
-
-    if (typeof exams !== "undefined" && Array.isArray(exams) && exams.length === 0) {
-      const loaded = await fallbackLoadExams();
-      if (loaded && typeof render === "function") {
-        try {
-          await render();
-        } catch (_) {}
-        fixPublicTitle();
-      }
-    }
-
-    if (typeof render !== "function") {
-      app.innerHTML = '<main class="container"><div class="card"><h1>🎓 Study</h1><p class="danger-text">Không tải được phần giao diện. Hãy tải lại trang.</p><button class="btn" type="button" id="boot-retry">↻ Tải lại</button></div></main>';
+    const current = app.textContent || "";
+    if (current.includes("Đang tải hệ thống")) {
+      app.innerHTML = '<main class="container"><div class="card"><h1>🎓 Study TH</h1><p class="danger-text">Không thể khởi động giao diện. Hãy tải lại trang.</p><button class="btn" type="button" id="boot-retry">↻ Tải lại</button></div></main>';
       const retry = document.getElementById("boot-retry");
       if (retry) retry.addEventListener("click", () => location.reload());
     }
-
-    fixPublicTitle();
   }
-
   // Intentionally NO MutationObserver here. Watching the whole document while
   // changing .brand creates a DOM mutation loop and can freeze the browser.
   fixPublicTitle();

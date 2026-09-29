@@ -1,3 +1,10 @@
+
+/* Final boot gate: hide legacy markup until the redesigned shell has rendered once. */
+html.fx-final-booting,
+html.fx-final-booting body,
+body.redesign-pending{overflow-x:hidden}
+body.redesign-pending #app{visibility:hidden}
+html.fx-final-booting body.redesign-pending #app{visibility:hidden}
 /* STUDY TH — FINAL USER EXPERIENCE CSS */
 :root{--fx-bg:#f4f7fb;--fx-card:#fff;--fx-text:#17233b;--fx-muted:#77859a;--fx-line:#dfe6f0;--fx-side:#101c31;--fx-side2:#172743;--fx-blue:#4169e8;--fx-blue2:#5f7df0;--fx-soft:#edf2ff;--fx-green:#28aa84;--fx-shadow:0 12px 34px rgba(17,35,66,.07)}
 *{box-sizing:border-box}html,body,#app{margin:0;min-height:100%;max-width:100%;overflow-x:hidden}body{background:var(--fx-bg)!important;color:var(--fx-text)!important;font-family:inherit}

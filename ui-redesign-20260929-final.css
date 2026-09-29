@@ -220,3 +220,45 @@ html.fx-final-booting body.redesign-pending #app{visibility:hidden}
   .fx-support-account{grid-template-columns:36px minmax(0,1fr) 14px}
   .fx-support-messages{height:calc(100dvh - 410px);min-height:250px}
 }
+
+
+/* 2026-09-30 responsive support/chat hardening */
+.fx-main,.fx-content,.fx-content>*,.fx-support-shell,.fx-support-chat,.fx-support-messages{min-width:0;max-width:100%;box-sizing:border-box}
+.fx-support-shell{width:100%;inline-size:100%}
+.fx-support-chat{overflow:hidden;min-height:0;height:clamp(520px,calc(100dvh - 190px),760px)}
+.fx-support-messages{min-height:0;max-height:none;height:auto;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain}
+.fx-support-bubble{max-width:min(78%,680px);overflow-wrap:anywhere;word-break:break-word}
+.fx-support-composer{min-width:0;grid-template-columns:minmax(0,1fr) auto}
+.fx-support-composer textarea{min-width:0;width:100%;box-sizing:border-box}
+@media(max-width:1024px){
+  .fx-content{padding-left:14px;padding-right:14px}
+  .fx-support-shell{display:flex;flex-direction:column;height:calc(100dvh - 150px);min-height:520px;overflow:hidden}
+  .fx-support-channels{flex:0 0 auto;width:100%;box-sizing:border-box;border-right:0;border-bottom:1px solid #e5eaf2;padding:10px}
+  .fx-support-account-list{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;max-width:100%;width:100%;gap:7px;padding:1px 1px 4px}
+  .fx-support-account{min-width:0;flex:0 0 min(230px,78vw);width:min(230px,78vw);box-sizing:border-box}
+  .fx-support-chat{flex:1 1 auto;width:100%;height:auto;min-height:0}
+  .fx-support-chat-head{flex:0 0 auto}
+  .fx-support-messages{flex:1 1 auto;width:100%;height:auto;min-height:0;padding:12px}
+  .fx-support-composer{flex:0 0 auto;width:100%;box-sizing:border-box}
+}
+@media(max-width:560px){
+  .fx-content{padding:10px 8px 20px}
+  .fx-page-head{margin-bottom:10px}
+  .fx-page-head h2{font-size:20px}
+  .fx-support-shell{height:calc(100dvh - 135px);min-height:500px;border-radius:16px}
+  .fx-support-label{font-size:8px;margin-bottom:6px}
+  .fx-support-account{flex-basis:min(205px,82vw);width:min(205px,82vw);padding:8px}
+  .fx-support-account>span{width:34px;height:34px;font-size:17px}
+  .fx-support-account b{font-size:11px}
+  .fx-support-account small{font-size:9px;line-height:1.3}
+  .fx-support-chat-head{padding:10px 12px}
+  .fx-support-chat-head>div>span{width:34px;height:34px}
+  .fx-support-chat-head b{font-size:11px}
+  .fx-support-chat-head small{font-size:9px}
+  .fx-support-messages{padding:10px}
+  .fx-support-bubble{max-width:88%;padding:9px 10px}
+  .fx-support-bubble p{font-size:12px}
+  .fx-support-composer{grid-template-columns:minmax(0,1fr) 60px;gap:6px;padding:8px}
+  .fx-support-composer textarea{font-size:16px;min-height:42px}
+  .fx-support-composer .fx-btn{min-width:0;width:60px;padding:9px 6px}
+}

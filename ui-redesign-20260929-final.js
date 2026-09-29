@@ -18,13 +18,13 @@
   async function restoreStudentSession(){
     try{
       const existing=getSession();
+      if(existing?.preview && existing?.candidate){
+        studentUser={id:'preview',full_name:existing.candidate,student_code:'',preview:true};
+        return true;
+      }
       if(!existing?.candidate || !existing?.code) {
         studentUser=null;
         return false;
-      }
-      if(existing?.preview){
-        studentUser={id:'preview',full_name:existing.candidate,student_code:'',preview:true};
-        return true;
       }
       const db=window.loadSupabase?await window.loadSupabase():null;
       if(!db) return false;

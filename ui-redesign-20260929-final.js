@@ -435,6 +435,11 @@
   function boot(){
     function kick(){
       if(!state() || !root()) return;
+      const legacyInput=document.getElementById('candidate');
+      const legacyCode=document.getElementById('code');
+      if(!getSession() && legacyInput && legacyInput.value && legacyInput.value.trim()){
+        saveSession(legacyInput.value.trim(), legacyCode?.value?.trim() || '');
+      }
       if(loggedIn()){
         state().candidate=userName();state().code=userCode();
         if(state().page==='public'||state().page==='login') state().page='home';

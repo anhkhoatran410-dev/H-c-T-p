@@ -149,7 +149,7 @@
             <h2 id="fxAuthTitle">Tiếp tục học tập</h2>
             <p id="fxAuthDesc">Nhập họ tên và mã học sinh để tiếp tục.</p>
             <label id="fxNameWrap">Họ và tên<input id="fxName" autocomplete="name" placeholder="Ví dụ: Nguyễn Văn A"></label>
-            <label id="fxCodeWrap">Mã học sinh<input id="fxCode" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="Ví dụ: HS001"></label>
+            <label id="fxCodeWrap">Mã học sinh<input id="fxCode" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="numeric" placeholder="Ví dụ: 483217"></label>
             <label id="fxEmailWrap">Email<input id="fxEmail" type="email" autocomplete="email" placeholder="ban@example.com"></label>
             <label id="fxPasswordWrap">Mật khẩu<input id="fxPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Ít nhất 8 ký tự"></label>
             <div id="fxLoginError" class="fx-error"></div>
@@ -307,7 +307,7 @@
 
   function settings(){
     return `<div class="fx-page-head"><div><span class="fx-eyebrow">CÀI ĐẶT</span><h2>Hồ sơ cá nhân</h2><p>Cập nhật thông tin hiển thị và giao diện.</p></div></div><div class="fx-settings">
-      <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Thông tin học tập</h3><p>Thông tin được lưu trong tài khoản STUDY TH của bạn.</p></div></div><div class="fx-form-grid"><label>Họ và tên<input id="fxSetName" value="${esc(userName())}"></label><label>Mã học sinh<input id="fxSetCode" value="${esc(userCode())}"></label></div><button class="fx-btn fx-primary" data-action="save-profile">Lưu thay đổi</button></article>
+      <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Thông tin học tập</h3><p>Mã học sinh được hệ thống cấp tự động và không thể tự đổi.</p></div></div><div class="fx-form-grid"><label>Họ và tên<input id="fxSetName" value="${esc(userName())}"></label><label>Mã học sinh<input id="fxSetCode" value="${esc(userCode())}" readonly></label></div><button class="fx-btn fx-primary" data-action="save-profile">Lưu thay đổi</button></article>
       <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Giao diện</h3><p>Chuyển giữa sáng và tối.</p></div></div><button class="fx-btn fx-secondary" data-action="theme">◐ Đổi giao diện</button></article></div>`;
   }
 
@@ -383,7 +383,7 @@
   function setAuthMode(mode){
     const register=mode==='register';
     root().querySelectorAll('[data-auth-mode]').forEach(b=>b.classList.toggle('active',b.dataset.authMode===mode));
-    const nameWrap=root().querySelector('#fxNameWrap');
+
     const codeWrap=root().querySelector('#fxCodeWrap');
     const emailWrap=root().querySelector('#fxEmailWrap');
     const passwordWrap=root().querySelector('#fxPasswordWrap');
@@ -394,22 +394,24 @@
     const password=root().querySelector('#fxPassword');
     const code=root().querySelector('#fxCode');
     const email=root().querySelector('#fxEmail');
+    const registerBox=root().querySelector('#fxRegisterBox');
 
-    if(nameWrap)nameWrap.style.display='grid';
-    if(codeWrap)codeWrap.style.display='grid';
+    if(codeWrap)codeWrap.style.display=register?'none':'grid';
     if(emailWrap)emailWrap.style.display=register?'grid':'none';
     if(passwordWrap)passwordWrap.style.display=register?'grid':'none';
 
     if(title)title.textContent=register?'Tạo tài khoản học tập':'Tiếp tục học tập';
     if(desc)desc.textContent=register
-      ?'Email chỉ dùng để tạo và xác minh tài khoản. Hệ thống lưu họ tên + mã học sinh cho lần đăng nhập sau.'
-      :'Chỉ cần họ tên và mã học sinh của tài khoản đã đăng ký.';
+      ?'Chỉ cần họ tên, email và mật khẩu. Hệ thống sẽ tự cấp cho bạn một mã học sinh ngẫu nhiên sau khi tạo tài khoản.'
+      :'Chỉ cần họ tên và mã học sinh để đăng nhập.';
     if(eyebrow)eyebrow.textContent=register?'ĐĂNG KÝ':'ĐĂNG NHẬP';
-    if(submit)submit.textContent=register?'Đăng ký tài khoản →':'Đăng nhập →';
+    if(submit)submit.textContent=register?'Tạo tài khoản →':'Đăng nhập →';
 
     if(code){
-      code.required=true;
+      code.required=!register;
+      code.value=register?'':code.value;
       code.autocomplete='off';
+      code.inputMode='numeric';
     }
     if(email){
       email.required=register;
@@ -419,10 +421,46 @@
       password.required=register;
       password.autocomplete=register?'new-password':'off';
     }
-
-    const registerBox=root().querySelector('#fxRegisterBox');
     if(registerBox)registerBox.style.display=register?'none':'flex';
   }
+
+  function registrationSuccess(code,email){
+    const panel=root().querySelector('.fx-login-panel');
+    if(!panel)return;
+    panel.innerHTML=`
+      <section class="fx-register-success">
+        <span class="fx-eyebrow">ĐĂNG KÝ THÀNH CÔNG</span>
+        <div class="fx-register-success-icon">✓</div>
+        <h2>Đây là mã học sinh của bạn</h2>
+        <p>Hệ thống đã tự tạo mã riêng. Hãy lưu mã này, vì lần sau bạn sẽ đăng nhập bằng <b>họ tên + mã học sinh</b>.</p>
+        <div class="fx-student-code-card">
+          <small>MÃ HỌC SINH</small>
+          <strong id="fxCreatedStudentCode">${esc(code)}</strong>
+          <button type="button" id="fxCopyStudentCode">Sao chép mã</button>
+        </div>
+        <div class="fx-register-email-note">Email xác nhận đã được gửi tới tài khoản của bạn. Hãy xác minh email rồi quay lại STUDY TH để đăng nhập.</div>
+        <div class="fx-success-actions">
+          <button class="fx-btn fx-primary fx-wide" type="button" id="fxGoLogin">Đăng nhập bằng mã này →</button>
+          <button class="fx-link" type="button" id="fxRegisterAgain">Tạo tài khoản khác</button>
+        </div>
+      </section>`;
+    panel.querySelector('#fxCopyStudentCode')?.addEventListener('click',async()=>{
+      try{
+        await navigator.clipboard.writeText(String(code));
+      }catch(_){}
+      const b=panel.querySelector('#fxCopyStudentCode');
+      if(b){b.textContent='Đã sao chép ✓';setTimeout(()=>{if(b)b.textContent='Sao chép mã'},1200);}
+    });
+    panel.querySelector('#fxGoLogin')?.addEventListener('click',()=>{
+      panel.innerHTML=loginPage().match(/<div class="fx-login-panel">([\s\S]*)<\/div>\s*<\/div>\s*$/)?.[1]||'';
+      renderFinal();
+    });
+    panel.querySelector('#fxRegisterAgain')?.addEventListener('click',()=>{
+      renderFinal();
+      setTimeout(()=>setAuthMode('register'),0);
+    });
+  }
+
   async function submitAuth(e){
     e.preventDefault();
     const err=root().querySelector('#fxLoginError');
@@ -434,8 +472,11 @@
     const password=root().querySelector('#fxPassword')?.value||'';
 
     err.textContent='';
+    err.className='fx-error';
+
     if(!n){err.textContent='Hãy nhập họ và tên.';return;}
-    if(!c){err.textContent='Hãy nhập mã học sinh.';return;}
+    if(!register && !c){err.textContent='Hãy nhập mã học sinh.';return;}
+    if(!register && !/^\d{6}$/.test(c)){err.textContent='Mã học sinh gồm đúng 6 chữ số.';return;}
     if(register && !email){err.textContent='Hãy nhập email để tạo tài khoản.';return;}
     if(register && password.length<8){err.textContent='Mật khẩu đăng ký phải có ít nhất 8 ký tự.';return;}
 
@@ -451,50 +492,57 @@
           email,
           password,
           options:{
-            data:{full_name:n,student_code:c},
+            data:{full_name:n},
             emailRedirectTo:'https://hoc-va-choi.vercel.app/?email_confirmed=1'
           }
         });
         if(error)throw error;
+        if(!data?.user?.id)throw new Error('Không nhận được mã tài khoản sau khi đăng ký.');
 
-        if(data?.user){
-          // The database trigger stores full name, code and email against the
-          // real Supabase Auth user. Do not put the email into the student-code field.
-          saveSession(n,c);
+        let generatedCode='';
+        for(let attempt=0;attempt<5 && !generatedCode;attempt++){
+          const {data:codeData,error:codeError}=await db.rpc('get_registration_code',{
+            p_user_id:data.user.id,
+            p_email:email
+          });
+          if(codeError)throw codeError;
+          generatedCode=String(codeData||'').trim();
+          if(!generatedCode)await new Promise(r=>setTimeout(r,150));
+        }
+        if(!/^\d{6}$/.test(generatedCode)){
+          throw new Error('Tạo tài khoản xong nhưng chưa lấy được mã học sinh. Vui lòng thử lại.');
         }
 
-        err.className='fx-success';
-        err.textContent=data?.session
-          ?'Tạo tài khoản thành công. Bạn có thể đăng nhập bằng họ tên + mã học sinh.'
-          :'Tạo tài khoản thành công. Hãy mở email xác nhận, sau đó quay lại đây và đăng nhập bằng họ tên + mã học sinh.';
-        root().querySelector('#fxLoginForm')?.reset();
-        setAuthMode('login');
-      }else{
-        const db=window.loadSupabase?await window.loadSupabase():null;
-        if(!db)throw new Error('Hệ thống tài khoản chưa sẵn sàng.');
-        const {data,error}=await db.rpc('lookup_student_login',{
-          p_name:n,
-          p_code:c
-        });
-        if(error)throw error;
-        if(!data?.ok){
-          const reason=String(data?.reason||'');
-          if(reason==='unconfirmed')throw new Error('Tài khoản chưa xác minh email. Hãy mở email xác nhận trước khi đăng nhập.');
-          if(reason==='ambiguous')throw new Error('Có nhiều tài khoản trùng họ tên và mã học sinh. Hãy nhờ Admin kiểm tra lại.');
-          throw new Error('Họ tên hoặc mã học sinh không đúng.');
-        }
-
-        studentUser=data.user;
-        saveSession(data.user.full_name||n,data.user.student_code||c);
-        if(state()){
-          state().page='home';
-          state().candidate=data.user.full_name||n;
-          state().code=data.user.student_code||c;
-        }
-        try{await window.loadExams?.();}catch(_){}
-        try{await window.loadHistory?.();}catch(_){}
-        renderFinal();
+        // Do not create a local logged-in session before email verification.
+        clearSession();
+        registrationSuccess(generatedCode,email);
+        return;
       }
+
+      const db=window.loadSupabase?await window.loadSupabase():null;
+      if(!db)throw new Error('Hệ thống tài khoản chưa sẵn sàng.');
+      const {data,error}=await db.rpc('lookup_student_login',{
+        p_name:n,
+        p_code:c
+      });
+      if(error)throw error;
+      if(!data?.ok){
+        const reason=String(data?.reason||'');
+        if(reason==='unconfirmed')throw new Error('Tài khoản chưa xác minh email. Hãy mở email xác nhận trước khi đăng nhập.');
+        if(reason==='ambiguous')throw new Error('Có nhiều tài khoản trùng họ tên và mã học sinh. Hãy nhờ Admin kiểm tra lại.');
+        throw new Error('Họ tên hoặc mã học sinh không đúng.');
+      }
+
+      studentUser=data.user;
+      saveSession(data.user.full_name||n,data.user.student_code||c);
+      if(state()){
+        state().page='home';
+        state().candidate=data.user.full_name||n;
+        state().code=data.user.student_code||c;
+      }
+      try{await window.loadExams?.();}catch(_){}
+      try{await window.loadHistory?.();}catch(_){}
+      renderFinal();
     }catch(e){
       err.className='fx-error';
       err.textContent=e?.message||'Không thể xác thực tài khoản.';
@@ -575,9 +623,10 @@
     document.body.appendChild(wrap);
   }
   function saveProfile(){
-    const n=root().querySelector('#fxSetName')?.value.trim()||'',c=root().querySelector('#fxSetCode')?.value.trim()||'';
+    const n=root().querySelector('#fxSetName')?.value.trim()||'';
     if(!n) return;
-    saveSession(n,c);renderFinal();
+    saveSession(n,userCode());
+    renderFinal();
   }
   function search(){
     const input=root().querySelector('#fxSearch'),box=root().querySelector('#fxSearchResults');if(!input||!box)return;

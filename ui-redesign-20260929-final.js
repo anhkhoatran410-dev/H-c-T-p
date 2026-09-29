@@ -399,7 +399,14 @@
       const db=window.loadSupabase?await window.loadSupabase():null;
       if(!db?.auth)throw new Error('Hệ thống tài khoản chưa sẵn sàng.');
       if(register){
-        const {data,error}=await db.auth.signUp({email,password,options:{data:{full_name:n,student_code:c}}});
+        const {data,error}=await db.auth.signUp({
+          email,
+          password,
+          options:{
+            data:{full_name:n,student_code:c},
+            emailRedirectTo:'https://hoc-va-choi.vercel.app/'
+          }
+        });
         if(error)throw error;
         if(data.session){
           authUser=data.user; await restoreAuth(); state().page='home'; await window.loadExams?.(); await window.loadHistory?.(); renderFinal();

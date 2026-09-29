@@ -295,7 +295,7 @@
 
   function settings(){
     return `<div class="fx-page-head"><div><span class="fx-eyebrow">CÀI ĐẶT</span><h2>Hồ sơ cá nhân</h2><p>Cập nhật thông tin hiển thị và giao diện.</p></div></div><div class="fx-settings">
-      <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Thông tin học tập</h3><p>Thông tin được lưu trên thiết bị này.</p></div></div><div class="fx-form-grid"><label>Họ và tên<input id="fxSetName" value="${esc(userName())}"></label><label>Mã học sinh<input id="fxSetCode" value="${esc(userCode())}"></label></div><button class="fx-btn fx-primary" data-action="save-profile">Lưu thay đổi</button></article>
+      <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Thông tin học tập</h3><p>Thông tin được lưu trong tài khoản STUDY TH của bạn.</p></div></div><div class="fx-form-grid"><label>Họ và tên<input id="fxSetName" value="${esc(userName())}"></label><label>Mã học sinh<input id="fxSetCode" value="${esc(userCode())}"></label></div><button class="fx-btn fx-primary" data-action="save-profile">Lưu thay đổi</button></article>
       <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Giao diện</h3><p>Chuyển giữa sáng và tối.</p></div></div><button class="fx-btn fx-secondary" data-action="theme">◐ Đổi giao diện</button></article></div>`;
   }
 

@@ -183,7 +183,11 @@ function startRepaint(){
  [250,700,1500,3000].forEach(function(ms){setTimeout(function(){if(S())renderV2()},ms)});
 }
 function boot(){
- if(window.__studyAppReady)startRepaint();else window.addEventListener('study-app-loaded',startRepaint,{once:false});
+ var started=false;
+ function kick(){if(started)return;if(window.state){started=true;startRepaint();}}
+ if(window.__studyAppReady)kick();else window.addEventListener('study-app-loaded',kick,{once:false});
+ [50,150,300,600,1000,1600,2500,4000].forEach(function(ms){setTimeout(kick,ms)});
+ window.addEventListener('load',function(){setTimeout(kick,100)});
 }
 window.studentUiV2=studentUiV2;window.studentGoV2=studentGoV2;window.toggleStudentSidebarV2=toggleStudentSidebarV2;window.toggleV2Theme=toggleV2Theme;window.logoutV2=logoutV2;window.saveSettingsV2=saveSettingsV2;window.chooseSubjectV2=chooseSubjectV2;window.generateExamV2=generateExamV2;window.setV2Filter=setV2Filter;window.filterV2Search=filterV2Search;window.render=renderV2;window.go=studentGoV2;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();

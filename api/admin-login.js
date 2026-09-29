@@ -11,8 +11,13 @@ const MFA_STEP_SECONDS = 30;
 function configuredSecret(name){ return String(process.env[name] || "").trim(); }
 function secret(){
   const sessionSecret = configuredSecret("ADMIN_SESSION_SECRET");
-  if (!sessionSecret) throw new Error("ADMIN_SESSION_SECRET chưa được cấu hình trên Vercel.");
-  return sessionSecret;
+  if (sessionSecret) return sessionSecret;
+  const adminPassword = configuredSecret("ADMIN_PASSWORD");
+  if (!adminPassword) throw new Error("ADMIN_PASSWORD chưa được cấu hình trên Vercel.");
+  return crypto.createHash("sha256")
+    .update("study-th-admin-session-fallback-v1:")
+    .update(adminPassword)
+    .digest("hex");
 }
 function mfaSecret(){ return configuredSecret("ADMIN_MFA_TOTP_SECRET"); }
 function digest(value){ return crypto.createHash("sha256").update(String(value)).digest(); }

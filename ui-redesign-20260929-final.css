@@ -128,3 +128,10 @@ html.fx-final-booting body.redesign-pending #app{visibility:hidden}
 .fx-success-actions{display:grid;gap:7px;margin-top:10px}
 .fx-success-actions .fx-link{margin-top:0}
 .fx-login-form #fxCodeWrap input{font-variant-numeric:tabular-nums;letter-spacing:.5px}
+
+.fx-profile-code{margin:14px 16px 0;padding:16px;border:1px solid #cfdbfa;border-radius:15px;background:#f4f7ff;text-align:center}
+.fx-profile-code small{display:block;color:#6573a2;font-size:8px;font-weight:900;letter-spacing:1px}
+.fx-profile-code strong{display:block;margin:5px 0 5px;color:#315eea;font-size:30px;letter-spacing:4px;font-variant-numeric:tabular-nums}
+.fx-profile-code span{display:block;color:var(--fx-muted);font-size:8px;line-height:1.45}
+.fx-profile-code button{margin-top:9px;border:1px solid #d3ddf7;background:#fff;color:#4661aa;border-radius:9px;padding:7px 10px;font-size:8px;font-weight:850;cursor:pointer}
+.fx-dark .fx-register-success,.fx-dark .fx-profile-code{background:#111c30;color:#edf3ff;border-color:#283852}

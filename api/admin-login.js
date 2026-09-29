@@ -136,7 +136,6 @@ export default async function handler(req,res){
     return res.status(401).json({error:"MFA_REQUIRED",mfaRequired:true,requestId});
   }
 
-  attempts.delete(ip);
   try{
     const token = makeToken(mfaEnabled);
     setSessionCookie(res, token);

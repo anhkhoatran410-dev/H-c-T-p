@@ -32,7 +32,7 @@ async function loadParticipants(){const box=$("participantRows");if(!box)return;
 async function loadUsers(){
   const box=$("userRows"); if(!box)return;
   try{
-    const r=await fetch("/api/admin-users?page=1&perPage=100",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
+    const r=await fetch("/api/admin-tools?route=admin-users",{method:"POST",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json","Content-Type":"application/json"},body:JSON.stringify({action:"list",page:1,perPage:100})});
     const data=await r.json().catch(()=>({})); if(!r.ok)throw new Error(data.error||"Không tải được tài khoản.");
     admin.users=Array.isArray(data.users)?data.users:[];
     box.innerHTML=admin.users.map(u=>`<tr>
@@ -53,7 +53,7 @@ async function editUser(id){
   const code=prompt("Mã học sinh:",u.student_code||""); if(code===null)return;
   const password=prompt("Mật khẩu mới (bỏ trống nếu không đổi):","");
   try{
-    const r=await fetch("/api/admin-users",{method:"PATCH",credentials:"same-origin",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({id,full_name:name,student_code:code,status:u.status,role:u.role,password:password||undefined})});
+    const r=await fetch("/api/admin-tools?route=admin-users",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({action:"update",id,full_name:name,student_code:code,status:u.status,role:u.role,password:password||undefined})});
     const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error||"Không cập nhật được.");
     toast("Đã cập nhật tài khoản"); loadUsers();
   }catch(e){toast(e.message)}
@@ -63,7 +63,7 @@ async function toggleUser(id){
   const status=u.status==="suspended"?"active":"suspended";
   if(!confirm(status==="suspended"?"Khóa tài khoản này?":"Mở khóa tài khoản này?"))return;
   try{
-    const r=await fetch("/api/admin-users",{method:"PATCH",credentials:"same-origin",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({id,full_name:u.full_name,student_code:u.student_code,status,role:u.role})});
+    const r=await fetch("/api/admin-tools?route=admin-users",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({action:"update",id,full_name:u.full_name,student_code:u.student_code,status,role:u.role})});
     const d=await r.json().catch(()=>({})); if(!r.ok)throw new Error(d.error||"Không cập nhật được.");
     toast(status==="suspended"?"Đã khóa tài khoản":"Đã mở khóa tài khoản"); loadUsers();
   }catch(e){toast(e.message)}

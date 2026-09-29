@@ -67,6 +67,7 @@ export default async function handler(req,res){
       const student_code=String(body.student_code??"").trim().slice(0,50)||null;
       const status=body.status==="suspended"?"suspended":"active";
       const role=body.role==="admin"?"admin":"student";
+      await authAdmin(`users/${encodeURIComponent(id)}`,{method:"PUT",body:JSON.stringify({ban_duration:status==="suspended"?"876000h":"none"})});
       await sb(`profiles?id=eq.${encodeURIComponent(id)}`,{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({full_name,student_code,status,role,updated_at:new Date().toISOString()})});
       if(body.password){
         const password=String(body.password); if(password.length<8)return res.status(400).json({error:"Mật khẩu tối thiểu 8 ký tự.",requestId});

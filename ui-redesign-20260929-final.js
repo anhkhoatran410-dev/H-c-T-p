@@ -27,7 +27,11 @@
     }catch(_){}
     return null;
   }
-  function loggedIn(){ return !!getSession(); }
+  function loggedIn(){
+  if(getSession()) return true;
+  const s=state();
+  return !!(s && typeof s.candidate==='string' && s.candidate.trim());
+}
   function userName(){ return getSession()?.candidate || state()?.candidate || localStorage.getItem('study_candidate') || 'Người học'; }
   function userCode(){ return getSession()?.code || state()?.code || localStorage.getItem('study_code') || ''; }
   function saveSession(name, code){
@@ -433,6 +437,7 @@
       if(!state() || !root()) return;
       if(loggedIn()){
         state().candidate=userName();state().code=userCode();
+        if(state().page==='public'||state().page==='login') state().page='home';
         renderFinal();
       }else{
         state().page='public';
@@ -442,6 +447,9 @@
     [0,100,300,700,1200,2000,3500].forEach(ms=>setTimeout(kick,ms));
     window.addEventListener('study-app-loaded',()=>setTimeout(kick,50));
     window.addEventListener('load',()=>setTimeout(kick,150));
+    setInterval(function(){
+      if(state() && loggedIn() && root() && !root().querySelector('.fx-app')) kick();
+    },800);
   }
 
   window.render=renderFinal;

@@ -5,9 +5,8 @@
   if (window.__studyThFinalUi) return;
   window.__studyThFinalUi = true;
 
-  const SESSION_KEY = 'study_student_session_v3';
-  let authUser = null;
-  let authProfile = null;
+  const SESSION_KEY = 'study_student_session_v4';
+  let studentUser = null;
 
   function state(){ return window.state || null; }
   function root(){ return document.getElementById('app'); }
@@ -16,23 +15,22 @@
       return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
     });
   }
-  async function restoreAuth(){
+  async function restoreStudentSession(){
     try{
-      const db = window.loadSupabase ? await window.loadSupabase() : null;
-      if(!db?.auth) return false;
-      const {data,error}=await db.auth.getUser();
-      if(error || !data?.user){authUser=null;authProfile=null;return false;}
-      authUser=data.user;
-      const p=await db.from('profiles').select('id,full_name,student_code,role,status').eq('id',data.user.id).maybeSingle();
-      authProfile=p?.data||null;
-      if(authProfile?.status==='suspended'){
-        await db.auth.signOut(); authUser=null; authProfile=null;
-        clearSession(); state().page='login';
+      const r=await fetch('/api/student-login',{method:'GET',credentials:'same-origin',cache:'no-store'});
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok || !data?.user){
+        studentUser=null;
         return false;
       }
-      saveSession(authProfile?.full_name || data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Người học', authProfile?.student_code || data.user.user_metadata?.student_code || '');
+      studentUser=data.user;
+      saveSession(data.user.full_name || 'Người học', data.user.student_code || '');
       return true;
-    }catch(e){console.warn('[STUDY auth restore]',e);return false;}
+    }catch(e){
+      console.warn('[STUDY student session]',e);
+      studentUser=null;
+      return false;
+    }
   }
   function getSession(){
     try{
@@ -43,7 +41,7 @@
     return null;
   }
   function loggedIn(){
-    return !!authUser;
+    return !!studentUser;
   }
   function userName(){ return getSession()?.candidate || state()?.candidate || localStorage.getItem('study_candidate') || 'Người học'; }
   function userCode(){ return getSession()?.code || state()?.code || localStorage.getItem('study_code') || ''; }
@@ -139,15 +137,15 @@
           <form class="fx-login-form" id="fxLoginForm">
             <span class="fx-eyebrow" id="fxAuthEyebrow">ĐĂNG NHẬP</span>
             <h2 id="fxAuthTitle">Tiếp tục học tập</h2>
-            <p id="fxAuthDesc">Dùng email và mật khẩu của tài khoản STUDY TH.</p>
+            <p id="fxAuthDesc">Nhập họ tên và mã học sinh để tiếp tục.</p>
             <label id="fxNameWrap">Họ và tên<input id="fxName" autocomplete="name" placeholder="Ví dụ: Nguyễn Văn A"></label>
-            <label>Mã học sinh <small>(không bắt buộc)</small><input id="fxCode" autocomplete="username" placeholder="HS001"></label>
-            <label>Email<input id="fxEmail" type="email" autocomplete="email" placeholder="ban@example.com" required></label>
-            <label>Mật khẩu<input id="fxPassword" type="password" autocomplete="current-password" minlength="8" placeholder="Ít nhất 8 ký tự" required></label>
+            <label id="fxCodeWrap">Mã học sinh<input id="fxCode" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" placeholder="Ví dụ: HS001"></label>
+            <label id="fxEmailWrap">Email<input id="fxEmail" type="email" autocomplete="email" placeholder="ban@example.com"></label>
+            <label id="fxPasswordWrap">Mật khẩu<input id="fxPassword" type="password" autocomplete="new-password" minlength="8" placeholder="Ít nhất 8 ký tự"></label>
             <div id="fxLoginError" class="fx-error"></div>
             <button class="fx-btn fx-primary fx-wide" type="submit" id="fxAuthSubmit">Đăng nhập →</button>
             <div class="fx-register-box" id="fxRegisterBox">
-              <div><b>Chưa có tài khoản?</b><small>Tạo tài khoản riêng để lưu tiến độ, lịch sử và hồ sơ học tập.</small></div>
+              <div><b>Chưa có tài khoản?</b><small>Đăng ký bằng email để tạo hồ sơ học tập riêng và lưu tên cùng mã học sinh.</small></div>
               <button class="fx-register-btn" type="button" data-auth-mode="register">Đăng ký ngay →</button>
             </div>
             <button class="fx-link" type="button" data-action="public">← Quay lại trang chủ</button>
@@ -375,30 +373,70 @@
   function setAuthMode(mode){
     const register=mode==='register';
     root().querySelectorAll('[data-auth-mode]').forEach(b=>b.classList.toggle('active',b.dataset.authMode===mode));
-    const nameWrap=root().querySelector('#fxNameWrap'), title=root().querySelector('#fxAuthTitle'), desc=root().querySelector('#fxAuthDesc'), eyebrow=root().querySelector('#fxAuthEyebrow'), submit=root().querySelector('#fxAuthSubmit'), password=root().querySelector('#fxPassword');
-    if(nameWrap)nameWrap.style.display=register?'grid':'none';
+    const nameWrap=root().querySelector('#fxNameWrap');
+    const codeWrap=root().querySelector('#fxCodeWrap');
+    const emailWrap=root().querySelector('#fxEmailWrap');
+    const passwordWrap=root().querySelector('#fxPasswordWrap');
+    const title=root().querySelector('#fxAuthTitle');
+    const desc=root().querySelector('#fxAuthDesc');
+    const eyebrow=root().querySelector('#fxAuthEyebrow');
+    const submit=root().querySelector('#fxAuthSubmit');
+    const password=root().querySelector('#fxPassword');
+    const code=root().querySelector('#fxCode');
+    const email=root().querySelector('#fxEmail');
+
+    if(nameWrap)nameWrap.style.display='grid';
+    if(codeWrap)codeWrap.style.display='grid';
+    if(emailWrap)emailWrap.style.display=register?'grid':'none';
+    if(passwordWrap)passwordWrap.style.display=register?'grid':'none';
+
     if(title)title.textContent=register?'Tạo tài khoản học tập':'Tiếp tục học tập';
-    if(desc)desc.textContent=register?'Tài khoản sẽ được lưu trong hệ thống để bạn dùng lại trên các thiết bị.':'Dùng email và mật khẩu của tài khoản STUDY TH.';
+    if(desc)desc.textContent=register
+      ?'Email chỉ dùng để tạo và xác minh tài khoản. Hệ thống lưu họ tên + mã học sinh cho lần đăng nhập sau.'
+      :'Chỉ cần họ tên và mã học sinh của tài khoản đã đăng ký.';
     if(eyebrow)eyebrow.textContent=register?'ĐĂNG KÝ':'ĐĂNG NHẬP';
     if(submit)submit.textContent=register?'Đăng ký tài khoản →':'Đăng nhập →';
+
+    if(code){
+      code.required=true;
+      code.autocomplete='off';
+    }
+    if(email){
+      email.required=register;
+      email.autocomplete=register?'email':'off';
+    }
+    if(password){
+      password.required=register;
+      password.autocomplete=register?'new-password':'off';
+    }
+
     const registerBox=root().querySelector('#fxRegisterBox');
     if(registerBox)registerBox.style.display=register?'none':'flex';
-    if(password)password.autocomplete=register?'new-password':'current-password';
   }
   async function submitAuth(e){
     e.preventDefault();
-    const err=root().querySelector('#fxLoginError'),btn=root().querySelector('#fxAuthSubmit');
+    const err=root().querySelector('#fxLoginError');
+    const btn=root().querySelector('#fxAuthSubmit');
     const register=root().querySelector('[data-auth-mode].active')?.dataset.authMode==='register';
-    const n=root().querySelector('#fxName')?.value.trim()||'', c=root().querySelector('#fxCode')?.value.trim()||'', email=root().querySelector('#fxEmail')?.value.trim()||'', password=root().querySelector('#fxPassword')?.value||'';
+    const n=root().querySelector('#fxName')?.value.trim()||'';
+    const c=root().querySelector('#fxCode')?.value.trim()||'';
+    const email=root().querySelector('#fxEmail')?.value.trim()||'';
+    const password=root().querySelector('#fxPassword')?.value||'';
+
     err.textContent='';
-    if(register && !n){err.textContent='Hãy nhập họ và tên.';return;}
-    if(!email){err.textContent='Hãy nhập email.';return;}
-    if(password.length<8){err.textContent='Mật khẩu phải có ít nhất 8 ký tự.';return;}
-    btn.disabled=true;btn.textContent=register?'Đang tạo tài khoản...':'Đang đăng nhập...';
+    if(!n){err.textContent='Hãy nhập họ và tên.';return;}
+    if(!c){err.textContent='Hãy nhập mã học sinh.';return;}
+    if(register && !email){err.textContent='Hãy nhập email để tạo tài khoản.';return;}
+    if(register && password.length<8){err.textContent='Mật khẩu đăng ký phải có ít nhất 8 ký tự.';return;}
+
+    btn.disabled=true;
+    btn.textContent=register?'Đang tạo tài khoản...':'Đang đăng nhập...';
+
     try{
-      const db=window.loadSupabase?await window.loadSupabase():null;
-      if(!db?.auth)throw new Error('Hệ thống tài khoản chưa sẵn sàng.');
       if(register){
+        const db=window.loadSupabase?await window.loadSupabase():null;
+        if(!db?.auth)throw new Error('Hệ thống tài khoản chưa sẵn sàng.');
+
         const {data,error}=await db.auth.signUp({
           email,
           password,
@@ -408,18 +446,48 @@
           }
         });
         if(error)throw error;
-        if(data.session){
-          authUser=data.user; await restoreAuth(); state().page='home'; await window.loadExams?.(); await window.loadHistory?.(); renderFinal();
-        }else{
-          err.textContent='Đã tạo tài khoản. Hãy kiểm tra email để xác thực rồi đăng nhập.';
+
+        if(data?.user){
+          // The database trigger stores full name, code and email against the
+          // real Supabase Auth user. Do not put the email into the student-code field.
+          saveSession(n,c);
         }
+
+        err.className='fx-success';
+        err.textContent=data?.session
+          ?'Tạo tài khoản thành công. Bạn có thể đăng nhập bằng họ tên + mã học sinh.'
+          :'Tạo tài khoản thành công. Hãy mở email xác nhận, sau đó quay lại đây và đăng nhập bằng họ tên + mã học sinh.';
+        root().querySelector('#fxLoginForm')?.reset();
+        setAuthMode('login');
       }else{
-        const {data,error}=await db.auth.signInWithPassword({email,password});
-        if(error)throw error;
-        authUser=data.user; await restoreAuth(); state().page='home'; await window.loadExams?.(); await window.loadHistory?.(); renderFinal();
+        const r=await fetch('/api/student-login',{
+          method:'POST',
+          credentials:'same-origin',
+          cache:'no-store',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({name:n,code:c})
+        });
+        const data=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(data.error||('HTTP '+r.status));
+
+        studentUser=data.user;
+        saveSession(data.user.full_name||n,data.user.student_code||c);
+        if(state()){
+          state().page='home';
+          state().candidate=data.user.full_name||n;
+          state().code=data.user.student_code||c;
+        }
+        try{await window.loadExams?.();}catch(_){}
+        try{await window.loadHistory?.();}catch(_){}
+        renderFinal();
       }
-    }catch(e){err.textContent=e.message||'Không thể xác thực tài khoản.'}
-    finally{btn.disabled=false;setAuthMode(register?'register':'login');}
+    }catch(e){
+      err.className='fx-error';
+      err.textContent=e?.message||'Không thể xác thực tài khoản.';
+    }finally{
+      btn.disabled=false;
+      setAuthMode(register?'register':'login');
+    }
   }
 
   function bindShell(){
@@ -473,7 +541,24 @@
     localStorage.setItem('study_final_theme',document.body.classList.contains('fx-dark')?'dark':'light');
   }
   function applyTheme(){document.body.classList.toggle('fx-dark',localStorage.getItem('study_final_theme')==='dark');}
-  async function logout(){try{if(window.stopSupportLive)window.stopSupportLive();const db=window.loadSupabase?await window.loadSupabase():null;if(db?.auth)await db.auth.signOut();}catch(_){}authUser=null;authProfile=null;clearSession();state().page='login';renderFinal();}
+  async function logout(){
+    try{
+      await fetch('/api/student-login',{
+        method:'POST',
+        credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'logout'})
+      });
+    }catch(_){}
+    try{
+      const db=window.loadSupabase?await window.loadSupabase():null;
+      if(db?.auth)await db.auth.signOut();
+    }catch(_){}
+    studentUser=null;
+    clearSession();
+    if(state())state().page='login';
+    renderFinal();
+  }
   function openProfile(){
     if(root().querySelector('.fx-profile-modal')) return;
     const m=metrics(), wrap=document.createElement('div');wrap.className='fx-profile-modal';
@@ -587,10 +672,10 @@
     document.body.classList.remove('redesign-pending');
     document.documentElement.classList.remove('fx-final-booting');
 
-    // Reconcile with the real Supabase session after the runtime becomes ready.
+    // Reconcile with the real server-side student session after the runtime becomes ready.
     if(window.loadSupabase){
       try{
-        if(await restoreAuth()){
+        if(await restoreStudentSession()){
           state().candidate=userName();
           state().code=userCode();
           state().page='home';
@@ -602,7 +687,7 @@
     }else{
       window.addEventListener('study-app-loaded', async function(){
         try{
-          if(await restoreAuth()){
+          if(await restoreStudentSession()){
             state().candidate=userName();
             state().code=userCode();
             state().page='home';

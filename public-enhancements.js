@@ -9,19 +9,52 @@
 
     /* One conversation per support channel instead of one conversation per device. */
     window.ensureThread=async function(){
-      if(state.thread && String(state.thread.account_id||'')===String(state.supportAccountId||'')) return state.thread;
-      await loadSupabase();
       var account=state.supportAccountId||state.supportAccounts?.[0]?.id||null;
-      var q=db.from('support_threads').select('*').eq('device_id',deviceId());
-      if(account) q=q.eq('account_id',account);
-      var found=await q.order('updated_at',{ascending:false}).limit(1).maybeSingle();
+      if(state.thread && String(state.thread.account_id||'')===String(account||'')) return state.thread;
+      await loadSupabase();
+
+      var id=deviceId();
+      var candidate=state.candidate||localStorage.getItem('study_candidate')||'Người dùng';
+
+      // There is exactly one support thread per device_id in the database.
+      // Never filter the lookup by account_id, otherwise switching channels
+      // makes the client miss the existing row and a second insert violates
+      // support_threads_device_id_key.
+      var found=await db.from('support_threads').select('*').eq('device_id',id).maybeSingle();
       if(found.error)throw found.error;
+
       var data=found.data;
       if(!data){
-        var r=await db.from('support_threads').insert({device_id:deviceId(),student_name:state.candidate||localStorage.getItem('study_candidate')||'Người dùng',account_id:account}).select().single();
-        if(r.error)throw r.error; data=r.data;
+        var r=await db.from('support_threads')
+          .insert({device_id:id,student_name:candidate,account_id:account})
+          .select('*').single();
+
+        if(r.error){
+          var duplicate=/duplicate key|unique constraint|support_threads_device_id_key/i.test(
+            String(r.error.message||r.error.details||'')
+          );
+          if(!duplicate)throw r.error;
+
+          // Another tab/request created the unique row first. Reuse it.
+          var retry=await db.from('support_threads').select('*').eq('device_id',id).maybeSingle();
+          if(retry.error||!retry.data)throw retry.error||r.error;
+          data=retry.data;
+        }else{
+          data=r.data;
+        }
       }
-      state.thread=data; return data;
+
+      // One device has one thread; the selected support channel is metadata
+      // on that thread, not a reason to create another thread.
+      if(account && String(data.account_id||'')!==String(account)){
+        var updated=await db.from('support_threads')
+          .update({account_id:account,student_name:candidate})
+          .eq('id',data.id).select('*').single();
+        if(!updated.error&&updated.data)data=updated.data;
+      }
+
+      state.thread=data;
+      return data;
     };
 
     window.selectSupportAccount=async function(id){

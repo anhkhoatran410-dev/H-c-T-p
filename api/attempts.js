@@ -199,6 +199,31 @@ export async function reviewAttemptCore({ attemptId, questionIndex, token }, dep
   return { status: 200, body: { ok: true, reviewed_indexes: row.reviewed_indexes } };
 }
 
+async function reviewStudentCore({ attemptId, questionIndex, studentCode }) {
+  const result = await supabasePublicRequest("rpc/attempt_review_student", {
+    method: "POST",
+    body: JSON.stringify({
+      p_student_code: studentCode,
+      p_attempt_id: attemptId,
+      p_question_index: questionIndex,
+    }),
+  });
+
+  if (!result.ok || !Array.isArray(result.data)) {
+    return { status: 502, body: { error: "Không lưu được trạng thái ôn tập." } };
+  }
+
+  const row = result.data[0];
+  if (!row) return { status: 404, body: { error: "Không tìm thấy lượt làm bài." } };
+  const code = Number(row.status_code);
+  if (code === 400) return { status: 400, body: { error: "Câu này không thuộc danh sách câu sai." } };
+  if (code !== 200 || !Array.isArray(row.reviewed_indexes)) {
+    return { status: 404, body: { error: "Không tìm thấy lượt làm bài." } };
+  }
+
+  return { status: 200, body: { ok: true, reviewed_indexes: row.reviewed_indexes } };
+}
+
 async function reviewAttempt(req, res, requestId) {
   if (!enforceMethod(req, res, ["POST"])) return;
   if (!enforceBodySize(req, res, 20_000)) return;

@@ -568,13 +568,25 @@
   }
 
   async function boot(){
-    // Hold the page visually until the final shell is ready so users never see
-    // the legacy login/home paint before the redesigned UI takes over.
+    // app-loader fetches app.js asynchronously. Wait for its ready event before
+    // rendering, otherwise #app stays hidden and the page appears completely blank.
     document.documentElement.classList.add('fx-final-booting');
+    if(!state() || !window.loadSupabase){
+      await new Promise(function(resolve){
+        var done=false;
+        function finish(){ if(done) return; done=true; window.removeEventListener('study-app-loaded',finish); resolve(); }
+        window.addEventListener('study-app-loaded',finish,{once:true});
+        setTimeout(finish,8000);
+      });
+    }
     try{
       await restoreAuth();
     }catch(_){}
-    if(!state() || !root()) return;
+    if(!state() || !root()){
+      document.body.classList.remove('redesign-pending');
+      document.documentElement.classList.remove('fx-final-booting');
+      return;
+    }
     if(loggedIn()){
       state().candidate=userName();
       state().code=userCode();

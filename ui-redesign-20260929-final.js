@@ -615,7 +615,20 @@
     }
   }
 
+  // Final UI is the sole owner of window.render. Legacy enhancement scripts may
+  // still run after the async app loader finishes; keep their assignments from
+  // replacing the new renderer and causing the login -> legacy navbar jump.
   window.__studyThFinalRender = renderFinal;
+  try{
+    Object.defineProperty(window,'render',{
+      configurable:true,
+      get:function(){return window.__studyThFinalRender;},
+      set:function(fn){
+        window.__studyLegacyRenderAttempt=fn;
+        if(window.__studyThFinalRender) window.__studyLegacyRenderBlocked=true;
+      }
+    });
+  }catch(_){ window.render=renderFinal; }
   window.render=renderFinal;
   window.go=go;
   window.studentGoV2=go;

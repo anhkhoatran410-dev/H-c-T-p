@@ -356,7 +356,7 @@
   function renderFinal(){
     if(!state() || !root()) return;
     if(!loggedIn()){
-      if(state().page!=='login' && state().page!=='public') state().page='public';
+      if(state().page!=='login') state().page='login';
       root().innerHTML = state().page==='login' ? loginPage() : publicHome();
       bindPublic();
       return;
@@ -466,7 +466,7 @@
     localStorage.setItem('study_final_theme',document.body.classList.contains('fx-dark')?'dark':'light');
   }
   function applyTheme(){document.body.classList.toggle('fx-dark',localStorage.getItem('study_final_theme')==='dark');}
-  async function logout(){try{if(window.stopSupportLive)window.stopSupportLive();const db=window.loadSupabase?await window.loadSupabase():null;if(db?.auth)await db.auth.signOut();}catch(_){}authUser=null;authProfile=null;clearSession();state().page='public';renderFinal();}
+  async function logout(){try{if(window.stopSupportLive)window.stopSupportLive();const db=window.loadSupabase?await window.loadSupabase():null;if(db?.auth)await db.auth.signOut();}catch(_){}authUser=null;authProfile=null;clearSession();state().page='login';renderFinal();}
   function openProfile(){
     if(root().querySelector('.fx-profile-modal')) return;
     const m=metrics(), wrap=document.createElement('div');wrap.className='fx-profile-modal';

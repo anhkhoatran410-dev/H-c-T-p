@@ -47,7 +47,7 @@ async function sb(path, options = {}) {
 }
 
 async function authAdmin(path, options = {}) {
-  const r = await fetch(`${SUPABASE_URL.replace(/\\\/$/, '')}/auth/v1/admin/${path}`, {
+  const r = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/${path}`, {
     ...options,
     headers: {
       apikey: SERVICE_KEY,

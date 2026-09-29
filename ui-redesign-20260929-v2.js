@@ -168,12 +168,12 @@ async function generateExamV2(){
  }catch(e){msg.textContent='Không tạo được đề: '+String(e.message||e)}finally{if(btn){btn.disabled=false;btn.textContent='Tạo đề bằng AI ✨'}}
 }
 function startRepaint(){
- renderV2();
+ window.render=renderV2;window.go=studentGoV2;renderV2();
  [250,700,1500,3000].forEach(function(ms){setTimeout(function(){if(S())renderV2()},ms)});
 }
 function boot(){
  if(window.__studyAppReady)startRepaint();else window.addEventListener('study-app-loaded',startRepaint,{once:false});
 }
-window.studentUiV2=studentUiV2;window.studentGoV2=studentGoV2;window.toggleStudentSidebarV2=toggleStudentSidebarV2;window.toggleV2Theme=toggleV2Theme;window.logoutV2=logoutV2;window.saveSettingsV2=saveSettingsV2;window.chooseSubjectV2=chooseSubjectV2;window.generateExamV2=generateExamV2;window.setV2Filter=setV2Filter;window.filterV2Search=filterV2Search;
+window.studentUiV2=studentUiV2;window.studentGoV2=studentGoV2;window.toggleStudentSidebarV2=toggleStudentSidebarV2;window.toggleV2Theme=toggleV2Theme;window.logoutV2=logoutV2;window.saveSettingsV2=saveSettingsV2;window.chooseSubjectV2=chooseSubjectV2;window.generateExamV2=generateExamV2;window.setV2Filter=setV2Filter;window.filterV2Search=filterV2Search;window.render=renderV2;window.go=studentGoV2;
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
 })();

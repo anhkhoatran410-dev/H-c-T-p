@@ -352,35 +352,71 @@
   }
 
   function supportPage(){
-    const s=state()||{}, accounts=Array.isArray(s.supportAccounts)?s.supportAccounts:[], msgs=Array.isArray(s.messages)?s.messages:[];
+    const s=state()||{};
+    const accounts=Array.isArray(s.supportAccounts)?s.supportAccounts:[];
+    const msgs=Array.isArray(s.messages)?s.messages:[];
+    const current=accounts.find(a=>String(a.id)===String(s.supportAccountId))||accounts[0]||{};
     return `
-      <div class="fx-page-head">
-        <div><span class="fx-eyebrow">HỖ TRỢ</span><h2>Hỗ trợ trực tiếp</h2><p>Trao đổi với kênh hỗ trợ của STUDY TH. Tin nhắn được cập nhật theo phiên hỗ trợ.</p></div>
+      <div class="fx-page-head fx-support-page-head">
+        <div>
+          <span class="fx-eyebrow">HỖ TRỢ TRỰC TIẾP</span>
+          <h2>Trung tâm hỗ trợ</h2>
+          <p>Chọn đúng kênh rồi gửi câu hỏi. Tin nhắn được cập nhật theo thời gian thực.</p>
+        </div>
         <button class="fx-btn fx-secondary" data-action="open-ai-support">🤖 Hỏi AI</button>
       </div>
-      <section class="fx-support-shell">
+
+      <section class="fx-support-shell" aria-label="Trung tâm hỗ trợ">
         <aside class="fx-support-channels">
           <div class="fx-support-label">KÊNH HỖ TRỢ</div>
           <div class="fx-support-account-list">
-            ${accounts.length ? accounts.map(a=>`<button class="fx-support-account ${String(a.id)===String(s.supportAccountId||accounts[0]?.id)?'active':''}" data-support-account="${esc(a.id)}"><span>${esc(a.avatar||'💬')}</span><div><b>${esc(a.name||'Hỗ trợ')}</b><small>${esc(a.description||'Kênh hỗ trợ')}</small></div></button>`).join('') : '<div class="fx-support-empty">Chưa có kênh hỗ trợ.</div>'}
+            ${accounts.length ? accounts.map(a=>`
+              <button type="button" class="fx-support-account ${String(a.id)===String(current.id)?'active':''}" data-support-account="${esc(a.id)}">
+                <span>${esc(a.avatar||'💬')}</span>
+                <div>
+                  <b>${esc(a.name||'Hỗ trợ')}</b>
+                  <small>${esc(a.description||'Kênh hỗ trợ')}</small>
+                </div>
+                <i>›</i>
+              </button>`).join('') : '<div class="fx-support-empty">Chưa có kênh hỗ trợ.</div>'}
           </div>
         </aside>
+
         <section class="fx-support-chat">
           <header class="fx-support-chat-head">
-            <div><span>💬</span><div><b>${esc((accounts.find(a=>String(a.id)===String(s.supportAccountId))||accounts[0]||{}).name||'Hỗ trợ chung')}</b><small>● Đang hoạt động</small></div></div>
-            <button class="fx-top-icon" data-action="refresh-support">↻</button>
+            <div class="fx-support-chat-identity">
+              <span>${esc(current.avatar||'💬')}</span>
+              <div>
+                <b>${esc(current.name||'Hỗ trợ chung')}</b>
+                <small><i></i> Đang hoạt động</small>
+              </div>
+            </div>
+            <button type="button" class="fx-top-icon" data-action="refresh-support" aria-label="Làm mới">↻</button>
           </header>
+
           <div class="fx-support-messages" id="fxSupportMessages">
-            ${msgs.length ? msgs.map(m=>`<div class="fx-support-msg ${m.sender==='user'?'user':m.sender==='admin'?'admin':'bot'}"><div class="fx-support-bubble"><small>${esc(m.sender_name||(m.sender==='admin'?'Hỗ trợ':m.sender==='bot'?'Bot':'Bạn'))}</small><p>${esc(m.message||'')}</p><time>${m.created_at?esc(new Date(m.created_at).toLocaleString('vi-VN')):''}</time></div></div>`).join('') : '<div class="fx-support-empty-big"><span>💬</span><b>Chưa có tin nhắn</b><small>Gửi câu hỏi bên dưới để bắt đầu.</small></div>'}
+            ${msgs.length ? msgs.map(m=>`
+              <div class="fx-support-msg ${m.sender==='user'?'user':m.sender==='admin'?'admin':'bot'}">
+                <div class="fx-support-bubble">
+                  <small>${esc(m.sender_name||(m.sender==='admin'?'Hỗ trợ':m.sender==='bot'?'Bot':'Bạn'))}</small>
+                  <p>${esc(m.message||'')}</p>
+                  <time>${m.created_at?esc(new Date(m.created_at).toLocaleString('vi-VN')):''}</time>
+                </div>
+              </div>`).join('') : `
+                <div class="fx-support-empty-big">
+                  <span>💬</span>
+                  <b>Bắt đầu cuộc trò chuyện</b>
+                  <small>Gửi câu hỏi hoặc mô tả vấn đề của bạn bên dưới.</small>
+                </div>`}
           </div>
+
           <form id="fxSupportForm" class="fx-support-composer">
             <textarea id="fxSupportInput" rows="1" placeholder="Nhập câu hỏi hoặc vấn đề bạn cần hỗ trợ..."></textarea>
-            <button class="fx-btn fx-primary" type="submit">Gửi →</button>
+            <button class="fx-btn fx-primary" type="submit">Gửi</button>
           </form>
         </section>
       </section>`;
   }
-
   function content(){
     switch(state()?.page){
       case 'home': return dashboard();

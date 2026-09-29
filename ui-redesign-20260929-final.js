@@ -575,35 +575,44 @@
   }
 
   async function boot(){
-    // app-loader fetches app.js asynchronously. Wait for its ready event before
-    // rendering, otherwise #app stays hidden and the page appears completely blank.
+    // Render the final auth shell immediately. The data/runtime loader may still
+    // be fetching app.js; waiting for it here caused a permanent blank screen on
+    // slow mobile connections.
     document.documentElement.classList.add('fx-final-booting');
-    if(!state() || !window.loadSupabase){
-      await new Promise(function(resolve){
-        var done=false;
-        function finish(){ if(done) return; done=true; window.removeEventListener('study-app-loaded',finish); resolve(); }
-        window.addEventListener('study-app-loaded',finish,{once:true});
-        setTimeout(finish,8000);
-      });
+    if(!window.state){
+      window.state={page:'login',candidate:'',code:'',history:[],exam:null,answers:[],messages:[],supportAccountId:null};
     }
-    try{
-      await restoreAuth();
-    }catch(_){}
-    if(!state() || !root()){
-      document.body.classList.remove('redesign-pending');
-      document.documentElement.classList.remove('fx-final-booting');
-      return;
-    }
-    if(loggedIn()){
-      state().candidate=userName();
-      state().code=userCode();
-      if(state().page==='public'||state().page==='login') state().page='home';
-    }else{
-      state().page='login';
-    }
+    state().page='login';
     renderFinal();
     document.body.classList.remove('redesign-pending');
     document.documentElement.classList.remove('fx-final-booting');
+
+    // Reconcile with the real Supabase session after the runtime becomes ready.
+    if(window.loadSupabase){
+      try{
+        if(await restoreAuth()){
+          state().candidate=userName();
+          state().code=userCode();
+          state().page='home';
+          try{await window.loadExams?.();}catch(_){}
+          try{await window.loadHistory?.();}catch(_){}
+          renderFinal();
+        }
+      }catch(_){}
+    }else{
+      window.addEventListener('study-app-loaded', async function(){
+        try{
+          if(await restoreAuth()){
+            state().candidate=userName();
+            state().code=userCode();
+            state().page='home';
+            try{await window.loadExams?.();}catch(_){}
+            try{await window.loadHistory?.();}catch(_){}
+            renderFinal();
+          }
+        }catch(_){}
+      }, {once:true});
+    }
   }
 
   window.__studyThFinalRender = renderFinal;

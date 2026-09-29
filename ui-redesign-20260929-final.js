@@ -43,11 +43,8 @@
     return null;
   }
   function loggedIn(){
-  if(authUser) return true;
-  if(getSession()?.auth) return true;
-  const s=state();
-  return !!(s && typeof s.candidate==='string' && s.candidate.trim());
-}
+    return !!authUser;
+  }
   function userName(){ return getSession()?.candidate || state()?.candidate || localStorage.getItem('study_candidate') || 'Người học'; }
   function userCode(){ return getSession()?.code || state()?.code || localStorage.getItem('study_code') || ''; }
   function saveSession(name, code){
@@ -169,7 +166,9 @@
 
   function shell(content){
     const p=state()?.page || 'home';
-    const nav=NAV.map(([k,ic,label])=>`<button class="fx-nav-item ${p===k?'active':''}" data-nav="${k}"><span>${ic}</span><b>${label}</b></button>`).join('');
+    const renderNav=(items)=>items.map(([k,ic,label])=>`<button class="fx-nav-item ${p===k?'active':''}" data-nav="${k}"><span>${ic}</span><b>${label}</b></button>`).join('');
+    const primaryNav=renderNav(NAV.slice(0,7));
+    const systemNav=renderNav(NAV.slice(7));
     return `
       <div class="fx-app">
         <aside class="fx-sidebar" id="fxSidebar">
@@ -179,9 +178,9 @@
           </div>
           <div class="fx-profile-mini"><i>${esc((userName()||'U').slice(0,1).toUpperCase())}</i><div><b>${esc(userName())}</b><small>${esc(userCode()||'Phiên học tập')}</small></div><em>●</em></div>
           <div class="fx-nav-label">HỌC TẬP</div>
-          <nav class="fx-nav">${nav.slice(0,7)}</nav>
+          <nav class="fx-nav">${primaryNav}</nav>
           <div class="fx-nav-label">HỆ THỐNG</div>
-          <nav class="fx-nav">${nav.slice(7)}<button class="fx-nav-item" data-action="admin"><span>⚑</span><b>Admin</b><small>↗</small></button></nav>
+          <nav class="fx-nav">${systemNav}<button class="fx-nav-item" data-action="admin"><span>⚑</span><b>Admin</b><small>↗</small></button></nav>
           <div class="fx-side-bottom"><button class="fx-nav-item fx-danger" data-action="logout"><span>⇥</span><b>Đăng xuất</b></button></div>
         </aside>
         <main class="fx-main">
@@ -410,7 +409,11 @@
   }
 
   function bindShell(){
-    root().querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>go(b.getAttribute('data-nav')));
+    root().querySelectorAll('[data-nav]').forEach(b=>b.onclick=async()=>{
+      const target=b.getAttribute('data-nav');
+      closeMenu();
+      await go(target);
+    });
     root().querySelectorAll('[data-action="menu"]').forEach(b=>b.onclick=toggleMenu);
     root().querySelectorAll('[data-action="theme"]').forEach(b=>b.onclick=toggleTheme);
     root().querySelectorAll('[data-action="profile"]').forEach(b=>b.onclick=openProfile);
@@ -556,25 +559,24 @@
     box.scrollTop=box.scrollHeight;
   }
 
-  function boot(){
-    restoreAuth().finally(function(){kick();});
-    function kick(){
-      if(!state() || !root()) return;
-      if(loggedIn()){
-        state().candidate=userName();state().code=userCode();
-        if(state().page==='public'||state().page==='login') state().page='home';
-        renderFinal();
-      }else{
-        state().page='public';
-        renderFinal();
-      }
+  async function boot(){
+    // Hold the page visually until the final shell is ready so users never see
+    // the legacy login/home paint before the redesigned UI takes over.
+    document.documentElement.classList.add('fx-final-booting');
+    try{
+      await restoreAuth();
+    }catch(_){}
+    if(!state() || !root()) return;
+    if(loggedIn()){
+      state().candidate=userName();
+      state().code=userCode();
+      if(state().page==='public'||state().page==='login') state().page='home';
+    }else{
+      state().page='public';
     }
-    [0,100,300,700,1200,2000,3500].forEach(ms=>setTimeout(kick,ms));
-    window.addEventListener('study-app-loaded',()=>setTimeout(kick,50));
-    window.addEventListener('load',()=>setTimeout(kick,150));
-    setInterval(function(){
-      if(state() && loggedIn() && root() && !root().querySelector('.fx-app')) kick();
-    },800);
+    renderFinal();
+    document.body.classList.remove('redesign-pending');
+    document.documentElement.classList.remove('fx-final-booting');
   }
 
   window.render=renderFinal;

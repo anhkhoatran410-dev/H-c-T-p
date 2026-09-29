@@ -38,25 +38,20 @@
     try{
       const v = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
       if(v && v.candidate) return v;
-      const legacy = localStorage.getItem('study_candidate');
-      if(legacy) return {
-        candidate: legacy,
-        code: localStorage.getItem('study_code') || '',
-        legacy: true
-      };
+      
     }catch(_){}
     return null;
   }
   function loggedIn(){
   if(authUser) return true;
-  if(getSession()) return true;
+  if(getSession()?.auth) return true;
   const s=state();
   return !!(s && typeof s.candidate==='string' && s.candidate.trim());
 }
   function userName(){ return getSession()?.candidate || state()?.candidate || localStorage.getItem('study_candidate') || 'Người học'; }
   function userCode(){ return getSession()?.code || state()?.code || localStorage.getItem('study_code') || ''; }
   function saveSession(name, code){
-    const v = {candidate:name, code:code || '', at:new Date().toISOString()};
+    const v = {candidate:name, code:code || '', auth:true, at:new Date().toISOString()};
     localStorage.setItem(SESSION_KEY, JSON.stringify(v));
     localStorage.setItem('study_candidate', name);
     localStorage.setItem('study_code', code || '');
@@ -492,11 +487,6 @@
     restoreAuth().finally(function(){kick();});
     function kick(){
       if(!state() || !root()) return;
-      const legacyInput=document.getElementById('candidate');
-      const legacyCode=document.getElementById('code');
-      if(!getSession() && legacyInput && legacyInput.value && legacyInput.value.trim()){
-        saveSession(legacyInput.value.trim(), legacyCode?.value?.trim() || '');
-      }
       if(loggedIn()){
         state().candidate=userName();state().code=userCode();
         if(state().page==='public'||state().page==='login') state().page='home';

@@ -4,8 +4,13 @@ import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
 import adminAssistantHandler from '../lib/admin-assistant.js';
 
-const SUPABASE_URL = String(process.env.SUPABASE_URL || '').trim();
-const SERVICE_KEY = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://mlqaeginqsgqacdqdzbm.supabase.co').trim();
+const SERVICE_KEY = String(
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  process.env.SUPABASE_SECRET_KEY ||
+  ''
+).trim();
 const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 
 async function guard(req, res) {
@@ -21,7 +26,7 @@ async function guard(req, res) {
     return false;
   }
   if (!SERVICE_KEY || !SUPABASE_URL) {
-    res.status(500).json({ error: 'Supabase server credentials chưa được cấu hình trên Vercel.' });
+    res.status(500).json({ error: 'Thiếu SUPABASE_SERVICE_ROLE_KEY trên Vercel (có thể dùng SUPABASE_SERVICE_KEY/SUPABASE_SECRET_KEY).' });
     return false;
   }
   return true;

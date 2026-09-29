@@ -58,8 +58,54 @@
       var patched = patchBrokenRenderQuestion(source);
       patched = bridgeRuntime(patched);
       try {
-        (0, eval)(patched);
-        window.dispatchEvent(new Event("study-app-loaded"));
+        // Final UI must be installed before the legacy runtime is evaluated.
+        // Otherwise the global render declaration in app.js and legacy
+        // enhancement listeners can take ownership of #app again.
+        function waitForFinalUi(){
+          return new Promise(function(resolve){
+            if(window.__studyThFinalUi && typeof window.__studyThFinalRender==='function'){
+              resolve();
+              return;
+            }
+            var done=false;
+            function finish(){
+              if(done)return;
+              done=true;
+              window.removeEventListener('study-final-ui-ready',finish);
+              resolve();
+            }
+            window.addEventListener('study-final-ui-ready',finish,{once:true});
+            setTimeout(finish,10000);
+          });
+        }
+
+        Promise.resolve(waitForFinalUi()).then(function(){
+          (0, eval)(patched);
+
+          // app.js has now created its global legacy render binding. Replace
+          // it after eval with a stable accessor so later legacy scripts cannot
+          // assign another renderer and overwrite the final interface.
+          if(window.__studyThFinalRender){
+            try{
+              Object.defineProperty(window,'render',{
+                configurable:true,
+                get:function(){return window.__studyThFinalRender;},
+                set:function(fn){window.__studyLegacyRenderBlocked=!!fn;}
+              });
+            }catch(_lockError){}
+            window.dispatchEvent(new Event("study-app-loaded"));
+            setTimeout(function(){
+              if(window.__studyThFinalRender){
+                try{window.__studyThFinalRender()}catch(_renderError){}
+              }
+            },0);
+          }else{
+            window.dispatchEvent(new Event("study-app-loaded"));
+          }
+        }).catch(function(error){
+          console.error("Study app final UI handoff error:", error);
+          showError("Không thể khởi động giao diện. Hãy tải lại trang.");
+        });
       } catch (error) {
         console.error("Study app syntax/runtime error:", error);
         showError("Không thể khởi động ứng dụng. Lỗi JavaScript đã được chặn để trang không bị treo.");

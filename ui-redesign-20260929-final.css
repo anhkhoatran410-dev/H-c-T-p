@@ -35,3 +35,59 @@
 @media(max-width:820px){.fx-sidebar{width:270px;transform:translateX(-105%);transition:.2s}.fx-sidebar.open{transform:translateX(0)}.fx-main{margin-left:0;width:100%}.fx-top{height:62px;padding:0 12px}.fx-menu{display:block}.fx-top-left{min-width:auto}.fx-top-search{display:none}.fx-top-right{margin-left:auto}.fx-user b{display:none}.fx-content{padding:14px 12px 28px}.fx-page-head{align-items:flex-start;gap:9px;flex-direction:column}.fx-head-actions .fx-secondary{display:none}.fx-dashboard-grid,.fx-lower{gap:9px}.fx-subjects{grid-template-columns:1fr 1fr}.fx-learn-subjects{grid-template-columns:1fr 1fr}.fx-dashboard-grid{grid-template-columns:1fr}.fx-achievements{grid-template-columns:1fr 1fr}.fx-profile-modal{padding:70px 10px 18px;place-items:start center}.fx-menu-open:after{content:"";position:fixed;inset:0;background:rgba(8,18,35,.35);z-index:150}.fx-sidebar{z-index:200}}
 @media(max-width:560px){.fx-content{padding:12px 9px 22px}.fx-top h1{font-size:18px}.fx-kicker{font-size:7px}.fx-stats{gap:7px}.fx-stat{padding:11px;min-height:92px}.fx-stat>span{width:31px;height:31px;font-size:14px}.fx-stat b{font-size:19px}.fx-stat small{font-size:8px}.fx-stat em{font-size:7px}.fx-page-head h2{font-size:21px}.fx-page-head p{font-size:10px}.fx-subjects,.fx-learn-subjects{gap:7px}.fx-subject{min-height:66px;padding:9px}.fx-subject>span{width:30px;height:30px}.fx-subject b{font-size:10px}.fx-subject small{font-size:7px}.fx-card.fx-week,.fx-pad{padding:13px}.fx-card-head h3{font-size:14px}.fx-card-head p{font-size:9px}.fx-week-meta{gap:5px}.fx-week-meta div{padding:7px}.fx-week-meta small{font-size:7px}.fx-week-meta b{font-size:9px}.fx-trend{height:90px}.fx-exam-row{grid-template-columns:32px minmax(0,1fr) auto;gap:7px;padding:8px}.fx-exam-row>span{width:32px;height:32px}.fx-exam-row b{font-size:10px}.fx-exam-row small{font-size:7px}.fx-exam-row button{min-width:66px;padding:8px 8px;font-size:9px}.fx-table th,.fx-table td{font-size:8px;padding:8px 6px}.fx-login{grid-template-columns:1fr}.fx-login-side{display:none}.fx-login-panel{padding:18px 12px}.fx-login-form{padding:18px}.fx-login-form h2{font-size:25px}.fx-public-hero{grid-template-columns:1fr;padding:28px 14px 50px}.fx-public-copy h1{font-size:43px}.fx-public-copy p{font-size:13px}.fx-cta{display:grid;grid-template-columns:1fr}.fx-cta .fx-btn{width:100%}}
 @media(max-width:380px){.fx-stats{grid-template-columns:1fr 1fr}.fx-subjects{grid-template-columns:1fr 1fr}.fx-top-right .fx-top-icon{display:none}.fx-user{padding:3px}.fx-user i{width:26px;height:26px}.fx-achievements{grid-template-columns:1fr 1fr}}
+
+/* 2026-09-29 final interaction fixes */
+.fx-support-shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:560px;overflow:hidden;border:1px solid #dfe5ef;border-radius:22px;background:#fff;box-shadow:0 12px 35px rgba(30,50,90,.08)}
+.fx-support-channels{padding:18px;background:#f7f9fd;border-right:1px solid #e5eaf2}
+.fx-support-label,.fx-support-account-list{font-size:10px}
+.fx-support-label{font-weight:800;letter-spacing:.14em;color:#6578ae;margin-bottom:12px}
+.fx-support-account-list{display:grid;gap:8px}
+.fx-support-account{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;gap:10px;text-align:left;padding:11px;border:1px solid transparent;background:transparent;border-radius:14px;color:#1b2942;cursor:pointer}
+.fx-support-account:hover{background:#fff;border-color:#e3e8f1}
+.fx-support-account.active{background:#edf1ff;border-color:#d9ddff}
+.fx-support-account>span{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#e9efff;font-size:21px}
+.fx-support-account b,.fx-support-account small{display:block}
+.fx-support-account b{font-size:13px}.fx-support-account small{margin-top:3px;color:#8190a6;line-height:1.35}
+.fx-support-chat{min-width:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:#fbfcff}
+.fx-support-chat-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #e7ebf2;background:#fff}
+.fx-support-chat-head>div{display:flex;align-items:center;gap:10px}.fx-support-chat-head>div>span{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#eef2ff}
+.fx-support-chat-head b,.fx-support-chat-head small{display:block}.fx-support-chat-head small{margin-top:2px;color:#37aa81;font-size:11px}
+.fx-support-messages{min-height:360px;max-height:62vh;overflow:auto;padding:18px}
+.fx-support-msg{display:flex;margin:0 0 10px}.fx-support-msg.user{justify-content:flex-end}.fx-support-msg.admin,.fx-support-msg.bot{justify-content:flex-start}
+.fx-support-bubble{max-width:min(78%,680px);padding:10px 12px;border:1px solid #e1e6ee;background:#fff;border-radius:16px 16px 16px 5px;box-shadow:0 2px 10px rgba(30,50,90,.04)}
+.fx-support-msg.user .fx-support-bubble{background:#eaf0ff;border-color:#d8e1ff;border-radius:16px 16px 5px 16px}
+.fx-support-msg.bot .fx-support-bubble{background:#f3f4ff}
+.fx-support-bubble small{display:block;font-size:10px;font-weight:800;color:#6173a9;margin-bottom:4px}.fx-support-bubble p{margin:0;color:#26344d;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;font-size:13px}.fx-support-bubble time{display:block;margin-top:6px;color:#9aa5b7;font-size:9px}
+.fx-support-composer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:12px;border-top:1px solid #e7ebf2;background:#fff}
+.fx-support-composer textarea{resize:none;min-height:44px;max-height:110px;padding:11px 12px;border:1px solid #d9e0eb;border-radius:13px;outline:none;font:inherit;font-size:14px}.fx-support-composer textarea:focus{border-color:#6e83ea;box-shadow:0 0 0 3px rgba(89,111,232,.1)}
+.fx-support-composer .fx-btn{min-width:82px}
+.fx-support-empty{padding:14px;color:#8d98a8}.fx-support-empty-big{min-height:300px;display:grid;place-items:center;align-content:center;text-align:center;color:#8b96a7}.fx-support-empty-big span{font-size:36px}.fx-support-empty-big b{margin-top:9px;color:#26344d;font-size:15px}.fx-support-empty-big small{margin-top:4px}
+
+/* Make exam launch remain inside the new shell instead of falling back to the old page renderer. */
+.fx-app .container,.fx-app .support-shell{width:100%;max-width:none}
+.fx-app .container{margin:0;padding:0}
+.fx-app .container>.card{max-width:none;margin:0;border-radius:18px}
+.fx-app .container .card h1{font-size:22px}
+.fx-app .container .card .btn{border-radius:12px}
+
+.fx-login-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:-4px 0 12px;padding:4px;background:#f3f5fb;border-radius:12px}
+.fx-login-tabs .fx-auth-tab{padding:9px;border-radius:9px}.fx-login-tabs .fx-auth-tab.active{background:#fff;box-shadow:0 2px 8px rgba(30,50,90,.08);color:#4960bc}
+
+@media(max-width:820px){
+  .fx-support-shell{grid-template-columns:1fr;min-height:0}
+  .fx-support-channels{border-right:0;border-bottom:1px solid #e5eaf2;padding:10px 12px}
+  .fx-support-label{margin-bottom:8px}
+  .fx-support-account-list{display:flex;overflow-x:auto;gap:7px;padding-bottom:2px;scroll-snap-type:x proximity}
+  .fx-support-account{min-width:190px;flex:0 0 190px;padding:9px;scroll-snap-align:start}
+  .fx-support-account>span{width:36px;height:36px;border-radius:11px;font-size:18px}
+  .fx-support-account b{font-size:12px}.fx-support-account small{font-size:10px}
+  .fx-support-chat{min-height:560px}
+  .fx-support-messages{max-height:none;min-height:0;height:calc(100dvh - 330px);padding:12px}
+  .fx-support-bubble{max-width:88%}
+  .fx-support-composer{position:sticky;bottom:0;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+}
+@media(max-width:560px){
+  .fx-support-chat{min-height:calc(100dvh - 180px)}
+  .fx-support-messages{height:calc(100dvh - 345px)}
+  .fx-support-composer .fx-btn{min-width:68px;padding:10px 12px}
+}

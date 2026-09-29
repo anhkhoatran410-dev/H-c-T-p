@@ -507,7 +507,7 @@
         let generatedCode='';
         for(let attempt=0;attempt<5 && !generatedCode;attempt++){
           const {data:codeData,error:codeError}=await db.rpc('get_registration_code',{
-            p_user_id:data.user.id,
+            p_user_id:null,
             p_email:email
           });
           if(codeError)throw codeError;

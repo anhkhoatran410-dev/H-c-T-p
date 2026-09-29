@@ -357,7 +357,7 @@
     if(!state() || !root()) return;
     if(!loggedIn()){
       if(state().page!=='login') state().page='login';
-      root().innerHTML = state().page==='login' ? loginPage() : publicHome();
+      root().innerHTML = loginPage();
       bindPublic();
       return;
     }

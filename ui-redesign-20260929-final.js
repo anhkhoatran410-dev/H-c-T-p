@@ -4,7 +4,6 @@
 
   if (window.__studyThFinalUi) return;
   window.__studyThFinalUi = true;
-  try{ window.dispatchEvent(new Event('study-final-ui-ready')); }catch(_){}
 
   const SESSION_KEY = 'study_student_session_v3';
   let authUser = null;
@@ -620,6 +619,7 @@
   // still run after the async app loader finishes; keep their assignments from
   // replacing the new renderer and causing the login -> legacy navbar jump.
   window.__studyThFinalRender = renderFinal;
+  try{ window.dispatchEvent(new Event('study-final-ui-ready')); }catch(_){}
   try{
     Object.defineProperty(window,'render',{
       configurable:true,

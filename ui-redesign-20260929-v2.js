@@ -7,7 +7,7 @@ var KEY='study_student_session_v3';
 function S(){return window.state||null}
 function A(){return document.getElementById('app')}
 function esc(v){return String(v==null?'':v).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-function session(){try{var v=JSON.parse(localStorage.getItem(KEY)||'null');return v&&v.candidate?v:null}catch(_){return null}}
+function session(){try{var v=JSON.parse(localStorage.getItem(KEY)||'null');if(v&&v.candidate)return v;var legacy=localStorage.getItem('study_candidate');if(legacy)return {candidate:legacy,code:localStorage.getItem('study_code')||'',legacy:true};return null}catch(_){return null}}
 function has(){return !!session()}
 function user(){return session()?.candidate||S()?.candidate||localStorage.getItem('study_candidate')||'Người học'}
 function code(){return session()?.code||S()?.code||localStorage.getItem('study_code')||''}

@@ -27,7 +27,7 @@
       authProfile=p?.data||null;
       if(authProfile?.status==='suspended'){
         await db.auth.signOut(); authUser=null; authProfile=null;
-        clearSession(); state().page='public';
+        clearSession(); state().page='login';
         return false;
       }
       saveSession(authProfile?.full_name || data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'Người học', authProfile?.student_code || data.user.user_metadata?.student_code || '');
@@ -368,7 +368,7 @@
 
   function bindPublic(){
     root().querySelectorAll('[data-action="login"]').forEach(b=>b.onclick=()=>{state().page='login';renderFinal();});
-    root().querySelectorAll('[data-action="public"]').forEach(b=>b.onclick=()=>{state().page='public';renderFinal();});
+    root().querySelectorAll('[data-action="public"]').forEach(b=>b.onclick=()=>{state().page='login';renderFinal();});
     root().querySelectorAll('[data-auth-mode]').forEach(b=>b.onclick=()=>setAuthMode(b.dataset.authMode));
     root().querySelector('#fxLoginForm')?.addEventListener('submit',submitAuth);
   }
@@ -580,7 +580,7 @@
       state().code=userCode();
       if(state().page==='public'||state().page==='login') state().page='home';
     }else{
-      state().page='public';
+      state().page='login';
     }
     renderFinal();
     document.body.classList.remove('redesign-pending');

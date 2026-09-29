@@ -433,7 +433,7 @@
         <span class="fx-eyebrow">ĐĂNG KÝ THÀNH CÔNG</span>
         <div class="fx-register-success-icon">✓</div>
         <h2>Đây là mã học sinh của bạn</h2>
-        <p>Hệ thống đã tự tạo mã riêng. Hãy lưu mã này, vì lần sau bạn sẽ đăng nhập bằng <b>họ tên + mã học sinh</b>.</p>
+        <p>Hệ thống đã tự tạo mã riêng cho tài khoản. Lưu mã này để lần sau đăng nhập bằng <b>họ tên + mã học sinh</b>.</p>
         <div class="fx-student-code-card">
           <small>MÃ HỌC SINH</small>
           <strong id="fxCreatedStudentCode">${esc(code)}</strong>
@@ -516,7 +516,21 @@
 
         // Do not create a local logged-in session before email verification.
         clearSession();
-        registrationSuccess(generatedCode,email);
+        if(data?.session){
+          studentUser=data.user;
+          saveSession(n,generatedCode);
+          if(state()){
+            state().page='home';
+            state().candidate=n;
+            state().code=generatedCode;
+          }
+          try{await window.loadExams?.();}catch(_){}
+          try{await window.loadHistory?.();}catch(_){}
+          renderFinal();
+          setTimeout(()=>openProfile(),120);
+        }else{
+          registrationSuccess(generatedCode,email);
+        }
         return;
       }
 
@@ -617,9 +631,15 @@
   function openProfile(){
     if(root().querySelector('.fx-profile-modal')) return;
     const m=metrics(), wrap=document.createElement('div');wrap.className='fx-profile-modal';
-    wrap.innerHTML=`<section class="fx-profile-card"><div class="fx-profile-head"><i>${esc((userName()||'U').slice(0,1).toUpperCase())}</i><div><b>${esc(userName())}</b><small>Hồ sơ học tập</small></div><button data-close>×</button></div><div class="fx-profile-body"><div><span>Họ và tên</span><b>${esc(userName())}</b></div><div><span>Mã học sinh</span><b>${esc(userCode()||'Chưa có')}</b></div><div><span>Bài đã làm</span><b>${m.total}</b></div><div><span>Điểm trung bình</span><b>${m.avg}%</b></div><div><span>Điểm cao nhất</span><b>${m.best}%</b></div></div><div class="fx-profile-actions"><button class="fx-btn fx-secondary" data-settings>Chỉnh hồ sơ</button><button class="fx-btn fx-primary" data-close>Đóng</button></div></section>`;
+    wrap.innerHTML=`<section class="fx-profile-card"><div class="fx-profile-head"><i>${esc((userName()||'U').slice(0,1).toUpperCase())}</i><div><b>${esc(userName())}</b><small>Hồ sơ học tập</small></div><button data-close>×</button></div><div class="fx-profile-code"><small>MÃ HỌC SINH CỦA BẠN</small><strong>${esc(userCode()||'Chưa có')}</strong><span>Dùng mã này cùng họ tên để đăng nhập lần sau.</span><button type="button" data-copy-code>Sao chép mã</button></div><div class="fx-profile-body"><div><span>Họ và tên</span><b>${esc(userName())}</b></div><div><span>Bài đã làm</span><b>${m.total}</b></div><div><span>Điểm trung bình</span><b>${m.avg}%</b></div><div><span>Điểm cao nhất</span><b>${m.best}%</b></div></div><div class="fx-profile-actions"><button class="fx-btn fx-secondary" data-settings>Chỉnh hồ sơ</button><button class="fx-btn fx-primary" data-close>Đóng</button></div></section>`;
     wrap.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>wrap.remove());
     wrap.querySelector('[data-settings]')?.addEventListener('click',()=>{wrap.remove();go('settings');});
+    wrap.querySelector('[data-copy-code]')?.addEventListener('click',async()=>{
+      const code=String(userCode()||'');
+      try{await navigator.clipboard.writeText(code);}catch(_){}
+      const b=wrap.querySelector('[data-copy-code]');
+      if(b){b.textContent='Đã sao chép ✓';setTimeout(()=>{if(b)b.textContent='Sao chép mã'},1200);}
+    });
     wrap.onclick=e=>{if(e.target===wrap)wrap.remove();};
     document.body.appendChild(wrap);
   }

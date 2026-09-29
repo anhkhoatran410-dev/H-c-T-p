@@ -299,6 +299,36 @@
       <article class="fx-card fx-pad"><div class="fx-card-head"><div><h3>Giao diện</h3><p>Chuyển giữa sáng và tối.</p></div></div><button class="fx-btn fx-secondary" data-action="theme">◐ Đổi giao diện</button></article></div>`;
   }
 
+  function supportPage(){
+    const s=state()||{}, accounts=Array.isArray(s.supportAccounts)?s.supportAccounts:[], msgs=Array.isArray(s.messages)?s.messages:[];
+    return `
+      <div class="fx-page-head">
+        <div><span class="fx-eyebrow">HỖ TRỢ</span><h2>Hỗ trợ trực tiếp</h2><p>Trao đổi với kênh hỗ trợ của STUDY TH. Tin nhắn được cập nhật theo phiên hỗ trợ.</p></div>
+        <button class="fx-btn fx-secondary" data-action="open-ai-support">🤖 Hỏi AI</button>
+      </div>
+      <section class="fx-support-shell">
+        <aside class="fx-support-channels">
+          <div class="fx-support-label">KÊNH HỖ TRỢ</div>
+          <div class="fx-support-account-list">
+            ${accounts.length ? accounts.map(a=>`<button class="fx-support-account ${String(a.id)===String(s.supportAccountId||accounts[0]?.id)?'active':''}" data-support-account="${esc(a.id)}"><span>${esc(a.avatar||'💬')}</span><div><b>${esc(a.name||'Hỗ trợ')}</b><small>${esc(a.description||'Kênh hỗ trợ')}</small></div></button>`).join('') : '<div class="fx-support-empty">Chưa có kênh hỗ trợ.</div>'}
+          </div>
+        </aside>
+        <section class="fx-support-chat">
+          <header class="fx-support-chat-head">
+            <div><span>💬</span><div><b>${esc((accounts.find(a=>String(a.id)===String(s.supportAccountId))||accounts[0]||{}).name||'Hỗ trợ chung')}</b><small>● Đang hoạt động</small></div></div>
+            <button class="fx-top-icon" data-action="refresh-support">↻</button>
+          </header>
+          <div class="fx-support-messages" id="fxSupportMessages">
+            ${msgs.length ? msgs.map(m=>`<div class="fx-support-msg ${m.sender==='user'?'user':m.sender==='admin'?'admin':'bot'}"><div class="fx-support-bubble"><small>${esc(m.sender_name||(m.sender==='admin'?'Hỗ trợ':m.sender==='bot'?'Bot':'Bạn'))}</small><p>${esc(m.message||'')}</p><time>${m.created_at?esc(new Date(m.created_at).toLocaleString('vi-VN')):''}</time></div></div>`).join('') : '<div class="fx-support-empty-big"><span>💬</span><b>Chưa có tin nhắn</b><small>Gửi câu hỏi bên dưới để bắt đầu.</small></div>'}
+          </div>
+          <form id="fxSupportForm" class="fx-support-composer">
+            <textarea id="fxSupportInput" rows="1" placeholder="Nhập câu hỏi hoặc vấn đề bạn cần hỗ trợ..."></textarea>
+            <button class="fx-btn fx-primary" type="submit">Gửi →</button>
+          </form>
+        </section>
+      </section>`;
+  }
+
   function content(){
     switch(state()?.page){
       case 'home': return dashboard();
@@ -309,11 +339,11 @@
       case 'stats': return statsPage();
       case 'achievements': return achievements();
       case 'settings': return settings();
+      case 'support': return supportPage();
       case 'subject':
       case 'exam':
       case 'result':
       case 'review':
-      case 'support':
         return typeof window.page==='function' ? window.page() : '<div class="fx-empty"><b>Chức năng đang tải...</b></div>';
       default: return dashboard();
     }
@@ -400,6 +430,11 @@
     root().querySelector('[data-action="generate"]')?.addEventListener('click',generate);
     root().querySelector('#fxAiForm')?.addEventListener('submit',sendAi);
     root().querySelector('[data-action="save-profile"]')?.addEventListener('click',saveProfile);
+    root().querySelector('[data-action="open-ai-support"]')?.addEventListener('click',()=>window.openSupportAI?.());
+    root().querySelector('[data-action="refresh-support"]')?.addEventListener('click',async()=>{try{await window.startSupportLive?.()}catch(_){}renderFinal()});
+    root().querySelectorAll('[data-support-account]').forEach(b=>b.addEventListener('click',()=>switchSupport(b.dataset.supportAccount)));
+    root().querySelector('#fxSupportForm')?.addEventListener('submit',sendSupport);
+    const sm=root().querySelector('#fxSupportMessages'); if(sm) sm.scrollTop=sm.scrollHeight;
   }
 
   async function go(p){
@@ -444,12 +479,50 @@
     box.classList.add('open');
     box.querySelectorAll('[data-qexam]').forEach(b=>b.onclick=()=>startExamById(b.getAttribute('data-qexam')));
   }
-  function startExamById(id){
-    const e=exams().find(x=>String(x.id)===String(id));
+  async function startExamById(id){
+    if(!state())return;
+    let e=exams().find(x=>String(x.id)===String(id));
     if(!e)return;
-    if(typeof window.startPractice==='function'){window.startPractice(e);return;}
-    if(typeof window.startExam==='function'){window.startExam(e.id);return;}
-    state().exam=e;state().page='exam';renderFinal();
+    try{
+      if(!Array.isArray(e.questions)||!e.questions.length){
+        if(window.loadSupabase){
+          const db=await window.loadSupabase();
+          const r=await db.from('exams').select('*').eq('id',e.id).maybeSingle();
+          if(!r.error&&r.data)e=r.data;
+        }
+      }
+    }catch(_){}
+    if(!Array.isArray(e.questions)||!e.questions.length){
+      alert('Đề này chưa có dữ liệu câu hỏi để mở.');
+      return;
+    }
+    state().exam=e;
+    state().answers={};
+    state().startedAt=Date.now();
+    state().page='exam';
+    renderFinal();
+    setTimeout(()=>{try{window.startTimer?.()}catch(_){}},50);
+  }
+  async function switchSupport(id){
+    if(!state())return;
+    state().supportAccountId=id;state().thread=null;state().messages=[];
+    try{await window.startSupportLive?.()}catch(_){}
+    renderFinal();
+  }
+  async function sendSupport(e){
+    e.preventDefault();
+    const input=root().querySelector('#fxSupportInput'), text=input?.value.trim();
+    if(!text)return;
+    const btn=e.submitter; if(btn)btn.disabled=true;
+    try{
+      if(typeof window.sendSupportMessage!=='function')throw new Error('Hệ thống hỗ trợ chưa sẵn sàng.');
+      await window.sendSupportMessage({message:text});
+      input.value='';
+      try{await window.refreshPublicChat?.()}catch(_){}
+      try{if(window.startSupportLive)await window.startSupportLive()}catch(_){}
+      renderFinal();
+    }catch(err){alert(String(err?.message||err||'Không gửi được tin nhắn.'))}
+    finally{if(btn)btn.disabled=false}
   }
   async function generate(){
     const file=root().querySelector('#fxFile')?.files?.[0],msg=root().querySelector('#fxGenMsg'),btn=root().querySelector('[data-action="generate"]');

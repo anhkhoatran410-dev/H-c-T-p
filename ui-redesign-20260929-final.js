@@ -967,6 +967,7 @@
           state().page='home';
           try{await window.loadExams?.();}catch(_){}
           try{await refreshLearnerExams();}catch(_){}
+          try{await refreshLearnerFlashcards();}catch(_){}
           try{await window.loadHistory?.();}catch(_){}
           renderFinal();
         }

@@ -378,8 +378,18 @@ async function adminSummary(req, res) {
   if (SERVICE_KEYS.length) {
     students = await safe(() => sb('rpc/admin_list_user_accounts', {method:'POST',body:JSON.stringify({})}), []).then(rows => Array.isArray(rows) ? rows.length : 0);
   }
-  if (!students) students = await safe(() => sbReadOnly('profiles?select=id&role=eq.student&limit=500'), []).then(rows => Array.isArray(rows) ? rows.length : 0);
-  if (!students) students = await safe(() => sbReadOnly('participants?select=id&limit=500'), []).then(rows => Array.isArray(rows) ? rows.length : 0);
+  if (!students) {
+    students = await safe(
+      () => sbReadOnly('admin_student_accounts_snapshot?select=id&limit=500'),
+      []
+    ).then(rows => Array.isArray(rows) ? rows.length : 0);
+  }
+  if (!students) {
+    students = await safe(() => sbReadOnly('profiles?select=id&role=eq.student&limit=500'), []).then(rows => Array.isArray(rows) ? rows.length : 0);
+  }
+  if (!students) {
+    students = await safe(() => sbReadOnly('participants?select=id&limit=500'), []).then(rows => Array.isArray(rows) ? rows.length : 0);
+  }
   const unread = (threadRows || []).reduce((sum, row) => sum + Number(row.unread_admin || 0), 0);
   return res.status(200).json({
     ok: true,

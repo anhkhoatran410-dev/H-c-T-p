@@ -317,13 +317,13 @@ async function publicExams(req, res) {
   if (!sameOrigin(req, res)) return;
   if (!supabasePublicReady()) return res.status(500).json({ error: 'Supabase public credentials chưa được cấu hình.' });
   const result = await supabasePublicRequest(
-    'exams?status=eq.active&select=id,title,subject,difficulty,duration,question_count,questions,status,open_at,close_at,created_at&order=created_at.desc&limit=200',
+    'exams?status=eq.active&select=id,title,subject,difficulty,duration,question_count,flashcard_only,status,open_at,close_at,created_at&order=created_at.desc&limit=200',
     { method: 'GET' }
   );
   if (!result.ok || !Array.isArray(result.data)) return res.status(502).json({ error: 'Không tải được bài kiểm tra.' });
   const exams = result.data
     .filter((e) => e?.flashcard_only !== true)
-    .map((e) => ({ ...e, questions: Array.isArray(e.questions) ? e.questions : [] }));
+    .map((e) => ({ ...e, questions: [] }));
   return res.status(200).json({ ok: true, exams });
 }
 

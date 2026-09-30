@@ -8,6 +8,7 @@
   const SESSION_KEY = 'study_student_session_v4';
   let studentUser = null;
   let learnerExams = [];
+  let learnerFlashcards = [];
 
   function state(){ return window.state || null; }
   function root(){ return document.getElementById('app'); }
@@ -93,6 +94,17 @@
       if(Array.isArray(learnerExams) && learnerExams.length) return learnerExams;
       return exams();
     }
+  }
+  async function refreshLearnerFlashcards(){
+    try{
+      const url=(window.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabase.co')+'/rest/v1/exams?select=id,title,subject,difficulty,duration,question_count,flashcard_only,status,created_at&status=eq.active&flashcard_only=eq.true&order=created_at.desc&limit=100';
+      const key=window.SUPABASE_KEY||'sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi';
+      const r=await fetch(url,{method:'GET',cache:'no-store',headers:{'Accept':'application/json','apikey':key,'Authorization':'Bearer '+key}});
+      const d=await r.json().catch(()=>[]);
+      if(!r.ok||!Array.isArray(d))throw new Error('Không tải được Flashcard.');
+      learnerFlashcards=d.map(function(e){return Object.assign({},e,{questions:[]})});
+      return learnerFlashcards;
+    }catch(e){ return Array.isArray(learnerFlashcards)?learnerFlashcards:[]; }
   }
   function history(){
     const h = state()?.history;

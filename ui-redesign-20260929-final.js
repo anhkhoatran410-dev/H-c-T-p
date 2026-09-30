@@ -7,6 +7,7 @@
 
   const SESSION_KEY = 'study_student_session_v4';
   let studentUser = null;
+  let learnerExams = [];
 
   function state(){ return window.state || null; }
   function root(){ return document.getElementById('app'); }
@@ -71,7 +72,28 @@
     localStorage.removeItem('study_candidate');
     localStorage.removeItem('study_code');
   }
-  function exams(){ return Array.isArray(window.exams) ? window.exams : []; }
+  function exams(){
+    if (Array.isArray(learnerExams) && learnerExams.length) return learnerExams;
+    return Array.isArray(window.exams) ? window.exams : [];
+  }
+
+  // The final learner UI owns its own exam list instead of depending on the
+  // legacy app-loader bridge. This guarantees the dashboard and Thi thử page
+  // see the same active exams that the public server endpoint exposes.
+  async function refreshLearnerExams(){
+    try{
+      const r=await fetch('/api/admin-tools?route=public-exams',{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok || !Array.isArray(d.exams)) throw new Error(d?.error || ('HTTP '+r.status));
+      learnerExams=d.exams.filter(function(e){return e && e.flashcard_only!==true;}).map(function(e){return Object.assign({},e,{questions:Array.isArray(e.questions)?e.questions:[]});});
+      try{window.exams=learnerExams;}catch(_){ }
+      return learnerExams;
+    }catch(e){
+      // Keep an already loaded list when a later refresh temporarily fails.
+      if(Array.isArray(learnerExams) && learnerExams.length) return learnerExams;
+      return exams();
+    }
+  }
   function history(){
     const h = state()?.history;
     return Array.isArray(h) ? h : [];
@@ -699,7 +721,7 @@
 
   async function go(p){
     if(!state()) return;
-    if(p==='tests'||p==='learning'){try{if(window.loadExams)await window.loadExams();}catch(_){}}
+    if(p==='home'||p==='tests'||p==='subject'){try{await refreshLearnerExams();}catch(_){} }
     if(p==='history'||p==='stats'||p==='achievements'){try{if(window.loadHistory)await window.loadHistory();}catch(_){}}
     state().page=p;
     renderFinal();
@@ -869,6 +891,7 @@
           state().code=userCode();
           state().page='home';
           try{await window.loadExams?.();}catch(_){}
+          try{await refreshLearnerExams();}catch(_){}
           try{await window.loadHistory?.();}catch(_){}
           renderFinal();
         }

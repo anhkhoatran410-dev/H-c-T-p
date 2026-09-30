@@ -4,7 +4,7 @@
   if(window.__studyLoginBootstrapV10)return;
   window.__studyLoginBootstrapV10=true;
   const CRITICAL_SCRIPT='auth.js?v=20260929-2';
-  const APP_SCRIPT='app.js?v=20260929-2';
+  const APP_SCRIPT='app.js?v=20260930-3';
   const TITLES={dashboard:'Tổng quan',support:'Hỗ trợ',participants:'Người tham gia',users:'Tài khoản người học',history:'Lịch sử làm bài',tests:'Bài kiểm tra',accounts:'Tài khoản hỗ trợ',bot:'Bot tự động',assistant:'Admin Copilot'};
   const LOADERS={dashboard:'loadDashboard',support:'startSupportLive',participants:'loadParticipants',users:'loadUsers',history:'loadHistory',tests:'renderTests',accounts:'loadAccounts',bot:'loadBotRules',assistant:'loadAssistant'};
   const $=id=>document.getElementById(id);

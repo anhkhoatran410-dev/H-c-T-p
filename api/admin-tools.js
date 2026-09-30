@@ -430,20 +430,60 @@ async function adminSummary(req, res) {
 async function adminParticipants(req, res) {
   if (!await guard(req, res, { requireService: false })) return;
   try {
-    const [participants, attempts] = await Promise.all([
+    const [participants, attempts, profiles] = await Promise.all([
       sbReadOnly('admin_participants_snapshot?select=id,name,code,created_at,attempts_count,latest_activity,latest_score&order=created_at.desc&limit=500'),
       sbReadOnly('admin_attempts_snapshot?select=id,student_name,student_code,score,created_at&order=created_at.desc&limit=1000'),
+      sbReadOnly('admin_student_accounts_snapshot?select=id,full_name,student_code,role,status,created_at,updated_at,email_masked&order=created_at.desc&limit=500'),
     ]);
     const ps = Array.isArray(participants) ? participants : [];
     const as = Array.isArray(attempts) ? attempts : [];
+    const us = Array.isArray(profiles) ? profiles.filter(u => String(u.role || 'student') === 'student') : [];
+    const byCode = new Map();
+    for (const u of us) {
+      const code = String(u.student_code || '').trim();
+      byCode.set(code || ('id:' + String(u.id || '')), {
+        id:u.id, name:u.full_name || 'Người học', email:u.email_masked || null,
+        code:code || '—', created_at:u.created_at || null,
+        attempts_count:0, latest_activity:null, latest_score:null
+      });
+    }
     // If an older deployment somehow has empty participants, derive them from
     // attempts here as a safe read-time repair. The canonical DB trigger also
     // keeps participants synchronized for future submissions.
-    const byCode = new Map(ps.map(p => [String(p.code || ''), p]));
+    for (const p of ps) {
+      const code = String(p.code || '').trim();
+      const k = code || ('id:' + String(p.id || ''));
+      const existing = byCode.get(k);
+      byCode.set(k, existing ? {
+        ...existing,
+        name: existing.name || p.name || 'Người học',
+        code: existing.code === '—' ? (p.code || '—') : existing.code,
+        created_at: existing.created_at || p.created_at || null,
+        attempts_count: Number(p.attempts_count || 0),
+        latest_activity: p.latest_activity || null,
+        latest_score: p.latest_score ?? null
+      } : p);
+    }
     for (const a of as) {
       const code = String(a.student_code || a.device_id || '').trim();
-      if (!code || byCode.has(code)) continue;
-      byCode.set(code, {id:'derived-'+code, name:a.student_name || 'Người học', email:null, code, created_at:a.created_at});
+      const k = code ? code : ('attempt:' + String(a.id || ''));
+      const existing = byCode.get(k);
+      if (existing) {
+        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const et = existing.latest_activity ? new Date(existing.latest_activity).getTime() : 0;
+        if (at >= et) {
+          existing.latest_activity = a.created_at || existing.latest_activity;
+          existing.latest_score = a.score == null ? existing.latest_score : Number(a.score);
+        }
+        existing.attempts_count = Math.max(Number(existing.attempts_count || 0), 1);
+      } else {
+        byCode.set(k, {
+          id:'derived-'+String(a.id || Date.now()),
+          name:a.student_name || 'Người học', email:null, code:code || '—',
+          created_at:a.created_at || null, attempts_count:1,
+          latest_activity:a.created_at || null, latest_score:a.score == null ? null : Number(a.score)
+        });
+      }
     }
     return res.status(200).json({ ok:true, participants:Array.from(byCode.values()), attempts:as, syncedAt:new Date().toISOString() });
   } catch (e) {

@@ -321,7 +321,10 @@ async function publicExams(req, res) {
     { method: 'GET' }
   );
   if (!result.ok || !Array.isArray(result.data)) return res.status(502).json({ error: 'Không tải được bài kiểm tra.' });
-  return res.status(200).json({ ok: true, exams: result.data.map((e) => ({ ...e, questions: Array.isArray(e.questions) ? e.questions : [] })) });
+  const exams = result.data
+    .filter((e) => e?.flashcard_only !== true)
+    .map((e) => ({ ...e, questions: Array.isArray(e.questions) ? e.questions : [] }));
+  return res.status(200).json({ ok: true, exams });
 }
 
 async function adminSummary(req, res) {

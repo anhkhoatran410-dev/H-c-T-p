@@ -34,3 +34,41 @@ begin
 end $$;
 
 notify pgrst, 'reload schema';
+
+
+-- Admin account directory: read Auth users and profile metadata in one server-side call.
+create or replace function public.admin_list_user_accounts()
+returns table(
+  id uuid,
+  email text,
+  full_name text,
+  student_code text,
+  role text,
+  status text,
+  email_confirmed boolean,
+  last_sign_in_at timestamptz,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select
+    u.id,
+    coalesce(u.email,'')::text,
+    coalesce(p.full_name, u.raw_user_meta_data->>'full_name', '')::text,
+    coalesce(p.student_code, u.raw_user_meta_data->>'student_code', '')::text,
+    coalesce(p.role, u.raw_app_meta_data->>'role', 'student')::text,
+    coalesce(p.status, 'active')::text,
+    (u.email_confirmed_at is not null),
+    u.last_sign_in_at,
+    u.created_at,
+    coalesce(p.updated_at, u.updated_at)
+  from auth.users u
+  left join public.profiles p on p.id = u.id
+  order by u.created_at desc;
+$$;
+
+revoke all on function public.admin_list_user_accounts() from public, anon, authenticated;
+grant execute on function public.admin_list_user_accounts() to service_role;

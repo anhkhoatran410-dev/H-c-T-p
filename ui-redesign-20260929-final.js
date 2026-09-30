@@ -9,6 +9,8 @@
   let studentUser = null;
   let learnerExams = [];
   let learnerFlashcards = [];
+  let learnerLastSyncAt = 0;
+  let learnerSyncState = 'Đang đồng bộ';
 
   function state(){ return window.state || null; }
   function root(){ return document.getElementById('app'); }
@@ -88,6 +90,7 @@
       if(!r.ok || !Array.isArray(d.exams)) throw new Error(d?.error || ('HTTP '+r.status));
       learnerExams=d.exams.filter(function(e){return e && e.flashcard_only!==true;}).map(function(e){return Object.assign({},e,{questions:Array.isArray(e.questions)?e.questions:[]});});
       try{window.exams=learnerExams;}catch(_){ }
+      learnerLastSyncAt=Date.now(); learnerSyncState='Đã đồng bộ';
       return learnerExams;
     }catch(e){
       // Keep an already loaded list when a later refresh temporarily fails.
@@ -103,6 +106,7 @@
       const d=await r.json().catch(()=>[]);
       if(!r.ok||!Array.isArray(d))throw new Error('Không tải được Flashcard.');
       learnerFlashcards=d.map(function(e){return Object.assign({},e,{questions:[]})});
+      learnerLastSyncAt=Date.now(); learnerSyncState='Đã đồng bộ';
       return learnerFlashcards;
     }catch(e){ return Array.isArray(learnerFlashcards)?learnerFlashcards:[]; }
   }
@@ -214,6 +218,12 @@
     ['settings','⚙','Cài đặt']
   ];
 
+  function ensureSyncBarStyle(){
+    if(document.getElementById('fx-sync-bar-style'))return;
+    const s=document.createElement('style');s.id='fx-sync-bar-style';
+    s.textContent='.fx-sync-bar{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 12px;border:1px solid #dbe4f2;border-radius:14px;background:#f8fbff}.fx-sync-dot{width:9px;height:9px;border-radius:50%;background:#35b878;flex:none}.fx-sync-bar>div{min-width:0;flex:1}.fx-sync-bar b{display:block;font-size:12px}.fx-sync-bar small{display:block;color:#718096;font-size:10px;margin-top:2px}.fx-sync-bar button{border:1px solid #d7e0ef;background:#fff;border-radius:10px;padding:7px 9px;font:inherit;font-size:10px;cursor:pointer;white-space:nowrap}';
+    document.head.appendChild(s);
+  }
   function shell(content){
     const p=state()?.page || 'home';
     const renderNav=(items)=>items.map(([k,ic,label])=>`<button class="fx-nav-item ${p===k?'active':''}" data-nav="${k}"><span>${ic}</span><b>${label}</b></button>`).join('');
@@ -304,6 +314,7 @@
     return `
       <div class="fx-page-head">
         <div><span class="fx-eyebrow">HỌC TẬP</span><h2>Không gian học tập</h2><p>Flashcard do Admin tạo sẽ được đồng bộ trực tiếp và xuất hiện tại đây.</p></div>
+      ${syncStatusHtml()}
       </div>
       <section class="fx-learning-coming">
         <article class="fx-card fx-learning-main">
@@ -328,6 +339,12 @@
         </div>
       </article>`;
   }
+  function syncStatusHtml(){
+    const t=learnerLastSyncAt?new Date(learnerLastSyncAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
+    const testsCount=Array.isArray(learnerExams)?learnerExams.length:0;
+    const flashCount=Array.isArray(learnerFlashcards)?learnerFlashcards.length:0;
+    return '<div class="fx-sync-bar"><span class="fx-sync-dot"></span><div><b>'+esc(learnerSyncState)+'</b><small>Cập nhật lúc '+esc(t)+' · '+testsCount+' bài kiểm tra · '+flashCount+' Flashcard</small></div><button type="button" data-action="refresh-data">↻ Cập nhật</button></div>';
+  }
   function tests(){
     const list=exams();
     const activeSubjects=Array.from(new Set(list.map(e=>String(e.subject||'').trim()).filter(Boolean)));
@@ -341,6 +358,7 @@
         </div>
         <div class="fx-test-count"><b>${list.length}</b><span>đề đang có</span></div>
       </div>
+      ${syncStatusHtml()}
       <div class="fx-filters"><button class="active" data-filter="">Tất cả</button>${filterSubjects.map(s=>`<button data-filter="${esc(s)}">${esc(s)}</button>`).join('')}</div>
       <article class="fx-card fx-pad">
         <div id="fxExamList" class="fx-exams">
@@ -715,6 +733,7 @@
   }
 
   function bindShell(){
+    ensureSyncBarStyle();
     root().querySelectorAll('[data-nav]').forEach(b=>b.onclick=async()=>{
       const target=b.getAttribute('data-nav');
       closeMenu();
@@ -751,6 +770,15 @@
     const sm=root().querySelector('#fxSupportMessages'); if(sm) sm.scrollTop=sm.scrollHeight;
   }
 
+  let learnerSyncTimer=null;
+  function startLearnerAutoSync(){
+    if(learnerSyncTimer)return;
+    learnerSyncTimer=setInterval(async function(){
+      if(document.hidden)return;
+      try{await refreshLearnerExams();await refreshLearnerFlashcards();if(state()?.page==='home'||state()?.page==='learning'||state()?.page==='tests')renderFinal();}catch(_){}
+    },30000);
+    window.addEventListener('focus',async function(){try{await refreshLearnerExams();await refreshLearnerFlashcards();if(state()?.page==='home'||state()?.page==='learning'||state()?.page==='tests')renderFinal();}catch(_){}},{passive:true});
+  }
   async function go(p){
     if(!state()) return;
     if(p==='home'||p==='tests'||p==='subject'||p==='learning'){try{await refreshLearnerExams();}catch(_){}}
@@ -981,4 +1009,5 @@
   window.studentGoV2=go;
   window.studentUiV2=function(p){if(state()){state().page=p;renderFinal();}};
   boot();
+  ensureSyncBarStyle(); startLearnerAutoSync();
 })();

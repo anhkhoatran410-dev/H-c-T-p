@@ -10,7 +10,7 @@ async function clientMeta(){try{const r=await fetch("/api/client-meta");return a
 async function registerDevice(){try{await loadSupabase();const meta=await clientMeta();await db.from("user_devices").upsert({device_id:deviceId(),last_seen:new Date().toISOString(),last_ip:meta.ip,user_agent:meta.userAgent},{onConflict:"device_id"})}catch(e){console.warn("registerDevice",e)}}
 async function loadExams(){
   try{
-    const r=await fetch("/api/exams",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
+    const r=await fetch("/api/admin-tools?route=public-exams",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
     const data=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
     exams=Array.isArray(data.exams)?data.exams.map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]})):[];

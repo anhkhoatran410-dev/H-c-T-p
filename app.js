@@ -8,7 +8,27 @@ function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function deviceId(){let id=localStorage.getItem(DEVICE_KEY);if(!id){id=crypto.randomUUID?crypto.randomUUID():"dev_"+Date.now()+"_"+Math.random().toString(36).slice(2);localStorage.setItem(DEVICE_KEY,id)}return id}
 async function clientMeta(){try{const r=await fetch("/api/client-meta");return await r.json()}catch{return {ip:null,userAgent:navigator.userAgent}}}
 async function registerDevice(){try{await loadSupabase();const meta=await clientMeta();await db.from("user_devices").upsert({device_id:deviceId(),last_seen:new Date().toISOString(),last_ip:meta.ip,user_agent:meta.userAgent},{onConflict:"device_id"})}catch(e){console.warn("registerDevice",e)}}
-async function loadExams(){try{await loadSupabase();const {data,error}=await db.from("exams").select("*").eq("status","active").order("created_at",{ascending:false});if(error)throw error;exams=(data||[]).map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}))}catch(e){console.error("loadExams",e);exams=[]}}
+async function loadExams(){
+  try{
+    const r=await fetch("/api/exams",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
+    exams=Array.isArray(data.exams)?data.exams.map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]})):[];
+    return exams;
+  }catch(apiError){
+    try{
+      await loadSupabase();
+      const {data,error}=await db.from("exams").select("*").eq("status","active").order("created_at",{ascending:false});
+      if(error)throw error;
+      exams=(data||[]).map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
+      return exams;
+    }catch(e){
+      console.error("loadExams",apiError,e);
+      exams=[];
+      return [];
+    }
+  }
+}
 async function loadHistory(){try{const code=String(localStorage.getItem("study_code")||"").trim();const url=code?("/api/attempts?studentCode="+encodeURIComponent(code)):"/api/attempts";const r=await fetch(url,{method:"GET",credentials:"same-origin",cache:"no-store"});if(r.status===401){state.history=[];state.historyNeedsNewSession=true;return}const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);state.history=Array.isArray(data.attempts)?data.attempts:[];state.historyNeedsNewSession=false}catch(e){console.warn("history",e);state.history=[]}}
 async function loadSupportAccounts(){try{await loadSupabase();const {data,error}=await db.from("support_accounts").select("*").eq("is_active",true).order("created_at",{ascending:true});if(error)throw error;state.supportAccounts=data||[];if(!state.supportAccountId&&state.supportAccounts.length)state.supportAccountId=state.supportAccounts[0].id}catch(e){console.warn("support accounts",e)}}
 function header(){return `<header class="top upgraded-top"><div class="brand">🎓 STUDY TEST AI</div><div class="nav"><button onclick="go('home')">Trang chủ</button><button onclick="go('history')">📊 Lịch sử</button><button onclick="go('support')">💬 Hỗ trợ</button><button onclick="go('admin')">Admin</button><button onclick="togglePublicTheme()" aria-label="Đổi giao diện">◐</button></div></header>`}

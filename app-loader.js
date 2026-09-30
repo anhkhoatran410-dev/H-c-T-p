@@ -1,5 +1,5 @@
 (function () {
-  var APP_URL = "/app.js?v=20260930-3&cache=" + Date.now();
+  var APP_URL = "/app.js?v=20260930-5&cache=" + Date.now();
 
   function showError(message) {
     var app = document.getElementById("app");

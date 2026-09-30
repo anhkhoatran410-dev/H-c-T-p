@@ -79,10 +79,17 @@ async function adminUsers(req, res) {
       const perPage = Math.min(100, Math.max(1, Math.trunc(Number(req.body?.perPage || 100))));
       const data = await authAdmin(`users?page=${page}&per_page=${perPage}`);
       const users = Array.isArray(data?.users) ? data.users : [];
-      const ids = users.map(u => u.id).filter(id => /^[0-9a-f-]{36}$/i.test(String(id)));
-      let profiles = [];
-      if (ids.length) profiles = await sb(`profiles?select=id,full_name,student_code,role,status,created_at,updated_at&id=in.(${ids.join(',')})&order=created_at.desc`);
-      const byId = new Map((profiles || []).map(p => [String(p.id), p]));
+      const byId = new Map();
+      // Profile enrichment is best-effort. A broken/missing profiles row must
+      // never hide real Auth accounts from Admin.
+      for (const u of users) {
+        const id = String(u?.id || '');
+        if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
+        try {
+          const rows = await sb(`profiles?select=id,full_name,student_code,role,status,created_at,updated_at&id=eq.${encodeURIComponent(id)}&limit=1`);
+          if (Array.isArray(rows) && rows[0]) byId.set(id, rows[0]);
+        } catch (_) {}
+      }
       return res.status(200).json({
         ok: true,
         total: Number(data?.total || users.length),
@@ -329,23 +336,22 @@ async function publicExams(req, res) {
 
 async function adminSummary(req, res) {
   if (!await guard(req, res)) return;
-  try {
-    const [tests, students, attempts, threadRows, recentAttempts] = await Promise.all([
-      exactCount('exams'),
-      exactCount('participants'),
-      exactCount('user_attempts'),
-      sb('support_threads?select=unread_admin&limit=1000'),
-      sb('user_attempts?select=created_at&order=created_at.desc&limit=5'),
-    ]);
-    const unread = (threadRows || []).reduce((sum, row) => sum + Number(row.unread_admin || 0), 0);
-    return res.status(200).json({
-      ok: true,
-      stats: { tests, students, attempts, unread },
-      recentActivity: Array.isArray(recentAttempts) ? recentAttempts : [],
-    });
-  } catch {
-    return res.status(502).json({ error: 'Không tải được tổng quan Admin.' });
-  }
+  const safe = async (fn, fallback) => {
+    try { return await fn(); } catch (_) { return fallback; }
+  };
+  const [tests, students, attempts, threadRows, recentAttempts] = await Promise.all([
+    safe(() => exactCount('exams'), 0),
+    safe(() => exactCount('participants'), 0),
+    safe(() => exactCount('user_attempts'), 0),
+    safe(() => sb('support_threads?select=unread_admin&limit=1000'), []),
+    safe(() => sb('user_attempts?select=created_at&order=created_at.desc&limit=5'), []),
+  ]);
+  const unread = (threadRows || []).reduce((sum, row) => sum + Number(row.unread_admin || 0), 0);
+  return res.status(200).json({
+    ok: true,
+    stats: { tests, students, attempts, unread },
+    recentActivity: Array.isArray(recentAttempts) ? recentAttempts : [],
+  });
 }
 
 async function adminParticipants(req, res) {

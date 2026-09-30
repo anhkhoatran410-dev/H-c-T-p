@@ -13,7 +13,7 @@ const SERVICE_KEYS = [
 ].map(v => String(v || '').trim()).filter(Boolean).filter((v,i,a) => a.indexOf(v) === i);
 const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 
-async function guard(req, res) {
+async function guard(req, res, options = {}) {
   applySecurityHeaders(res);
   res.setHeader('X-Request-ID', safeRequestId());
   if (!enforceMethod(req, res, ['POST'])) return false;
@@ -25,8 +25,8 @@ async function guard(req, res) {
     res.status(401).json({ error: 'Admin session required' });
     return false;
   }
-  if (!SERVICE_KEYS.length || !SUPABASE_URL) {
-    res.status(500).json({ error: 'Thiếu SUPABASE_SERVICE_ROLE_KEY trên Vercel (có thể dùng SUPABASE_SERVICE_KEY/SUPABASE_SECRET_KEY).' });
+  if (options.requireService !== false && (!SERVICE_KEYS.length || !SUPABASE_URL)) {
+    res.status(500).json({ error: 'Thiếu khóa Supabase server trên Vercel.' });
     return false;
   }
   return true;
@@ -323,6 +323,15 @@ async function updateExam(req, res) {
 }
 
 
+async function sbReadOnly(path) {
+  try { return await sb(path); }
+  catch (e) {
+    const result = await supabasePublicRequest(path, { method: 'GET' });
+    if (!result.ok) throw e;
+    return Array.isArray(result.data) ? result.data : [];
+  }
+}
+
 async function exactCount(table) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
     headers: {
@@ -355,51 +364,59 @@ async function publicExams(req, res) {
 }
 
 async function adminSummary(req, res) {
-  if (!await guard(req, res)) return;
-  const safe = async (fn, fallback) => {
-    try { return await fn(); } catch (_) { return fallback; }
-  };
-  const [tests, students, attempts, threadRows, recentAttempts] = await Promise.all([
-    safe(() => sb('exams?select=id&status=eq.active&flashcard_only=eq.false&limit=200'), []).then(rows => Array.isArray(rows) ? rows.length : 0),
-    safe(() => sb('rpc/admin_list_user_accounts', { method: 'POST', body: JSON.stringify({}) }), []).then(rows => Array.isArray(rows) ? rows.length : 0),
-    safe(() => exactCount('user_attempts'), 0),
-    safe(() => sb('support_threads?select=unread_admin&limit=1000'), []),
-    safe(() => sb('user_attempts?select=created_at&order=created_at.desc&limit=5'), []),
-  ]);
+  if (!await guard(req, res, { requireService: false })) return;
+  const safe = async (fn, fallback) => { try { return await fn(); } catch (_) { return fallback; } };
+  const testRows = await safe(() => sbReadOnly('exams?select=id&status=eq.active&flashcard_only=eq.false&limit=200'), []);
+  const attemptRows = await safe(() => sbReadOnly('user_attempts?select=id,created_at&order=created_at.desc&limit=500'), []);
+  const threadRows = await safe(() => sbReadOnly('support_threads?select=unread_admin&limit=1000'), []);
+  let students = 0;
+  if (SERVICE_KEYS.length) {
+    students = await safe(() => sb('rpc/admin_list_user_accounts', {method:'POST',body:JSON.stringify({})}), []).then(rows => Array.isArray(rows) ? rows.length : 0);
+  }
+  if (!students) students = await safe(() => sbReadOnly('profiles?select=id&role=eq.student&limit=500'), []).then(rows => Array.isArray(rows) ? rows.length : 0);
   const unread = (threadRows || []).reduce((sum, row) => sum + Number(row.unread_admin || 0), 0);
   return res.status(200).json({
     ok: true,
-    stats: { tests, students, attempts, unread },
-    recentActivity: Array.isArray(recentAttempts) ? recentAttempts : [],
+    stats: { tests: testRows.length, students, attempts: attemptRows.length, unread },
+    recentActivity: Array.isArray(attemptRows) ? attemptRows.slice(0,5) : [],
+    syncedAt: new Date().toISOString(),
   });
 }
 
 async function adminParticipants(req, res) {
-  if (!await guard(req, res)) return;
+  if (!await guard(req, res, { requireService: false })) return;
   try {
     const [participants, attempts] = await Promise.all([
-      sb('participants?select=id,name,email,code,created_at&order=created_at.desc&limit=500'),
-      sb('user_attempts?select=id,device_id,student_code,score,created_at&order=created_at.desc&limit=1000'),
+      sbReadOnly('participants?select=id,name,email,code,created_at&order=created_at.desc&limit=500'),
+      sbReadOnly('user_attempts?select=id,device_id,student_code,score,created_at&order=created_at.desc&limit=1000'),
     ]);
-    if (!Array.isArray(participants) || !Array.isArray(attempts)) {
-      return res.status(502).json({ error: 'Không tải được danh sách người tham gia.' });
+    const ps = Array.isArray(participants) ? participants : [];
+    const as = Array.isArray(attempts) ? attempts : [];
+    // If an older deployment somehow has empty participants, derive them from
+    // attempts here as a safe read-time repair. The canonical DB trigger also
+    // keeps participants synchronized for future submissions.
+    const byCode = new Map(ps.map(p => [String(p.code || ''), p]));
+    for (const a of as) {
+      const code = String(a.student_code || a.device_id || '').trim();
+      if (!code || byCode.has(code)) continue;
+      byCode.set(code, {id:'derived-'+code, name:a.student_name || 'Người học', email:null, code, created_at:a.created_at});
     }
-    return res.status(200).json({ ok: true, participants, attempts });
-  } catch {
-    return res.status(502).json({ error: 'Không tải được danh sách người tham gia.' });
+    return res.status(200).json({ ok:true, participants:Array.from(byCode.values()), attempts:as, syncedAt:new Date().toISOString() });
+  } catch (e) {
+    return res.status(502).json({ error: e?.message || 'Không tải được danh sách người tham gia.' });
   }
 }
 
 async function adminAttempts(req, res) {
-  if (!await guard(req, res)) return;
+  if (!await guard(req, res, { requireService: false })) return;
   const requestedLimit = Number(req.body?.limit);
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 500) : 300;
   try {
-    const rows = await sb(`user_attempts?select=id,created_at,student_name,student_code,device_id,exam_title,score,correct,total,wrong_indexes&order=created_at.desc&limit=${limit}`);
+    const rows = await sbReadOnly(`user_attempts?select=id,created_at,student_name,student_code,device_id,exam_title,score,correct,total,wrong_indexes&order=created_at.desc&limit=${limit}`);
     if (!Array.isArray(rows)) return res.status(502).json({ error: 'Không tải được lịch sử làm bài.' });
-    return res.status(200).json({ ok: true, attempts: rows });
-  } catch {
-    return res.status(502).json({ error: 'Không tải được lịch sử làm bài.' });
+    return res.status(200).json({ ok:true, attempts:rows, syncedAt:new Date().toISOString() });
+  } catch (e) {
+    return res.status(502).json({ error:e?.message || 'Không tải được lịch sử làm bài.' });
   }
 }
 

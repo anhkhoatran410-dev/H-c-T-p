@@ -3,6 +3,7 @@ import '../lib/api/_gemini-network-guard.js';
 import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
 import adminAssistantHandler from '../lib/admin-assistant.js';
+import { supabasePublicReady, supabasePublicRequest } from '../lib/api/_supabase-public.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://mlqaeginqsgqacdqdzbm.supabase.co').trim();
 const SERVICE_KEY = String(
@@ -311,6 +312,18 @@ async function exactCount(table) {
   return Number.isFinite(total) ? total : 0;
 }
 
+async function publicExams(req, res) {
+  if (!enforceMethod(req, res, ['GET'])) return;
+  if (!sameOrigin(req, res)) return;
+  if (!supabasePublicReady()) return res.status(500).json({ error: 'Supabase public credentials chưa được cấu hình.' });
+  const result = await supabasePublicRequest(
+    'exams?status=eq.active&select=id,title,subject,difficulty,duration,question_count,questions,status,open_at,close_at,created_at&order=created_at.desc&limit=200',
+    { method: 'GET' }
+  );
+  if (!result.ok || !Array.isArray(result.data)) return res.status(502).json({ error: 'Không tải được bài kiểm tra.' });
+  return res.status(200).json({ ok: true, exams: result.data.map((e) => ({ ...e, questions: Array.isArray(e.questions) ? e.questions : [] })) });
+}
+
 async function adminSummary(req, res) {
   if (!await guard(req, res)) return;
   try {
@@ -376,6 +389,7 @@ export default async function handler(req, res) {
   applySecurityHeaders(res);
   res.setHeader('Cache-Control', 'no-store');
   const path = String(req.query?.route || '').replace(/^\/+|\/+$/g, '');
+  if (path === 'public-exams') return publicExams(req, res);
   if (path === 'admin-health') return health(req, res);
   if (path === 'admin-summary') return adminSummary(req, res);
   if (path === 'admin-users') return adminUsers(req, res);

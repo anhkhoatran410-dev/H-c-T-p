@@ -759,15 +759,31 @@
     if(!state())return;
     let e=exams().find(x=>String(x.id)===String(id));
     if(!e)return;
-    try{
-      if(!Array.isArray(e.questions)||!e.questions.length){
+
+    // The library intentionally loads lightweight metadata only. Fetch the
+    // question payload only after the learner actually opens a test.
+    if(!Array.isArray(e.questions)||!e.questions.length){
+      try{
+        const url=window.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabase.co';
+        const key=window.SUPABASE_KEY||'sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi';
+        const r=await fetch(url+"/rest/v1/exams?select=*&id=eq."+encodeURIComponent(e.id)+"&status=eq.active&limit=1",{
+          method:'GET',
+          cache:'no-store',
+          headers:{'Accept':'application/json','apikey':key,'Authorization':'Bearer '+key}
+        });
+        const rows=await r.json().catch(()=>[]);
+        if(r.ok&&Array.isArray(rows)&&rows[0])e=rows[0];
+      }catch(_){}
+    }
+    if(!Array.isArray(e.questions)||!e.questions.length){
+      try{
         if(window.loadSupabase){
           const db=await window.loadSupabase();
-          const r=await db.from('exams').select('*').eq('id',e.id).maybeSingle();
+          const r=await db.from('exams').select('*').eq('id',e.id).eq('status','active').maybeSingle();
           if(!r.error&&r.data)e=r.data;
         }
-      }
-    }catch(_){}
+      }catch(_){}
+    }
     if(!Array.isArray(e.questions)||!e.questions.length){
       alert('Đề này chưa có dữ liệu câu hỏi để mở.');
       return;

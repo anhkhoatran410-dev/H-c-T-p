@@ -162,6 +162,34 @@ async function adminUsers(req, res) {
     if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'User ID không hợp lệ.' });
 
     if (action === 'update') {
+      const full_name = String(req.body?.full_name ?? '').trim().slice(0, 120);
+      const student_code = String(req.body?.student_code ?? '').trim().slice(0, 50) || null;
+      const status = req.body?.status === 'suspended' ? 'suspended' : 'active';
+      const password = String(req.body?.password || '');
+      if (password && password.length < 8) return res.status(400).json({ error: 'Mật khẩu mới tối thiểu 8 ký tự.' });
+
+      await sb(`profiles?id=eq.${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ full_name, student_code, status, updated_at: new Date().toISOString() }),
+      });
+
+      await authAdmin(`users/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          ban_duration: status === 'suspended' ? '876000h' : 'none',
+          ...(password ? { password } : {}),
+        }),
+      });
+
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: 'Thao tác tài khoản không hợp lệ.' });
+  } catch (e) {
+    return res.status(502).json({ error: e.message || 'Không quản lý được tài khoản.' });
+  }
+}
 
 async function health(req, res) {
   applySecurityHeaders(res);

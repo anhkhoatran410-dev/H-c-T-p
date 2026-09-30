@@ -1,3 +1,4 @@
+import '../lib/api/_gemini-network-guard.js';
 import { protectGeneration } from '../lib/generation-guard.js';
 /* STUDY TH — Flashcard AI: one simple, reliable multimodal path. */
 export const maxDuration=300;
@@ -6,8 +7,6 @@ export default async function handler(req,res){
   if(!cleanup)return;
   try{
     const b=req.body||{};
-    const key=String(process.env.GEMINI_API_KEY||'').trim();
-    if(!key)return res.status(503).json({error:'GEMINI_API_KEY chưa được cấu hình trên Vercel.'});
     const names=Array.isArray(b.sourceFiles)?b.sourceFiles:[];
     const urls=Array.isArray(b.sourceUrls)?b.sourceUrls.filter(x=>/^https:\/\//i.test(String(x||''))).slice(0,8):[];
     const mimes=Array.isArray(b.mimeTypes)?b.mimeTypes:[];
@@ -27,11 +26,13 @@ export default async function handler(req,res){
       parts.push({inlineData:{mimeType:mt,data:buf.toString('base64')}});
     }
     if(!text&&parts.length===1)return res.status(400).json({error:'Thiếu nội dung tài liệu hoặc ảnh/PDF.'});
-    const models=['gemini-3.6-flash','gemini-3.5-flash','gemini-3.5-flash-lite'];
+    const configured=String(process.env.GEMINI_MODEL||'').trim();
+    const configuredFallbacks=String(process.env.GEMINI_FALLBACK_MODELS||'').split(',').map(x=>String(x||'').trim()).filter(Boolean);
+    const models=[...new Set([configured,'gemini-3.5-flash-lite','gemini-3.5-flash','gemini-3.6-flash',...configuredFallbacks].filter(Boolean))];
     let last='';
     for(const model of models){
       try{
-        const rr=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:12000}})});
+        const rr=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json'},timeoutMs:28000,body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:12000}})});
         const raw=await rr.text();let d={};try{d=raw?JSON.parse(raw):{}}catch{}
         if(!rr.ok){last=`${model}: HTTP ${rr.status}`;continue}
         const out=d?.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim()||'';

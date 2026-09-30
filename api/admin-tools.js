@@ -6,12 +6,11 @@ import adminAssistantHandler from '../lib/admin-assistant.js';
 import { supabasePublicReady, supabasePublicRequest } from '../lib/api/_supabase-public.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://mlqaeginqsgqacdqdzbm.supabase.co').trim();
-const SERVICE_KEY = String(
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.SUPABASE_SERVICE_KEY ||
-  process.env.SUPABASE_SECRET_KEY ||
-  ''
-).trim();
+const SERVICE_KEYS = [
+  process.env.SUPABASE_SECRET_KEY,
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  process.env.SUPABASE_SERVICE_KEY,
+].map(v => String(v || '').trim()).filter(Boolean).filter((v,i,a) => a.indexOf(v) === i);
 const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 
 async function guard(req, res) {
@@ -26,7 +25,7 @@ async function guard(req, res) {
     res.status(401).json({ error: 'Admin session required' });
     return false;
   }
-  if (!SERVICE_KEY || !SUPABASE_URL) {
+  if (!SERVICE_KEYS.length || !SUPABASE_URL) {
     res.status(500).json({ error: 'Thiếu SUPABASE_SERVICE_ROLE_KEY trên Vercel (có thể dùng SUPABASE_SERVICE_KEY/SUPABASE_SECRET_KEY).' });
     return false;
   }
@@ -34,40 +33,58 @@ async function guard(req, res) {
 }
 
 async function sb(path, options = {}) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    ...options,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-      ...(options.headers || {}),
-    },
-    signal: options.signal || AbortSignal.timeout(8000),
-  });
-  const text = await r.text();
-  let data = [];
-  try { data = text ? JSON.parse(text) : []; } catch { data = []; }
-  if (!r.ok) throw new Error('Supabase request failed.');
-  return data;
+  let last = new Error('Supabase request failed.');
+  for (const key of SERVICE_KEYS) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+        ...options,
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+          ...(options.headers || {}),
+        },
+        signal: options.signal || AbortSignal.timeout(8000),
+      });
+      const text = await r.text();
+      let data = [];
+      try { data = text ? JSON.parse(text) : []; } catch { data = []; }
+      if (!r.ok) {
+        last = new Error(data?.message || data?.error || `Supabase HTTP ${r.status}`);
+        continue;
+      }
+      return data;
+    } catch (e) { last = e; }
+  }
+  throw last;
 }
 
 async function authAdmin(path, options = {}) {
-  const r = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/${path}`, {
-    ...options,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    signal: options.signal || AbortSignal.timeout(9000),
-  });
-  const text = await r.text();
-  let data = {};
-  try { data = text ? JSON.parse(text) : {}; } catch {}
-  if (!r.ok) throw new Error(data?.msg || data?.message || data?.error_description || 'Supabase Auth request failed.');
-  return data;
+  let last = new Error('Supabase Auth request failed.');
+  for (const key of SERVICE_KEYS) {
+    try {
+      const r = await fetch(`${SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/${path}`, {
+        ...options,
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          ...(options.headers || {}),
+        },
+        signal: options.signal || AbortSignal.timeout(9000),
+      });
+      const text = await r.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch {}
+      if (!r.ok) {
+        last = new Error(data?.msg || data?.message || data?.error_description || `Supabase Auth HTTP ${r.status}`);
+        continue;
+      }
+      return data;
+    } catch (e) { last = e; }
+  }
+  throw last;
 }
 
 async function adminUsers(req, res) {

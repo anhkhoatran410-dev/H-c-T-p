@@ -300,34 +300,33 @@
   }
 
   function learning(){
+    const cards=Array.isArray(learnerFlashcards)?learnerFlashcards:[];
     return `
       <div class="fx-page-head">
-        <div>
-          <span class="fx-eyebrow">HỌC TẬP</span>
-          <h2>Không gian học tập</h2>
-          <p>Khu vực học tập sẽ được mở rộng ở phiên bản tiếp theo.</p>
-        </div>
+        <div><span class="fx-eyebrow">HỌC TẬP</span><h2>Không gian học tập</h2><p>Flashcard do Admin tạo sẽ được đồng bộ trực tiếp và xuất hiện tại đây.</p></div>
       </div>
       <section class="fx-learning-coming">
         <article class="fx-card fx-learning-main">
           <div class="fx-learning-icon">📚</div>
-          <span class="fx-eyebrow">ĐANG PHÁT TRIỂN</span>
-          <h3>Khu vực học tập riêng của bạn</h3>
-          <p>Phần này dành cho các nội dung học, tài liệu và lộ trình cá nhân. Hiện tại chưa đưa chức năng tạo bài kiểm tra vào đây để tránh trùng với khu vực quản trị.</p>
-          <div class="fx-learning-actions">
-            <button class="fx-btn fx-primary" data-nav="tests">Vào Thi thử →</button>
-            <button class="fx-btn fx-secondary" data-nav="ai">Hỏi AI trợ lý</button>
-          </div>
+          <span class="fx-eyebrow">FLASHCARD</span>
+          <h3>${cards.length} bộ Flashcard đang có</h3>
+          <p>Flashcard là nội dung học riêng và không bị tính vào số bài Thi thử.</p>
+          <div class="fx-learning-actions"><button class="fx-btn fx-primary" data-nav="tests">Vào Thi thử →</button><button class="fx-btn fx-secondary" data-nav="ai">Hỏi AI trợ lý</button></div>
         </article>
         <article class="fx-card fx-learning-side">
-          <span class="fx-eyebrow">DỮ LIỆU HIỆN TẠI</span>
-          <h3>Tiến độ của bạn</h3>
+          <span class="fx-eyebrow">TIẾN ĐỘ</span><h3>Tiến độ của bạn</h3>
           <div class="fx-learning-stat"><b>${metrics().total}</b><span>lượt làm bài</span></div>
           <div class="fx-learning-stat"><b>${metrics().avg}%</b><span>điểm trung bình</span></div>
           <div class="fx-learning-stat"><b>${metrics().streak}</b><span>ngày liên tiếp</span></div>
           <button class="fx-link-btn" data-nav="stats">Xem thống kê →</button>
         </article>
-      </section>`;
+      </section>
+      <article class="fx-card fx-pad" style="margin-top:18px">
+        <div class="fx-card-head"><div><span class="fx-eyebrow">BỘ TỪ VỰNG</span><h3>Flashcard đã tạo</h3><p>Dữ liệu mới tạo ở Admin sẽ xuất hiện sau khi đồng bộ.</p></div></div>
+        <div class="fx-exams">
+          ${cards.length?cards.map(function(e){return '<div class="fx-exam-row"><span>📚</span><div><b>'+esc(e.title||'Flashcard')+'</b><small>'+esc(e.subject||'')+' · '+Number(e.question_count||0)+' thẻ · '+esc(e.difficulty||'')+'</small></div><button class="fx-btn fx-primary" data-flashcard="'+esc(e.id)+'">Học ngay</button></div>';}).join(''):'<div class="fx-empty"><span>📚</span><b>Chưa có Flashcard</b><small>Khi Admin tạo bộ mới, bộ đó sẽ xuất hiện ở đây.</small></div>'}
+        </div>
+      </article>`;
   }
   function tests(){
     const list=exams();

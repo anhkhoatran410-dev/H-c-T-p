@@ -77,38 +77,41 @@ async function adminUsers(req, res) {
     if (action === 'list') {
       const page = Math.max(1, Math.trunc(Number(req.body?.page || 1)));
       const perPage = Math.min(100, Math.max(1, Math.trunc(Number(req.body?.perPage || 100))));
-      const data = await authAdmin(`users?page=${page}&per_page=${perPage}`);
-      const users = Array.isArray(data?.users) ? data.users : [];
-      const byId = new Map();
-      // Profile enrichment is best-effort. A broken/missing profiles row must
-      // never hide real Auth accounts from Admin.
-      for (const u of users) {
-        const id = String(u?.id || '');
-        if (!/^[0-9a-f-]{36}$/i.test(id)) continue;
-        try {
-          const rows = await sb(`profiles?select=id,full_name,student_code,role,status,created_at,updated_at&id=eq.${encodeURIComponent(id)}&limit=1`);
-          if (Array.isArray(rows) && rows[0]) byId.set(id, rows[0]);
-        } catch (_) {}
-      }
-      return res.status(200).json({
-        ok: true,
-        total: Number(data?.total || users.length),
-        users: users.map(u => {
-          const p = byId.get(String(u.id)) || {};
-          return {
+      // Read Auth users + public profiles through one SECURITY DEFINER RPC.
+      // This avoids the fragile Auth Admin REST -> profiles enrichment chain.
+      try {
+        const rows = await sb('rpc/admin_list_user_accounts', {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
+        const users = Array.isArray(rows) ? rows : [];
+        return res.status(200).json({
+          ok: true,
+          total: users.length,
+          users,
+        });
+      } catch (rpcError) {
+        // Fallback for projects where the RPC has not propagated yet.
+        const data = await authAdmin(`users?page=${page}&per_page=${perPage}`);
+        const users = Array.isArray(data?.users) ? data.users : [];
+        return res.status(200).json({
+          ok: true,
+          total: Number(data?.total || users.length),
+          users: users.map(u => ({
             id: u.id,
             email: u.email || '',
-            full_name: p.full_name || u.user_metadata?.full_name || '',
-            student_code: p.student_code || u.user_metadata?.student_code || '',
-            role: p.role || u.app_metadata?.role || 'student',
-            status: p.status || 'active',
+            full_name: u.user_metadata?.full_name || '',
+            student_code: u.user_metadata?.student_code || '',
+            role: u.app_metadata?.role || 'student',
+            status: 'active',
             email_confirmed: !!u.email_confirmed_at,
             last_sign_in_at: u.last_sign_in_at || null,
             created_at: u.created_at || null,
-            updated_at: p.updated_at || u.updated_at || null,
-          };
-        }),
-      });
+            updated_at: u.updated_at || null,
+          })),
+          warning: 'profile enrichment fallback',
+        });
+      }
     }
 
     const id = String(req.body?.id || '').trim();
@@ -340,8 +343,8 @@ async function adminSummary(req, res) {
     try { return await fn(); } catch (_) { return fallback; }
   };
   const [tests, students, attempts, threadRows, recentAttempts] = await Promise.all([
-    safe(() => exactCount('exams'), 0),
-    safe(() => exactCount('participants'), 0),
+    safe(() => sb('exams?select=id&status=eq.active&flashcard_only=eq.false&limit=200'), []).then(rows => Array.isArray(rows) ? rows.length : 0),
+    safe(() => sb('rpc/admin_list_user_accounts', { method: 'POST', body: JSON.stringify({}) }), []).then(rows => Array.isArray(rows) ? rows.length : 0),
     safe(() => exactCount('user_attempts'), 0),
     safe(() => sb('support_threads?select=unread_admin&limit=1000'), []),
     safe(() => sb('user_attempts?select=created_at&order=created_at.desc&limit=5'), []),

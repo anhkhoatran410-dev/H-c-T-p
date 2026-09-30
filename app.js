@@ -17,7 +17,7 @@ async function loadExams(){
   try{
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),8000);
-    const url=SUPABASE_URL+"/rest/v1/exams?select=id,title,subject,difficulty,duration,question_count,questions,status,open_at,close_at,created_at&status=eq.active&order=created_at.desc&limit=200";
+    const url=SUPABASE_URL+"/rest/v1/exams?select=id,title,subject,difficulty,duration,question_count,flashcard_only,status,open_at,close_at,created_at&status=eq.active&order=created_at.desc&limit=200";
     const r=await fetch(url,{
       method:"GET",
       cache:"no-store",
@@ -34,7 +34,7 @@ async function loadExams(){
     try{data=text?JSON.parse(text):[]}catch(_){data=[]}
     if(!r.ok)throw new Error(data?.message||data?.error_description||("Supabase HTTP "+r.status));
     if(!Array.isArray(data))throw new Error("Supabase trả về dữ liệu đề thi không hợp lệ.");
-    exams=data.map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
+    exams=data.filter(e=>e?.flashcard_only!==true).map(e=>({...e,questions:[]}));
     // Keep the global bridge in sync because app-loader exposes window.exams separately.
     try{window.exams=exams}catch(_){}
     return exams;
@@ -46,7 +46,7 @@ async function loadExams(){
     const data=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
     if(!Array.isArray(data.exams))throw new Error("API bài kiểm tra trả về dữ liệu không hợp lệ.");
-    exams=data.exams.map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
+    exams=data.exams.filter(e=>e?.flashcard_only!==true).map(e=>({...e,questions:[]}));
     try{window.exams=exams}catch(_){}
     return exams;
   }catch(e){lastError=lastError||e}
@@ -54,9 +54,9 @@ async function loadExams(){
   // 3) Supabase JS fallback.
   try{
     await loadSupabase();
-    const {data,error}=await db.from("exams").select("id,title,subject,difficulty,duration,question_count,questions,status,open_at,close_at,created_at").eq("status","active").order("created_at",{ascending:false}).limit(200);
+    const {data,error}=await db.from("exams").select("id,title,subject,difficulty,duration,question_count,flashcard_only,status,open_at,close_at,created_at").eq("status","active").order("created_at",{ascending:false}).limit(200);
     if(error)throw error;
-    exams=(data||[]).map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
+    exams=(data||[]).filter(e=>e?.flashcard_only!==true).map(e=>({...e,questions:[]}));
     try{window.exams=exams}catch(_){}
     return exams;
   }catch(e){

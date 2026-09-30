@@ -9,24 +9,60 @@ function deviceId(){let id=localStorage.getItem(DEVICE_KEY);if(!id){id=crypto.ra
 async function clientMeta(){try{const r=await fetch("/api/client-meta");return await r.json()}catch{return {ip:null,userAgent:navigator.userAgent}}}
 async function registerDevice(){try{await loadSupabase();const meta=await clientMeta();await db.from("user_devices").upsert({device_id:deviceId(),last_seen:new Date().toISOString(),last_ip:meta.ip,user_agent:meta.userAgent},{onConflict:"device_id"})}catch(e){console.warn("registerDevice",e)}}
 async function loadExams(){
+  let lastError=null;
+
+  // 1) Read directly from Supabase with the verified publishable key.
+  // This path is intentionally independent of the Admin API/service-role env,
+  // so student pages can see every active exam that the public RLS policy allows.
+  try{
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),8000);
+    const url=SUPABASE_URL+"/rest/v1/exams?select=id,title,subject,difficulty,duration,question_count,questions,status,open_at,close_at,created_at&status=eq.active&order=created_at.desc&limit=200";
+    const r=await fetch(url,{
+      method:"GET",
+      cache:"no-store",
+      headers:{
+        "Accept":"application/json",
+        "apikey":SUPABASE_KEY,
+        "Authorization":"Bearer "+SUPABASE_KEY
+      },
+      signal:controller.signal
+    });
+    clearTimeout(timer);
+    const text=await r.text();
+    let data=[];
+    try{data=text?JSON.parse(text):[]}catch(_){data=[]}
+    if(!r.ok)throw new Error(data?.message||data?.error_description||("Supabase HTTP "+r.status));
+    if(!Array.isArray(data))throw new Error("Supabase trả về dữ liệu đề thi không hợp lệ.");
+    exams=data.map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
+    // Keep the global bridge in sync because app-loader exposes window.exams separately.
+    try{window.exams=exams}catch(_){}
+    return exams;
+  }catch(e){lastError=e}
+
+  // 2) Server-side public endpoint as a secondary path.
   try{
     const r=await fetch("/api/admin-tools?route=public-exams",{method:"GET",credentials:"same-origin",cache:"no-store",headers:{"Accept":"application/json"}});
     const data=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error(data.error||("HTTP "+r.status));
-    exams=Array.isArray(data.exams)?data.exams.map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]})):[];
+    if(!Array.isArray(data.exams))throw new Error("API bài kiểm tra trả về dữ liệu không hợp lệ.");
+    exams=data.exams.map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
+    try{window.exams=exams}catch(_){}
     return exams;
-  }catch(apiError){
-    try{
-      await loadSupabase();
-      const {data,error}=await db.from("exams").select("*").eq("status","active").order("created_at",{ascending:false});
-      if(error)throw error;
-      exams=(data||[]).map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
-      return exams;
-    }catch(e){
-      console.error("loadExams",apiError,e);
-      exams=[];
-      return [];
-    }
+  }catch(e){lastError=lastError||e}
+
+  // 3) Supabase JS fallback.
+  try{
+    await loadSupabase();
+    const {data,error}=await db.from("exams").select("id,title,subject,difficulty,duration,question_count,questions,status,open_at,close_at,created_at").eq("status","active").order("created_at",{ascending:false}).limit(200);
+    if(error)throw error;
+    exams=(data||[]).map(e=>({...e,questions:Array.isArray(e.questions)?e.questions:[]}));
+    try{window.exams=exams}catch(_){}
+    return exams;
+  }catch(e){
+    console.error("loadExams",lastError,e);
+    // Do not wipe a list that was already loaded successfully.
+    return Array.isArray(exams)?exams:[];
   }
 }
 async function loadHistory(){try{const code=String(localStorage.getItem("study_code")||"").trim();const url=code?("/api/attempts?studentCode="+encodeURIComponent(code)):"/api/attempts";const r=await fetch(url,{method:"GET",credentials:"same-origin",cache:"no-store"});if(r.status===401){state.history=[];state.historyNeedsNewSession=true;return}const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||`HTTP ${r.status}`);state.history=Array.isArray(data.attempts)?data.attempts:[];state.historyNeedsNewSession=false}catch(e){console.warn("history",e);state.history=[]}}

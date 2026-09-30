@@ -450,6 +450,22 @@
         </section>
       </section>`;
   }
+  function flashcardPage(){
+    const e=state().flashcardExam;
+    const qs=Array.isArray(e?.questions)?e.questions.filter(function(q){return q&&String(q.front||q.term||'').trim()&&String(q.back||q.definition||q.answer||'').trim()}):[];
+    const idx=Math.max(0,Math.min(qs.length-1,Number(state().flashIndex||0)));
+    const q=qs[idx], flipped=!!state().flashFlipped;
+    if(!q)return '<div class="fx-empty"><b>Không có dữ liệu Flashcard.</b><button class="fx-btn fx-secondary" data-nav="learning">Quay lại</button></div>';
+    return '<div class="fx-page-head"><div><span class="fx-eyebrow">FLASHCARD</span><h2>'+esc(e.title||'Flashcard')+'</h2><p>'+String(idx+1)+'/'+String(qs.length)+' thẻ</p></div><button class="fx-btn fx-secondary" data-nav="learning">← Thoát</button></div>'
+      +'<article class="fx-card fx-pad"><div style="display:grid;gap:18px;max-width:760px;margin:0 auto">'
+      +'<button type="button" data-flip-card style="min-height:300px;border:1px solid #dce3ef;border-radius:28px;background:#fff;padding:32px;text-align:center;cursor:pointer">'
+      +'<small>'+(flipped?'NGHĨA':'TỪ / CỤM TỪ')+'</small><div style="font-size:34px;font-weight:800;margin:28px 0 14px">'+esc(flipped?(q.back||q.definition||q.answer):(q.front||q.term))+'</div>'
+      +(!flipped&&q.phonetic?'<div class="muted">'+esc(q.phonetic)+'</div>':'')
+      +(flipped&&q.example?'<div class="muted">'+esc(q.example)+'</div>':'')
+      +'<div class="muted" style="margin-top:24px">Chạm vào thẻ để lật</div></button>'
+      +'<div style="display:flex;justify-content:center;gap:10px"><button class="fx-btn fx-secondary" data-flash-prev '+(idx<=0?'disabled':'')+'>← Trước</button><button class="fx-btn fx-primary" data-flash-next '+(idx>=qs.length-1?'disabled':'')+'>Tiếp →</button></div>'
+      +'</div></article>';
+  }
   function content(){
     switch(state()?.page){
       case 'home': return dashboard();
@@ -461,6 +477,7 @@
       case 'achievements': return achievements();
       case 'settings': return settings();
       case 'support': return supportPage();
+      case 'flashcard': return flashcardPage();
       case 'subject':
       case 'exam':
       case 'result':
@@ -711,6 +728,10 @@
     root().querySelectorAll('[data-action="admin"]').forEach(b=>b.onclick=()=>{location.href='/admin/';});
     root().querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>{state().subject=b.getAttribute('data-subject');go('tests');});
     root().querySelectorAll('[data-exam]').forEach(b=>b.onclick=(e)=>{e.preventDefault();e.stopPropagation();startExamById(b.getAttribute('data-exam'))});
+    root().querySelectorAll('[data-flashcard]').forEach(b=>b.onclick=async(e)=>{e.preventDefault();e.stopPropagation();await startFlashcardById(b.getAttribute('data-flashcard'))});
+    root().querySelector('[data-flip-card]')?.addEventListener('click',()=>{state().flashFlipped=!state().flashFlipped;renderFinal()});
+    root().querySelector('[data-flash-prev]')?.addEventListener('click',()=>{state().flashIndex=Math.max(0,Number(state().flashIndex||0)-1);state().flashFlipped=false;renderFinal()});
+    root().querySelector('[data-flash-next]')?.addEventListener('click',()=>{state().flashIndex=Math.min(Number(state().flashcardExam?.questions?.length||1)-1,Number(state().flashIndex||0)+1);state().flashFlipped=false;renderFinal()});
     root().querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{
       root().querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active')); b.classList.add('active');
       const v=b.getAttribute('data-filter')||'';
@@ -732,7 +753,8 @@
 
   async function go(p){
     if(!state()) return;
-    if(p==='home'||p==='tests'||p==='subject'){try{await refreshLearnerExams();}catch(_){} }
+    if(p==='home'||p==='tests'||p==='subject'||p==='learning'){try{await refreshLearnerExams();}catch(_){}}
+    if(p==='home'||p==='learning'){try{await refreshLearnerFlashcards();}catch(_){}}
     if(p==='history'||p==='stats'||p==='achievements'){try{if(window.loadHistory)await window.loadHistory();}catch(_){}}
     state().page=p;
     renderFinal();
@@ -787,6 +809,20 @@
     box.innerHTML=rows.length?rows.map(e=>`<button data-qexam="${esc(e.id)}"><span>📝</span><div><b>${esc(e.title||'Bài kiểm tra')}</b><small>${esc(e.subject||'')}</small></div></button>`).join(''):'<div class="fx-search-empty">Không tìm thấy bài kiểm tra phù hợp.</div>';
     box.classList.add('open');
     box.querySelectorAll('[data-qexam]').forEach(b=>b.onclick=()=>startExamById(b.getAttribute('data-qexam')));
+  }
+  async function startFlashcardById(id){
+    if(!state())return;
+    let e=learnerFlashcards.find(x=>String(x.id)===String(id));
+    if(!e)return;
+    try{
+      const url=(window.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabase.co')+'/rest/v1/exams?select=*&id=eq.'+encodeURIComponent(e.id)+'&status=eq.active&flashcard_only=eq.true&limit=1';
+      const key=window.SUPABASE_KEY||'sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi';
+      const r=await fetch(url,{method:'GET',cache:'no-store',headers:{'Accept':'application/json','apikey':key,'Authorization':'Bearer '+key}});
+      const rows=await r.json().catch(()=>[]);
+      if(r.ok&&Array.isArray(rows)&&rows[0])e=rows[0];
+    }catch(_){}
+    if(!Array.isArray(e.questions)||!e.questions.length){alert('Bộ Flashcard này chưa có dữ liệu thẻ.');return;}
+    state().flashcardExam=e;state().flashIndex=0;state().flashFlipped=false;state().page='flashcard';renderFinal();
   }
   async function startExamById(id){
     if(!state())return;
@@ -916,6 +952,7 @@
             state().page='home';
             try{await window.loadExams?.();}catch(_){}
             try{await refreshLearnerExams();}catch(_){}
+            try{await refreshLearnerFlashcards();}catch(_){}
             try{await window.loadHistory?.();}catch(_){}
             renderFinal();
           }

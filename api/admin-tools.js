@@ -88,75 +88,80 @@ async function authAdmin(path, options = {}) {
 }
 
 async function adminUsers(req, res) {
-  if (!await guard(req, res)) return;
+  if (!await guard(req, res, { requireService: false })) return;
   const action = String(req.body?.action || 'list');
   try {
     if (action === 'list') {
       const page = Math.max(1, Math.trunc(Number(req.body?.page || 1)));
       const perPage = Math.min(100, Math.max(1, Math.trunc(Number(req.body?.perPage || 100))));
-      // Read Auth users + public profiles through one SECURITY DEFINER RPC.
-      // This avoids the fragile Auth Admin REST -> profiles enrichment chain.
-      try {
-        const rows = await sb('rpc/admin_list_user_accounts', {
-          method: 'POST',
-          body: JSON.stringify({}),
-        });
-        const users = Array.isArray(rows) ? rows : [];
-        return res.status(200).json({
-          ok: true,
-          total: users.length,
-          users,
-        });
-      } catch (rpcError) {
-        // Fallback for projects where the RPC has not propagated yet.
-        const data = await authAdmin(`users?page=${page}&per_page=${perPage}`);
-        const users = Array.isArray(data?.users) ? data.users : [];
-        return res.status(200).json({
-          ok: true,
-          total: Number(data?.total || users.length),
-          users: users.map(u => ({
-            id: u.id,
-            email: u.email || '',
-            full_name: u.user_metadata?.full_name || '',
-            student_code: u.user_metadata?.student_code || '',
-            role: u.app_metadata?.role || 'student',
-            status: 'active',
-            email_confirmed: !!u.email_confirmed_at,
-            last_sign_in_at: u.last_sign_in_at || null,
-            created_at: u.created_at || null,
-            updated_at: u.updated_at || null,
-          })),
-          warning: 'profile enrichment fallback',
-        });
+
+      if (SERVICE_KEYS.length) {
+        try {
+          const rows = await sb('rpc/admin_list_user_accounts', {
+            method: 'POST',
+            body: JSON.stringify({}),
+          });
+          const users = Array.isArray(rows) ? rows : [];
+          if (users.length) {
+            return res.status(200).json({ ok:true, total:users.length, users, syncedAt:new Date().toISOString() });
+          }
+        } catch (_) {}
+
+        try {
+          const data = await authAdmin('users?page=' + page + '&per_page=' + perPage);
+          const users = Array.isArray(data?.users) ? data.users : [];
+          if (users.length) {
+            return res.status(200).json({
+              ok:true,
+              total:Number(data?.total || users.length),
+              users:users.map(u=>({
+                id:u.id,
+                email:u.email||'',
+                full_name:u.user_metadata?.full_name||'',
+                student_code:u.user_metadata?.student_code||'',
+                role:u.app_metadata?.role||'student',
+                status:'active',
+                email_confirmed:!!u.email_confirmed_at,
+                last_sign_in_at:u.last_sign_in_at||null,
+                created_at:u.created_at||null,
+                updated_at:u.updated_at||null
+              })),
+              syncedAt:new Date().toISOString()
+            });
+          }
+        } catch (_) {}
       }
+
+      const rows = await sbReadOnly('admin_student_accounts_snapshot?select=id,full_name,student_code,role,status,created_at,updated_at,email_masked&order=created_at.desc&limit=100');
+      const users = Array.isArray(rows) ? rows.map(u=>({
+        id:u.id,
+        email:u.email_masked||'—',
+        full_name:u.full_name||'',
+        student_code:u.student_code||'',
+        role:u.role||'student',
+        status:u.status||'active',
+        email_confirmed:true,
+        last_sign_in_at:null,
+        created_at:u.created_at||null,
+        updated_at:u.updated_at||null
+      })) : [];
+      return res.status(200).json({
+        ok:true,
+        total:users.length,
+        users,
+        warning:'safe profile snapshot',
+        syncedAt:new Date().toISOString()
+      });
+    }
+
+    if (!SERVICE_KEYS.length) {
+      return res.status(503).json({error:'Chức năng chỉnh sửa tài khoản cần khóa Supabase server trên Vercel.'});
     }
 
     const id = String(req.body?.id || '').trim();
     if (!/^[0-9a-f-]{36}$/i.test(id)) return res.status(400).json({ error: 'User ID không hợp lệ.' });
 
     if (action === 'update') {
-      const full_name = String(req.body?.full_name ?? '').trim().slice(0, 120);
-      const student_code = String(req.body?.student_code ?? '').trim().slice(0, 50) || null;
-      const status = req.body?.status === 'suspended' ? 'suspended' : 'active';
-      const password = String(req.body?.password || '');
-      if (password && password.length < 8) return res.status(400).json({ error: 'Mật khẩu mới tối thiểu 8 ký tự.' });
-      await sb(`profiles?id=eq.${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ full_name, student_code, status, updated_at: new Date().toISOString() }),
-      });
-      await authAdmin(`users/${encodeURIComponent(id)}`, {
-        method: 'PUT',
-        body: JSON.stringify({ ban_duration: status === 'suspended' ? '876000h' : 'none', ...(password ? { password } : {}) }),
-      });
-      return res.status(200).json({ ok: true });
-    }
-
-    return res.status(400).json({ error: 'Thao tác tài khoản không hợp lệ.' });
-  } catch (e) {
-    return res.status(502).json({ error: e.message || 'Không quản lý được tài khoản.' });
-  }
-}
 
 async function health(req, res) {
   applySecurityHeaders(res);
@@ -367,7 +372,7 @@ async function adminSummary(req, res) {
   if (!await guard(req, res, { requireService: false })) return;
   const safe = async (fn, fallback) => { try { return await fn(); } catch (_) { return fallback; } };
   const testRows = await safe(() => sbReadOnly('exams?select=id&status=eq.active&flashcard_only=eq.false&limit=200'), []);
-  const attemptRows = await safe(() => sbReadOnly('user_attempts?select=id,created_at&order=created_at.desc&limit=500'), []);
+  const attemptRows = await safe(() => sbReadOnly('admin_attempts_snapshot?select=id,created_at&order=created_at.desc&limit=500'), []);
   const threadRows = await safe(() => sbReadOnly('support_threads?select=unread_admin&limit=1000'), []);
   let students = 0;
   if (SERVICE_KEYS.length) {
@@ -388,8 +393,8 @@ async function adminParticipants(req, res) {
   if (!await guard(req, res, { requireService: false })) return;
   try {
     const [participants, attempts] = await Promise.all([
-      sbReadOnly('participants?select=id,name,email,code,created_at&order=created_at.desc&limit=500'),
-      sbReadOnly('user_attempts?select=id,device_id,student_code,score,created_at&order=created_at.desc&limit=1000'),
+      sbReadOnly('admin_participants_snapshot?select=id,name,code,created_at,attempts_count,latest_activity,latest_score&order=created_at.desc&limit=500'),
+      sbReadOnly('admin_attempts_snapshot?select=id,student_name,student_code,score,created_at&order=created_at.desc&limit=1000'),
     ]);
     const ps = Array.isArray(participants) ? participants : [];
     const as = Array.isArray(attempts) ? attempts : [];
@@ -413,7 +418,7 @@ async function adminAttempts(req, res) {
   const requestedLimit = Number(req.body?.limit);
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 500) : 300;
   try {
-    const rows = await sbReadOnly(`user_attempts?select=id,created_at,student_name,student_code,device_id,exam_title,score,correct,total,wrong_indexes&order=created_at.desc&limit=${limit}`);
+    const rows = await sbReadOnly(`admin_attempts_snapshot?select=id,created_at,student_name,student_code,exam_title,score,correct,total,wrong_count&order=created_at.desc&limit=${limit}`);
     if (!Array.isArray(rows)) return res.status(502).json({ error: 'Không tải được lịch sử làm bài.' });
     return res.status(200).json({ ok:true, attempts:rows, syncedAt:new Date().toISOString() });
   } catch (e) {

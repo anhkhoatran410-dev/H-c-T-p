@@ -699,7 +699,7 @@
     root().querySelectorAll('[data-action="logout"]').forEach(b=>b.onclick=logout);
     root().querySelectorAll('[data-action="admin"]').forEach(b=>b.onclick=()=>{location.href='/admin/';});
     root().querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>{state().subject=b.getAttribute('data-subject');go('tests');});
-    root().querySelectorAll('[data-exam]').forEach(b=>b.onclick=()=>startExamById(b.getAttribute('data-exam')));
+    root().querySelectorAll('[data-exam]').forEach(b=>b.onclick=(e)=>{e.preventDefault();e.stopPropagation();startExamById(b.getAttribute('data-exam'))});
     root().querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{
       root().querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active')); b.classList.add('active');
       const v=b.getAttribute('data-filter')||'';

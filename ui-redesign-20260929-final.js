@@ -84,19 +84,62 @@
   // legacy app-loader bridge. This guarantees the dashboard and Thi thử page
   // see the same active exams that the public server endpoint exposes.
   async function refreshLearnerExams(){
+    const normalize=function(rows){
+      return (Array.isArray(rows)?rows:[])
+        .filter(function(e){return e && e.flashcard_only!==true && String(e.status||'active')==='active';})
+        .map(function(e){return Object.assign({},e,{questions:Array.isArray(e.questions)?e.questions:[]});});
+    };
+    let lastError=null;
+
+    // Primary path: read the public Supabase table directly. The student app
+    // must not depend on an Admin-only route or on server-side service keys.
+    try{
+      const base=(window.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabase.co').replace(/\/$/,'');
+      const key=window.SUPABASE_KEY||'sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi';
+      const r=await fetch(base+'/rest/v1/exams?select=id,title,subject,difficulty,duration,question_count,flashcard_only,status,open_at,close_at,created_at&status=eq.active&order=created_at.desc&limit=200',{
+        method:'GET',cache:'no-store',
+        headers:{'Accept':'application/json','apikey':key,'Authorization':'Bearer '+key}
+      });
+      const d=await r.json().catch(function(){return [];});
+      if(!r.ok || !Array.isArray(d)) throw new Error('Supabase HTTP '+r.status);
+      learnerExams=normalize(d);
+      try{window.exams=learnerExams;}catch(_){}
+      learnerLastSyncAt=Date.now();
+      learnerSyncState='Đã đồng bộ';
+      return learnerExams;
+    }catch(e){ lastError=e; }
+
+    // Secondary path: same-origin public endpoint.
     try{
       const r=await fetch('/api/admin-tools?route=public-exams',{method:'GET',credentials:'same-origin',cache:'no-store',headers:{'Accept':'application/json'}});
-      const d=await r.json().catch(()=>({}));
+      const d=await r.json().catch(function(){return {};});
       if(!r.ok || !Array.isArray(d.exams)) throw new Error(d?.error || ('HTTP '+r.status));
-      learnerExams=d.exams.filter(function(e){return e && e.flashcard_only!==true;}).map(function(e){return Object.assign({},e,{questions:Array.isArray(e.questions)?e.questions:[]});});
-      try{window.exams=learnerExams;}catch(_){ }
-      learnerLastSyncAt=Date.now(); learnerSyncState='Đã đồng bộ';
+      learnerExams=normalize(d.exams);
+      try{window.exams=learnerExams;}catch(_){}
+      learnerLastSyncAt=Date.now();
+      learnerSyncState='Đã đồng bộ';
       return learnerExams;
-    }catch(e){
-      // Keep an already loaded list when a later refresh temporarily fails.
-      if(Array.isArray(learnerExams) && learnerExams.length) return learnerExams;
-      return exams();
-    }
+    }catch(e){ lastError=lastError||e; }
+
+    // Tertiary path: let the legacy loader try its own direct Supabase path.
+    try{
+      if(typeof window.loadExams==='function'){
+        const rows=await window.loadExams();
+        if(Array.isArray(rows) && rows.length){
+          learnerExams=normalize(rows);
+          try{window.exams=learnerExams;}catch(_){}
+          learnerLastSyncAt=Date.now();
+          learnerSyncState='Đã đồng bộ';
+          return learnerExams;
+        }
+      }
+    }catch(e){ lastError=lastError||e; }
+
+    // Never recurse through exams() here: when both arrays are empty that
+    // previously created a recursion loop and left the page apparently frozen.
+    learnerSyncState='Chưa đồng bộ được';
+    if(lastError) console.warn('[STUDY learner exams]',lastError);
+    return Array.isArray(learnerExams)?learnerExams:[];
   }
   async function refreshLearnerFlashcards(){
     try{
@@ -749,6 +792,21 @@
     root().querySelectorAll('[data-action="theme"]').forEach(b=>b.onclick=toggleTheme);
     root().querySelectorAll('[data-action="profile"]').forEach(b=>b.onclick=openProfile);
     root().querySelectorAll('[data-action="logout"]').forEach(b=>b.onclick=logout);
+    root().querySelectorAll('[data-action="refresh-data"]').forEach(b=>b.onclick=async(e)=>{
+      e.preventDefault();
+      const btn=e.currentTarget;
+      if(btn.dataset.busy==='1')return;
+      btn.dataset.busy='1';
+      const oldText=btn.textContent;
+      btn.textContent='Đang cập nhật…';
+      try{
+        await refreshLearnerExams();
+        await refreshLearnerFlashcards();
+      }finally{
+        btn.dataset.busy='0';
+        renderFinal();
+      }
+    });
     root().querySelectorAll('[data-action="admin"]').forEach(b=>b.onclick=()=>{location.href='/admin/';});
     root().querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>{state().subject=b.getAttribute('data-subject');go('tests');});
     root().querySelectorAll('[data-exam]').forEach(b=>b.onclick=(e)=>{e.preventDefault();e.stopPropagation();startExamById(b.getAttribute('data-exam'))});
@@ -962,6 +1020,11 @@
     renderFinal();
     document.body.classList.remove('redesign-pending');
     document.documentElement.classList.remove('fx-final-booting');
+
+    // Public exam metadata is safe to read before login. Prime the learner
+    // cache so the dashboard never renders a false "0 đề" while data exists.
+    try{await refreshLearnerExams();}catch(_){}
+    try{await refreshLearnerFlashcards();}catch(_){}
 
     // Reconcile with the real server-side student session after the runtime becomes ready.
     if(window.loadSupabase){

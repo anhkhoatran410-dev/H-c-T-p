@@ -738,7 +738,11 @@
           state().code='';
           state().preview=true;
         }
-        try{await window.loadExams?.();}catch(_){}
+        // Backup/preview login must receive the same live exam catalog as a
+        // normal account. The old branch only called legacy loadExams(), which
+        // could leave window.exams empty and made the dashboard show 0 đề.
+        try{await refreshLearnerExams();}catch(_){}
+        try{await refreshLearnerFlashcards();}catch(_){}
         try{await window.loadHistory?.();}catch(_){}
         renderFinal();
         return;

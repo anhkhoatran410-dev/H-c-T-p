@@ -720,7 +720,12 @@
         state().candidate=data.user.full_name||n;
         state().code=data.user.student_code||c;
       }
+      // Always hydrate from the same public endpoint used by the learner dashboard.
+      // loadExams() is a legacy path and can leave window.exams empty even though
+      // the Admin list already contains active tests.
       try{await window.loadExams?.();}catch(_){}
+      try{await refreshLearnerExams();}catch(_){}
+      try{await refreshLearnerFlashcards();}catch(_){}
       try{await window.loadHistory?.();}catch(_){}
       renderFinal();
     }catch(e){

@@ -11,6 +11,7 @@ const SERVICE_KEYS = [
   process.env.SUPABASE_SERVICE_ROLE_KEY,
   process.env.SUPABASE_SERVICE_KEY,
 ].map(v => String(v || '').trim()).filter(Boolean).filter((v,i,a) => a.indexOf(v) === i);
+const SERVICE_KEY = SERVICE_KEYS[0] || '';
 const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-3.5-flash-lite'];
 
 async function guard(req, res, options = {}) {
@@ -365,19 +366,53 @@ async function sbReadOnly(path) {
   }
 }
 
-async function exactCount(table) {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?select=id`, {
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      Prefer: 'count=exact',
-      Range: '0-0',
-    },
-    signal: AbortSignal.timeout(7000),
-  });
-  if (!r.ok) throw new Error('Count failed');
-  const range = String(r.headers.get('content-range') || '');
-  const total = range.includes('/') ? Number(range.split('/').pop()) : 0;
+async function exactCount(table, filter = '') {
+  const qs = `select=id${filter ? '&' + filter : ''}`;
+  let last = new Error('Count failed');
+  for (const key of SERVICE_KEYS) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${qs}`, {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+          Prefer: 'count=exact',
+          Range: '0-0',
+        },
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!r.ok) {
+        last = new Error(`HTTP ${r.status}`);
+        continue;
+      }
+      const range = String(r.headers.get('content-range') || '');
+      if (range.includes('/')) {
+        const total = Number(range.split('/').pop());
+        if (Number.isFinite(total)) return total;
+      }
+    } catch (e) { last = e; }
+  }
+  try {
+    const result = await supabasePublicRequest(`${table}?${qs}`, {
+      method: 'GET',
+      headers: { Prefer: 'count=exact', Range: '0-0' },
+    });
+    if (result.ok) {
+      const range = String(result.headers?.get?.('content-range') || '');
+      const total = range.includes('/') ? Number(range.split('/').pop()) : NaN;
+      if (Number.isFinite(total)) return total;
+    }
+  } catch (e) { last = e; }
+  throw last;
+}
+
+async function getAdminSummaryCounts() {
+  const [tests, students, attempts] = await Promise.all([
+    exactCount('exams', 'status=eq.active&flashcard_only=eq.false').catch(() => 0),
+    exactCount('admin_student_accounts_snapshot').catch(() => 0),
+    exactCount('admin_attempts_snapshot').catch(() => 0),
+  ]);
+  return { tests, students, attempts };
+}
   return Number.isFinite(total) ? total : 0;
 }
 
@@ -399,29 +434,15 @@ async function publicExams(req, res) {
 async function adminSummary(req, res) {
   if (!await guard(req, res, { requireService: false })) return;
   const safe = async (fn, fallback) => { try { return await fn(); } catch (_) { return fallback; } };
-  const testRows = await safe(() => sbReadOnly('exams?select=id&status=eq.active&flashcard_only=eq.false&limit=200'), []);
-  const attemptRows = await safe(() => sbReadOnly('admin_attempts_snapshot?select=id,created_at&order=created_at.desc&limit=500'), []);
-  const threadRows = await safe(() => sbReadOnly('support_threads?select=unread_admin&limit=1000'), []);
-  let students = 0;
-  if (SERVICE_KEYS.length) {
-    students = await safe(() => sb('rpc/admin_list_user_accounts', {method:'POST',body:JSON.stringify({})}), []).then(rows => Array.isArray(rows) ? rows.length : 0);
-  }
-  if (!students) {
-    students = await safe(
-      () => sbReadOnly('admin_student_accounts_snapshot?select=id&limit=500'),
-      []
-    ).then(rows => Array.isArray(rows) ? rows.length : 0);
-  }
-  if (!students) {
-    students = await safe(() => sbReadOnly('profiles?select=id&role=eq.student&limit=500'), []).then(rows => Array.isArray(rows) ? rows.length : 0);
-  }
-  if (!students) {
-    students = await safe(() => sbReadOnly('participants?select=id&limit=500'), []).then(rows => Array.isArray(rows) ? rows.length : 0);
-  }
+  const [countStats, attemptRows, threadRows] = await Promise.all([
+    getAdminSummaryCounts(),
+    safe(() => sbReadOnly('admin_attempts_snapshot?select=id,created_at&order=created_at.desc&limit=20'), []),
+    safe(() => sbReadOnly('support_threads?select=unread_admin&limit=2000'), []),
+  ]);
   const unread = (threadRows || []).reduce((sum, row) => sum + Number(row.unread_admin || 0), 0);
   return res.status(200).json({
     ok: true,
-    stats: { tests: testRows.length, students, attempts: attemptRows.length, unread },
+    stats: { tests: countStats.tests, students: countStats.students, attempts: countStats.attempts, unread },
     recentActivity: Array.isArray(attemptRows) ? attemptRows.slice(0,5) : [],
     syncedAt: new Date().toISOString(),
   });
@@ -464,24 +485,41 @@ async function adminParticipants(req, res) {
         latest_score: p.latest_score ?? null
       } : p);
     }
+    const derived = new Map();
     for (const a of as) {
       const code = String(a.student_code || a.device_id || '').trim();
       const k = code ? code : ('attempt:' + String(a.id || ''));
+      const item = derived.get(k) || {
+        count: 0,
+        latest_activity: null,
+        latest_score: null,
+        name: a.student_name || 'Người học',
+        code: code || '—',
+        created_at: a.created_at || null,
+      };
+      item.count += 1;
+      const at = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const et = item.latest_activity ? new Date(item.latest_activity).getTime() : 0;
+      if (at >= et) {
+        item.latest_activity = a.created_at || item.latest_activity;
+        item.latest_score = a.score == null ? item.latest_score : Number(a.score);
+      }
+      derived.set(k, item);
+    }
+    for (const [k, item] of derived) {
       const existing = byCode.get(k);
       if (existing) {
-        const at = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const et = existing.latest_activity ? new Date(existing.latest_activity).getTime() : 0;
-        if (at >= et) {
-          existing.latest_activity = a.created_at || existing.latest_activity;
-          existing.latest_score = a.score == null ? existing.latest_score : Number(a.score);
+        existing.attempts_count = Math.max(Number(existing.attempts_count || 0), item.count);
+        if (!existing.latest_activity || new Date(item.latest_activity || 0).getTime() >= new Date(existing.latest_activity || 0).getTime()) {
+          existing.latest_activity = item.latest_activity || existing.latest_activity;
+          existing.latest_score = item.latest_score == null ? existing.latest_score : item.latest_score;
         }
-        existing.attempts_count = Math.max(Number(existing.attempts_count || 0), 1);
       } else {
         byCode.set(k, {
-          id:'derived-'+String(a.id || Date.now()),
-          name:a.student_name || 'Người học', email:null, code:code || '—',
-          created_at:a.created_at || null, attempts_count:1,
-          latest_activity:a.created_at || null, latest_score:a.score == null ? null : Number(a.score)
+          id:'derived-'+String(k),
+          name:item.name || 'Người học', email:null, code:item.code,
+          created_at:item.created_at || null, attempts_count:item.count,
+          latest_activity:item.latest_activity || null, latest_score:item.latest_score
         });
       }
     }

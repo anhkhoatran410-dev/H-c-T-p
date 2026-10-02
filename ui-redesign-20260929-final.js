@@ -410,7 +410,7 @@
       </article>`;
   }
   function examRow(e){
-    const n=Array.isArray(e.questions)?e.questions.length:Number(e.question_count||0);
+    const n=(Array.isArray(e.questions)&&e.questions.length)?e.questions.length:Number(e.question_count||0);
     return `<div class="fx-exam-row" data-subject="${esc(e.subject||'')}"><span>📝</span><div><b>${esc(e.title||'Bài kiểm tra')}</b><small>${esc(e.subject||'')} · ${n} câu · ${Number(e.duration||0)} phút · ${esc(e.difficulty||'')}</small></div><button class="fx-btn fx-primary" data-exam="${esc(e.id)}">Bắt đầu</button></div>`;
   }
 

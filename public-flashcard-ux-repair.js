@@ -38,7 +38,7 @@ function style(){
  '.fx-flash-dots{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:16px}',
  '.fx-flash-dots i{width:11px;height:11px;border-radius:50%;background:#d9e1f1;display:block;transition:transform .15s ease,background .15s ease}',
  '.fx-flash-dots i.active{background:#5d66e8;transform:scale(1.15)}',
- '@media(max-width:700px){.fx-learning-actions{grid-template-columns:1fr}.fx-library-head{align-items:flex-start;flex-direction:column}.fx-flashcard-card,.fx-content button[data-flip-card]:first-child{min-height:330px!important;padding:28px 20px!important}.fx-flashcard-card>div,.fx-content button[data-flip-card]:first-child>div{font-size:34px!important}.fx-flashcard-card .muted,.fx-content button[data-flip-card]:first-child .muted{font-size:17px!important}}'
+ '@media(max-width:700px){.fx-learning-coming{grid-template-columns:1fr!important}.fx-learning-coming>.fx-learning-main{grid-column:1!important;grid-row:1!important}.fx-learning-coming>#studyFlashLibraryRepair{grid-column:1!important;grid-row:2!important}.fx-learning-coming>.fx-learning-side{grid-column:1!important;grid-row:3!important}.fx-learning-actions{grid-template-columns:1fr}.fx-library-head{align-items:flex-start;flex-direction:column}.fx-flashcard-card,.fx-content button[data-flip-card]:first-child{min-height:330px!important;padding:28px 20px!important}.fx-flashcard-card>div,.fx-content button[data-flip-card]:first-child>div{font-size:34px!important}.fx-flashcard-card .muted,.fx-content button[data-flip-card]:first-child .muted{font-size:17px!important}}'
  ].join('');
  document.head.appendChild(s);
 }
@@ -87,7 +87,8 @@ function repairLearning(){
  const root=document.getElementById('app');if(!root)return;
  const card=root.querySelector('.fx-learning-main');if(!card)return;
  const coming=root.querySelector('.fx-learning-coming');
- const saved=root.querySelector('#studyFlashLibraryRepair');
+ let saved=root.querySelector('#studyFlashLibraryRepair');
+ if(!saved&&coming&&coming.nextElementSibling?.matches('.fx-card.fx-pad')&&coming.nextElementSibling.querySelector('[data-flashcard]')){saved=coming.nextElementSibling;saved.id='studyFlashLibraryRepair'}
  if(coming&&saved&&saved.parentElement!==coming)coming.appendChild(saved);
  const row=root.querySelector('.fx-exam-row [data-flashcard]')?.closest('.fx-exam-row');
  const primary=card.querySelector('.fx-learning-actions .fx-primary');const secondary=card.querySelector('.fx-learning-actions .fx-secondary');

@@ -8,6 +8,10 @@ function style(){
  const s=document.createElement('style');s.id='study-flashcard-ux-repair-style';
  s.textContent=[
  '.fx-learning-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:10px!important}',
+ '.fx-learning-coming{display:grid!important;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:18px!important;align-items:start}',
+ '.fx-learning-coming>.fx-learning-main{grid-column:1;grid-row:1}',
+ '.fx-learning-coming>.fx-learning-side{grid-column:2;grid-row:1}',
+ '.fx-learning-coming>#studyFlashLibraryRepair{grid-column:1/-1;grid-row:2;margin-top:0}',
  '.fx-learning-actions .fx-btn{width:100%;justify-content:center}',
  '.fx-library-section{margin-top:18px}',
  '.fx-library-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:0 2px 10px}',
@@ -29,6 +33,7 @@ function style(){
  '.fx-flash-meta b{font-size:13px;color:#64718a}',
  '.fx-flash-actions,.fx-flash-nav{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}',
  '.fx-flash-actions{margin-top:14px}',
+ '.fx-flash-repair-actions{display:flex;justify-content:center;margin-top:14px}',
  '.fx-flash-nav{margin-top:10px}',
  '.fx-flash-dots{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:16px}',
  '.fx-flash-dots i{width:11px;height:11px;border-radius:50%;background:#d9e1f1;display:block;transition:transform .15s ease,background .15s ease}',
@@ -57,7 +62,8 @@ async function openFlashcard(id){
 }
 async function repairTests(){
  const root=document.getElementById('app');if(!root||!root.querySelector('.fx-test-count'))return;
- if(root.querySelector('#studyFlashLibraryRepair'))return;
+ if(root.querySelector('#studyFlashLibraryRepair')||root.dataset.flashRepairBusy==='1')return;
+ root.dataset.flashRepairBusy='1';
  const cards=await getFlashcards();
  const rows=root.querySelectorAll('[data-exam]');
  // Correct visible counts even when the main library intentionally stores lightweight metadata.
@@ -67,18 +73,22 @@ async function repairTests(){
    const rr=await fetch(SUPABASE_URL+'/rest/v1/exams?select=question_count&id=eq.'+encodeURIComponent(b.getAttribute('data-exam'))+'&limit=1',{method:'GET',cache:'no-store',headers:{Accept:'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY}});const dd=await rr.json().catch(()=>[]);const n=Array.isArray(dd)&&dd[0]?Number(dd[0].question_count||0):0;if(n)small.textContent=small.textContent.replace(/·\s*0\s*câu\s*·/,'· '+n+' câu ·');
   }catch(_){}
  }}
- if(!cards.length)return;
+ if(!cards.length){root.dataset.flashRepairBusy='0';return;}
  const section=document.createElement('section');section.id='studyFlashLibraryRepair';section.className='fx-library-section fx-flash-library';
  section.innerHTML='<div class="fx-library-head"><div><span class="fx-eyebrow">FLASHCARD</span><h3>'+cards.length+' bộ Flashcard</h3></div><button type="button" class="fx-link-btn" data-flash-repair-learning>Vào Học tập →</button></div><article class="fx-card fx-pad"><div class="fx-exams">'+cards.map(function(e){return '<div class="fx-exam-row fx-flash-row"><span>📚</span><div><b>'+esc0(e.title||'Flashcard')+'</b><small>'+esc0(e.subject||'')+' · '+Number(e.question_count||0)+' thẻ · '+esc0(e.difficulty||'')+'</small></div><button type="button" class="fx-btn fx-primary" data-flash-repair="'+esc0(e.id)+'">Học ngay</button></div>'}).join('')+'</div></article>';
  const host=root.querySelector('#fxExamList')?.closest('.fx-card')?.parentElement||root.querySelector('.fx-content')||root;
  host.appendChild(section);
  section.querySelectorAll('[data-flash-repair]').forEach(b=>b.onclick=function(e){e.preventDefault();e.stopPropagation();openFlashcard(b.getAttribute('data-flash-repair'))});
  section.querySelector('[data-flash-repair-learning]')?.addEventListener('click',function(){window.studentGoV2?window.studentGoV2('learning'):window.go&&window.go('learning')});
+ root.dataset.flashRepairBusy='0';
 }
 function esc0(v){return String(v==null?'':v).replace(/[&<>\"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]||c})}
 function repairLearning(){
  const root=document.getElementById('app');if(!root)return;
  const card=root.querySelector('.fx-learning-main');if(!card)return;
+ const coming=root.querySelector('.fx-learning-coming');
+ const saved=root.querySelector('#studyFlashLibraryRepair');
+ if(coming&&saved&&saved.parentElement!==coming)coming.appendChild(saved);
  const row=root.querySelector('.fx-exam-row [data-flashcard]')?.closest('.fx-exam-row');
  const primary=card.querySelector('.fx-learning-actions .fx-primary');const secondary=card.querySelector('.fx-learning-actions .fx-secondary');
  if(row&&primary){const src=row.querySelector('[data-flashcard]');primary.removeAttribute('data-nav');primary.onclick=function(e){e.preventDefault();e.stopPropagation();src.click()};primary.textContent='Học Flashcard →'}
@@ -90,6 +100,15 @@ function repairFlashInteractions(){
   if(flip){e.preventDefault();e.stopImmediatePropagation();if(window.state){window.state.flashFlipped=!window.state.flashFlipped;(window.__studyThFinalRender||window.render||function(){})();}return}
  },true);
 }
-function run(){style();repairLearning();const p=new MutationObserver(function(){repairLearning();const r=document.getElementById('app');if(r&&r.querySelector('.fx-test-count'))repairTests()});const root=document.getElementById('app');if(root)p.observe(root,{childList:true,subtree:true});repairTests();repairFlashInteractions()}
+function repairFlashcardPage(){
+ const root=document.getElementById('app');if(!root)return;
+ const card=root.querySelector('button[data-flip-card]');if(!card)return;
+ if(!root.querySelector('[data-flip-extra]')){
+  const wrap=document.createElement('div');wrap.setAttribute('data-flip-extra','1');wrap.className='fx-flash-repair-actions';
+  const b=document.createElement('button');b.type='button';b.className='fx-btn fx-secondary';b.setAttribute('data-flip-card','repair');b.textContent='↻ Lật thẻ';
+  wrap.appendChild(b);card.parentElement?.insertBefore(wrap,card.nextElementSibling||null);
+ }
+}
+function run(){style();repairLearning();repairFlashcardPage();const p=new MutationObserver(function(){repairLearning();repairFlashcardPage();const r=document.getElementById('app');if(r&&r.querySelector('.fx-test-count'))repairTests()});const root=document.getElementById('app');if(root)p.observe(root,{childList:true,subtree:true});repairTests();repairFlashInteractions()}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
 })();

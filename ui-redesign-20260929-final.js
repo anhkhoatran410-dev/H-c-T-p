@@ -267,6 +267,37 @@
     s.textContent='.fx-sync-bar{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 12px;border:1px solid #dbe4f2;border-radius:14px;background:#f8fbff}.fx-sync-dot{width:9px;height:9px;border-radius:50%;background:#35b878;flex:none}.fx-sync-bar>div{min-width:0;flex:1}.fx-sync-bar b{display:block;font-size:12px}.fx-sync-bar small{display:block;color:#718096;font-size:10px;margin-top:2px}.fx-sync-bar button{border:1px solid #d7e0ef;background:#fff;border-radius:10px;padding:7px 9px;font:inherit;font-size:10px;cursor:pointer;white-space:nowrap}';
     document.head.appendChild(s);
   }
+  function ensureFlashcardStyle(){
+    if(document.getElementById('study-flashcard-native-style'))return;
+    const s=document.createElement('style');s.id='study-flashcard-native-style';
+    s.textContent=[
+      '.fx-learning-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:10px!important}',
+      '.fx-learning-actions .fx-btn{width:100%;justify-content:center}',
+      '.fx-library-section{margin-top:18px}',
+      '.fx-library-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:0 2px 10px}',
+      '.fx-library-head h3{margin:4px 0 0}',
+      '.fx-library-head small{color:#7a879a}',
+      '.fx-flashcard-card{position:relative;overflow:hidden;min-height:360px;width:100%;border:1px solid #cfd8ff;border-radius:28px;background:linear-gradient(145deg,#ecefff 0%,#f9fbff 50%,#eef3ff 100%);color:#18275c;box-shadow:0 18px 40px rgba(47,72,150,.11);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px 28px;cursor:pointer;touch-action:manipulation;transition:transform .18s ease,box-shadow .18s ease}',
+      '.fx-flashcard-card:hover{transform:translateY(-2px);box-shadow:0 24px 50px rgba(47,72,150,.16)}',
+      '.fx-flashcard-card:active{transform:scale(.992)}',
+      '.fx-flashcard-card.is-back{background:linear-gradient(145deg,#f5f8ff,#edf5ff);border-color:#b9cff8}',
+      '.fx-flash-kind{font-size:12px;letter-spacing:2px;font-weight:800;color:#5870c9}',
+      '.fx-flash-word{font-size:42px;line-height:1.18;font-weight:800;margin:22px 0 10px;color:#17275c}',
+      '.fx-flash-example,.fx-flash-phonetic{display:block;font-size:19px;line-height:1.5;color:#73809a;max-width:90%}',
+      '.fx-flash-hint{margin-top:28px;font-size:15px;color:#6c7890}',
+      '.fx-flash-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}',
+      '.fx-flash-meta span{display:inline-flex;align-items:center;padding:8px 14px;border-radius:999px;background:#eef2ff;color:#4558b7;font-weight:800}',
+      '.fx-flash-meta b{font-size:13px;color:#64718a}',
+      '.fx-flash-actions,.fx-flash-nav{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}',
+      '.fx-flash-actions{margin-top:14px}',
+      '.fx-flash-nav{margin-top:10px}',
+      '.fx-flash-dots{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:16px}',
+      '.fx-flash-dots i{width:11px;height:11px;border-radius:50%;background:#d9e1f1;display:block}',
+      '.fx-flash-dots i.active{background:#5d66e8;transform:scale(1.15)}',
+      '@media(max-width:700px){.fx-learning-actions{grid-template-columns:1fr}.fx-library-head{align-items:flex-start;flex-direction:column}.fx-flashcard-card{min-height:330px;padding:28px 20px}.fx-flash-word{font-size:34px}.fx-flash-example,.fx-flash-phonetic{font-size:17px}}'
+    ].join('');
+    document.head.appendChild(s);
+  }
   function shell(content){
     const p=state()?.page || 'home';
     const renderNav=(items)=>items.map(([k,ic,label])=>`<button class="fx-nav-item ${p===k?'active':''}" data-nav="${k}"><span>${ic}</span><b>${label}</b></button>`).join('');
@@ -365,7 +396,7 @@
           <span class="fx-eyebrow">FLASHCARD</span>
           <h3>${cards.length} bộ Flashcard đang có</h3>
           <p>Flashcard là nội dung học riêng và không bị tính vào số bài Thi thử.</p>
-          <div class="fx-learning-actions"><button class="fx-btn fx-primary" data-nav="tests">Vào Thi thử →</button><button class="fx-btn fx-secondary" data-nav="ai">Hỏi AI trợ lý</button></div>
+          <div class="fx-learning-actions">${cards.length?'<button class="fx-btn fx-primary" data-flashcard="'+esc(cards[0].id)+'">Học Flashcard →</button>':'<button class="fx-btn fx-primary" data-nav="tests">Xem bài kiểm tra →</button>'}<button class="fx-btn fx-secondary" data-nav="tests">Xem bài kiểm tra →</button></div>
         </article>
         <article class="fx-card fx-learning-side">
           <span class="fx-eyebrow">TIẾN ĐỘ</span><h3>Tiến độ của bạn</h3>
@@ -390,24 +421,26 @@
   }
   function tests(){
     const list=exams();
+    const cards=Array.isArray(learnerFlashcards)?learnerFlashcards:[];
     const activeSubjects=Array.from(new Set(list.map(e=>String(e.subject||'').trim()).filter(Boolean)));
     const filterSubjects=activeSubjects.length?activeSubjects:['Toán','Tiếng Anh','Ngữ Văn'];
     return `
       <div class="fx-page-head">
-        <div>
-          <span class="fx-eyebrow">THI THỬ</span>
-          <h2>Thư viện bài kiểm tra</h2>
-          <p>Chọn môn, xem nhanh số câu, thời gian và mức độ rồi bắt đầu làm bài.</p>
-        </div>
-        <div class="fx-test-count"><b>${list.length}</b><span>đề đang có</span></div>
+        <div><span class="fx-eyebrow">THI THỬ</span><h2>Thư viện học & luyện tập</h2><p>Chọn bài kiểm tra để làm bài hoặc mở Flashcard để học.</p></div>
+        <div class="fx-test-count"><b>${list.length}</b><span>bài kiểm tra</span></div>
       </div>
       ${syncStatusHtml()}
       <div class="fx-filters"><button class="active" data-filter="">Tất cả</button>${filterSubjects.map(s=>`<button data-filter="${esc(s)}">${esc(s)}</button>`).join('')}</div>
-      <article class="fx-card fx-pad">
-        <div id="fxExamList" class="fx-exams">
-          ${list.length?list.map(examRow).join(''):'<div class="fx-empty"><span>📝</span><b>Chưa có bài kiểm tra</b><small>Admin chưa phát hành đề nào cho người học.</small></div>'}
-        </div>
-      </article>`;
+      <section class="fx-library-section">
+        <div class="fx-library-head"><div><span class="fx-eyebrow">BÀI KIỂM TRA</span><h3>${list.length} bài đang có</h3></div><small>Nội dung kiểm tra</small></div>
+        <article class="fx-card fx-pad"><div id="fxExamList" class="fx-exams">${list.length?list.map(examRow).join(''):'<div class="fx-empty"><span>📝</span><b>Chưa có bài kiểm tra</b><small>Admin chưa phát hành đề nào cho người học.</small></div>'}</div></article>
+      </section>
+      <section class="fx-library-section">
+        <div class="fx-library-head"><div><span class="fx-eyebrow">FLASHCARD</span><h3>${cards.length} bộ Flashcard</h3></div><button class="fx-link-btn" data-nav="learning">Vào Học tập →</button></div>
+        <article class="fx-card fx-pad"><div class="fx-exams">
+          ${cards.length?cards.map(function(e){return '<div class="fx-exam-row"><span>📚</span><div><b>'+esc(e.title||'Flashcard')+'</b><small>'+esc(e.subject||'')+' · '+Number(e.question_count||0)+' thẻ · '+esc(e.difficulty||'')+'</small></div><button class="fx-btn fx-primary" data-flashcard="'+esc(e.id)+'">Học ngay</button></div>';}).join(''):'<div class="fx-empty"><span>📚</span><b>Chưa có Flashcard</b><small>Khi Admin tạo bộ mới, bộ đó sẽ xuất hiện ở đây.</small></div>'}
+        </div></article>
+      </section>`;
   }
   function examRow(e){
     const n=(Array.isArray(e.questions)&&e.questions.length)?e.questions.length:Number(e.question_count||0);
@@ -514,18 +547,22 @@
   function flashcardPage(){
     const e=state().flashcardExam;
     const qs=Array.isArray(e?.questions)?e.questions.filter(function(q){return q&&String(q.front||q.term||'').trim()&&String(q.back||q.definition||q.answer||'').trim()}):[];
-    const idx=Math.max(0,Math.min(qs.length-1,Number(state().flashIndex||0)));
+    const idx=Math.max(0,Math.min(Math.max(qs.length-1,0),Number(state().flashIndex||0)));
     const q=qs[idx], flipped=!!state().flashFlipped;
     if(!q)return '<div class="fx-empty"><b>Không có dữ liệu Flashcard.</b><button class="fx-btn fx-secondary" data-nav="learning">Quay lại</button></div>';
-    return '<div class="fx-page-head"><div><span class="fx-eyebrow">FLASHCARD</span><h2>'+esc(e.title||'Flashcard')+'</h2><p>'+String(idx+1)+'/'+String(qs.length)+' thẻ</p></div><button class="fx-btn fx-secondary" data-nav="learning">← Thoát</button></div>'
-      +'<article class="fx-card fx-pad"><div style="display:grid;gap:18px;max-width:760px;margin:0 auto">'
-      +'<button type="button" data-flip-card style="min-height:300px;border:1px solid #dce3ef;border-radius:28px;background:#fff;padding:32px;text-align:center;cursor:pointer">'
-      +'<small>'+(flipped?'NGHĨA':'TỪ / CỤM TỪ')+'</small><div style="font-size:34px;font-weight:800;margin:28px 0 14px">'+esc(flipped?(q.back||q.definition||q.answer):(q.front||q.term))+'</div>'
-      +(!flipped&&q.phonetic?'<div class="muted">'+esc(q.phonetic)+'</div>':'')
-      +(flipped&&q.example?'<div class="muted">'+esc(q.example)+'</div>':'')
-      +'<div class="muted" style="margin-top:24px">Chạm vào thẻ để lật</div></button>'
-      +'<div style="display:flex;justify-content:center;gap:10px"><button class="fx-btn fx-secondary" data-flash-prev '+(idx<=0?'disabled':'')+'>← Trước</button><button class="fx-btn fx-primary" data-flash-next '+(idx>=qs.length-1?'disabled':'')+'>Tiếp →</button></div>'
-      +'</div></article>';
+    const main=flipped?(q.back||q.definition||q.answer):(q.front||q.term);
+    const dots=qs.map(function(_,i){return '<i class="'+(i===idx?'active':'')+'"></i>';}).join('');
+    return '<div class="fx-page-head"><div><span class="fx-eyebrow">FLASHCARD</span><h2>'+esc(e.title||'Flashcard')+'</h2><p>'+(idx+1)+' / '+qs.length+' thẻ · Chạm thẻ để lật</p></div><button class="fx-btn fx-secondary" data-nav="learning">← Thoát</button></div>'
+      +'<article class="fx-card fx-pad"><div class="fx-flash-wrap">'
+      +'<div class="fx-flash-meta"><span>✨ Flashcards</span><b>'+(idx+1)+' / '+qs.length+'</b></div>'
+      +'<button type="button" class="fx-flashcard-card '+(flipped?'is-back':'is-front')+'" data-flip-card aria-label="Lật thẻ">'
+      +'<span class="fx-flash-kind">'+(flipped?'NGHĨA':'TỪ VỰNG')+'</span><strong class="fx-flash-word">'+esc(main)+'</strong>'
+      +(flipped&&q.example?'<span class="fx-flash-example">'+esc(q.example)+'</span>':'')
+      +(!flipped&&q.phonetic?'<span class="fx-flash-phonetic">'+esc(q.phonetic)+'</span>':'')
+      +'<span class="fx-flash-hint">Chạm vào thẻ để lật ↻</span></button>'
+      +'<div class="fx-flash-actions"><button type="button" class="fx-btn fx-secondary" data-flip-card>↻ Lật thẻ</button><button type="button" class="fx-btn fx-primary" data-flash-next '+(idx>=qs.length-1?'disabled':'')+'>Tiếp theo →</button></div>'
+      +'<div class="fx-flash-nav"><button type="button" class="fx-btn fx-secondary" data-flash-prev '+(idx<=0?'disabled':'')+'>← Trước</button><button type="button" class="fx-btn fx-secondary" data-nav="learning">Thoát</button></div>'
+      +'<div class="fx-flash-dots">'+dots+'</div></div></article>';
   }
   function content(){
     switch(state()?.page){
@@ -786,6 +823,7 @@
 
   function bindShell(){
     ensureSyncBarStyle();
+    ensureFlashcardStyle();
     root().querySelectorAll('[data-nav]').forEach(b=>b.onclick=async()=>{
       const target=b.getAttribute('data-nav');
       closeMenu();
@@ -815,9 +853,9 @@
     root().querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>{state().subject=b.getAttribute('data-subject');go('tests');});
     root().querySelectorAll('[data-exam]').forEach(b=>b.onclick=(e)=>{e.preventDefault();e.stopPropagation();startExamById(b.getAttribute('data-exam'))});
     root().querySelectorAll('[data-flashcard]').forEach(b=>b.onclick=async(e)=>{e.preventDefault();e.stopPropagation();await startFlashcardById(b.getAttribute('data-flashcard'))});
-    root().querySelector('[data-flip-card]')?.addEventListener('click',()=>{state().flashFlipped=!state().flashFlipped;renderFinal()});
-    root().querySelector('[data-flash-prev]')?.addEventListener('click',()=>{state().flashIndex=Math.max(0,Number(state().flashIndex||0)-1);state().flashFlipped=false;renderFinal()});
-    root().querySelector('[data-flash-next]')?.addEventListener('click',()=>{state().flashIndex=Math.min(Number(state().flashcardExam?.questions?.length||1)-1,Number(state().flashIndex||0)+1);state().flashFlipped=false;renderFinal()});
+    root().querySelectorAll('[data-flip-card]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashFlipped=!state().flashFlipped;renderFinal();});});
+    root().querySelector('[data-flash-prev]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.max(0,Number(state().flashIndex||0)-1);state().flashFlipped=false;renderFinal();});
+    root().querySelector('[data-flash-next]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.min(Number(state().flashcardExam?.questions?.length||1)-1,Number(state().flashIndex||0)+1);state().flashFlipped=false;renderFinal();});
     root().querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{
       root().querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active')); b.classList.add('active');
       const v=b.getAttribute('data-filter')||'';
@@ -848,12 +886,19 @@
   }
   async function go(p){
     if(!state()) return;
-    if(p==='home'||p==='tests'||p==='subject'||p==='learning'){try{await refreshLearnerExams();}catch(_){}}
-    if(p==='home'||p==='learning'){try{await refreshLearnerFlashcards();}catch(_){}}
-    if(p==='history'||p==='stats'||p==='achievements'){try{if(window.loadHistory)await window.loadHistory();}catch(_){}}
+    const previous=state().page;
     state().page=p;
     renderFinal();
-    if(p==='support' && window.startSupportLive){try{await window.startSupportLive();renderFinal();}catch(_){}}
+    // Never wait on network before changing pages. Slow Supabase requests must not freeze mobile navigation.
+    (async function(){
+      try{
+        if(p==='home'||p==='tests'||p==='subject'||p==='learning') await refreshLearnerExams();
+        if(p==='home'||p==='learning') await refreshLearnerFlashcards();
+        if(p==='history'||p==='stats'||p==='achievements') await window.loadHistory?.();
+        if(state()?.page===p && previous!==p) renderFinal();
+      }catch(_){}
+    })();
+    if(p==='support' && window.startSupportLive){try{await window.startSupportLive();if(state()?.page===p)renderFinal();}catch(_){}}
   }
   function toggleMenu(){
     root().querySelector('#fxSidebar')?.classList.toggle('open');
@@ -1082,5 +1127,7 @@
   window.studentGoV2=go;
   window.studentUiV2=function(p){if(state()){state().page=p;renderFinal();}};
   boot();
-  ensureSyncBarStyle(); startLearnerAutoSync();
+  ensureSyncBarStyle();
+  ensureFlashcardStyle();
+  startLearnerAutoSync();
 })();

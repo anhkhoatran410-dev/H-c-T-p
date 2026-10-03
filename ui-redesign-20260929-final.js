@@ -267,6 +267,37 @@
     s.textContent='.fx-sync-bar{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 12px;border:1px solid #dbe4f2;border-radius:14px;background:#f8fbff}.fx-sync-dot{width:9px;height:9px;border-radius:50%;background:#35b878;flex:none}.fx-sync-bar>div{min-width:0;flex:1}.fx-sync-bar b{display:block;font-size:12px}.fx-sync-bar small{display:block;color:#718096;font-size:10px;margin-top:2px}.fx-sync-bar button{border:1px solid #d7e0ef;background:#fff;border-radius:10px;padding:7px 9px;font:inherit;font-size:10px;cursor:pointer;white-space:nowrap}';
     document.head.appendChild(s);
   }
+  function ensureFlashcardStyle(){
+    if(document.getElementById('study-flashcard-native-style'))return;
+    const s=document.createElement('style');s.id='study-flashcard-native-style';
+    s.textContent=[
+      '.fx-learning-actions{display:grid!important;grid-template-columns:1fr 1fr;gap:10px!important}',
+      '.fx-learning-actions .fx-btn{width:100%;justify-content:center}',
+      '.fx-library-section{margin-top:18px}',
+      '.fx-library-head{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:0 2px 10px}',
+      '.fx-library-head h3{margin:4px 0 0}',
+      '.fx-library-head small{color:#7a879a}',
+      '.fx-flashcard-card{position:relative;overflow:hidden;min-height:360px;width:100%;border:1px solid #cfd8ff;border-radius:28px;background:linear-gradient(145deg,#ecefff 0%,#f9fbff 50%,#eef3ff 100%);color:#18275c;box-shadow:0 18px 40px rgba(47,72,150,.11);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:34px 28px;cursor:pointer;touch-action:manipulation;transition:transform .18s ease,box-shadow .18s ease}',
+      '.fx-flashcard-card:hover{transform:translateY(-2px);box-shadow:0 24px 50px rgba(47,72,150,.16)}',
+      '.fx-flashcard-card:active{transform:scale(.992)}',
+      '.fx-flashcard-card.is-back{background:linear-gradient(145deg,#f5f8ff,#edf5ff);border-color:#b9cff8}',
+      '.fx-flash-kind{font-size:12px;letter-spacing:2px;font-weight:800;color:#5870c9}',
+      '.fx-flash-word{font-size:42px;line-height:1.18;font-weight:800;margin:22px 0 10px;color:#17275c}',
+      '.fx-flash-example,.fx-flash-phonetic{display:block;font-size:19px;line-height:1.5;color:#73809a;max-width:90%}',
+      '.fx-flash-hint{margin-top:28px;font-size:15px;color:#6c7890}',
+      '.fx-flash-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}',
+      '.fx-flash-meta span{display:inline-flex;align-items:center;padding:8px 14px;border-radius:999px;background:#eef2ff;color:#4558b7;font-weight:800}',
+      '.fx-flash-meta b{font-size:13px;color:#64718a}',
+      '.fx-flash-actions,.fx-flash-nav{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}',
+      '.fx-flash-actions{margin-top:14px}',
+      '.fx-flash-nav{margin-top:10px}',
+      '.fx-flash-dots{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-top:16px}',
+      '.fx-flash-dots i{width:11px;height:11px;border-radius:50%;background:#d9e1f1;display:block}',
+      '.fx-flash-dots i.active{background:#5d66e8;transform:scale(1.15)}',
+      '@media(max-width:700px){.fx-learning-actions{grid-template-columns:1fr}.fx-library-head{align-items:flex-start;flex-direction:column}.fx-flashcard-card{min-height:330px;padding:28px 20px}.fx-flash-word{font-size:34px}.fx-flash-example,.fx-flash-phonetic{font-size:17px}}'
+    ].join('');
+    document.head.appendChild(s);
+  }
   function shell(content){
     const p=state()?.page || 'home';
     const renderNav=(items)=>items.map(([k,ic,label])=>`<button class="fx-nav-item ${p===k?'active':''}" data-nav="${k}"><span>${ic}</span><b>${label}</b></button>`).join('');
@@ -792,6 +823,7 @@
 
   function bindShell(){
     ensureSyncBarStyle();
+    ensureFlashcardStyle();
     root().querySelectorAll('[data-nav]').forEach(b=>b.onclick=async()=>{
       const target=b.getAttribute('data-nav');
       closeMenu();
@@ -1095,5 +1127,7 @@
   window.studentGoV2=go;
   window.studentUiV2=function(p){if(state()){state().page=p;renderFinal();}};
   boot();
-  ensureSyncBarStyle(); startLearnerAutoSync();
+  ensureSyncBarStyle();
+  ensureFlashcardStyle();
+  startLearnerAutoSync();
 })();

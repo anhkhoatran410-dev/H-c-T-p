@@ -365,7 +365,7 @@
           <span class="fx-eyebrow">FLASHCARD</span>
           <h3>${cards.length} bộ Flashcard đang có</h3>
           <p>Flashcard là nội dung học riêng và không bị tính vào số bài Thi thử.</p>
-          <div class="fx-learning-actions"><button class="fx-btn fx-primary" data-nav="tests">Vào Thi thử →</button><button class="fx-btn fx-secondary" data-nav="ai">Hỏi AI trợ lý</button></div>
+          <div class="fx-learning-actions">${cards.length?'<button class="fx-btn fx-primary" data-flashcard="'+esc(cards[0].id)+'">Học Flashcard →</button>':'<button class="fx-btn fx-primary" data-nav="tests">Xem bài kiểm tra →</button>'}<button class="fx-btn fx-secondary" data-nav="tests">Xem bài kiểm tra →</button></div>
         </article>
         <article class="fx-card fx-learning-side">
           <span class="fx-eyebrow">TIẾN ĐỘ</span><h3>Tiến độ của bạn</h3>
@@ -390,24 +390,26 @@
   }
   function tests(){
     const list=exams();
+    const cards=Array.isArray(learnerFlashcards)?learnerFlashcards:[];
     const activeSubjects=Array.from(new Set(list.map(e=>String(e.subject||'').trim()).filter(Boolean)));
     const filterSubjects=activeSubjects.length?activeSubjects:['Toán','Tiếng Anh','Ngữ Văn'];
     return `
       <div class="fx-page-head">
-        <div>
-          <span class="fx-eyebrow">THI THỬ</span>
-          <h2>Thư viện bài kiểm tra</h2>
-          <p>Chọn môn, xem nhanh số câu, thời gian và mức độ rồi bắt đầu làm bài.</p>
-        </div>
-        <div class="fx-test-count"><b>${list.length}</b><span>đề đang có</span></div>
+        <div><span class="fx-eyebrow">THI THỬ</span><h2>Thư viện học & luyện tập</h2><p>Chọn bài kiểm tra để làm bài hoặc mở Flashcard để học.</p></div>
+        <div class="fx-test-count"><b>${list.length}</b><span>bài kiểm tra</span></div>
       </div>
       ${syncStatusHtml()}
       <div class="fx-filters"><button class="active" data-filter="">Tất cả</button>${filterSubjects.map(s=>`<button data-filter="${esc(s)}">${esc(s)}</button>`).join('')}</div>
-      <article class="fx-card fx-pad">
-        <div id="fxExamList" class="fx-exams">
-          ${list.length?list.map(examRow).join(''):'<div class="fx-empty"><span>📝</span><b>Chưa có bài kiểm tra</b><small>Admin chưa phát hành đề nào cho người học.</small></div>'}
-        </div>
-      </article>`;
+      <section class="fx-library-section">
+        <div class="fx-library-head"><div><span class="fx-eyebrow">BÀI KIỂM TRA</span><h3>${list.length} bài đang có</h3></div><small>Nội dung kiểm tra</small></div>
+        <article class="fx-card fx-pad"><div id="fxExamList" class="fx-exams">${list.length?list.map(examRow).join(''):'<div class="fx-empty"><span>📝</span><b>Chưa có bài kiểm tra</b><small>Admin chưa phát hành đề nào cho người học.</small></div>'}</div></article>
+      </section>
+      <section class="fx-library-section">
+        <div class="fx-library-head"><div><span class="fx-eyebrow">FLASHCARD</span><h3>${cards.length} bộ Flashcard</h3></div><button class="fx-link-btn" data-nav="learning">Vào Học tập →</button></div>
+        <article class="fx-card fx-pad"><div class="fx-exams">
+          ${cards.length?cards.map(function(e){return '<div class="fx-exam-row"><span>📚</span><div><b>'+esc(e.title||'Flashcard')+'</b><small>'+esc(e.subject||'')+' · '+Number(e.question_count||0)+' thẻ · '+esc(e.difficulty||'')+'</small></div><button class="fx-btn fx-primary" data-flashcard="'+esc(e.id)+'">Học ngay</button></div>';}).join(''):'<div class="fx-empty"><span>📚</span><b>Chưa có Flashcard</b><small>Khi Admin tạo bộ mới, bộ đó sẽ xuất hiện ở đây.</small></div>'}
+        </div></article>
+      </section>`;
   }
   function examRow(e){
     const n=(Array.isArray(e.questions)&&e.questions.length)?e.questions.length:Number(e.question_count||0);
@@ -514,18 +516,22 @@
   function flashcardPage(){
     const e=state().flashcardExam;
     const qs=Array.isArray(e?.questions)?e.questions.filter(function(q){return q&&String(q.front||q.term||'').trim()&&String(q.back||q.definition||q.answer||'').trim()}):[];
-    const idx=Math.max(0,Math.min(qs.length-1,Number(state().flashIndex||0)));
+    const idx=Math.max(0,Math.min(Math.max(qs.length-1,0),Number(state().flashIndex||0)));
     const q=qs[idx], flipped=!!state().flashFlipped;
     if(!q)return '<div class="fx-empty"><b>Không có dữ liệu Flashcard.</b><button class="fx-btn fx-secondary" data-nav="learning">Quay lại</button></div>';
-    return '<div class="fx-page-head"><div><span class="fx-eyebrow">FLASHCARD</span><h2>'+esc(e.title||'Flashcard')+'</h2><p>'+String(idx+1)+'/'+String(qs.length)+' thẻ</p></div><button class="fx-btn fx-secondary" data-nav="learning">← Thoát</button></div>'
-      +'<article class="fx-card fx-pad"><div style="display:grid;gap:18px;max-width:760px;margin:0 auto">'
-      +'<button type="button" data-flip-card style="min-height:300px;border:1px solid #dce3ef;border-radius:28px;background:#fff;padding:32px;text-align:center;cursor:pointer">'
-      +'<small>'+(flipped?'NGHĨA':'TỪ / CỤM TỪ')+'</small><div style="font-size:34px;font-weight:800;margin:28px 0 14px">'+esc(flipped?(q.back||q.definition||q.answer):(q.front||q.term))+'</div>'
-      +(!flipped&&q.phonetic?'<div class="muted">'+esc(q.phonetic)+'</div>':'')
-      +(flipped&&q.example?'<div class="muted">'+esc(q.example)+'</div>':'')
-      +'<div class="muted" style="margin-top:24px">Chạm vào thẻ để lật</div></button>'
-      +'<div style="display:flex;justify-content:center;gap:10px"><button class="fx-btn fx-secondary" data-flash-prev '+(idx<=0?'disabled':'')+'>← Trước</button><button class="fx-btn fx-primary" data-flash-next '+(idx>=qs.length-1?'disabled':'')+'>Tiếp →</button></div>'
-      +'</div></article>';
+    const main=flipped?(q.back||q.definition||q.answer):(q.front||q.term);
+    const dots=qs.map(function(_,i){return '<i class="'+(i===idx?'active':'')+'"></i>';}).join('');
+    return '<div class="fx-page-head"><div><span class="fx-eyebrow">FLASHCARD</span><h2>'+esc(e.title||'Flashcard')+'</h2><p>'+(idx+1)+' / '+qs.length+' thẻ · Chạm thẻ để lật</p></div><button class="fx-btn fx-secondary" data-nav="learning">← Thoát</button></div>'
+      +'<article class="fx-card fx-pad"><div class="fx-flash-wrap">'
+      +'<div class="fx-flash-meta"><span>✨ Flashcards</span><b>'+(idx+1)+' / '+qs.length+'</b></div>'
+      +'<button type="button" class="fx-flashcard-card '+(flipped?'is-back':'is-front')+'" data-flip-card aria-label="Lật thẻ">'
+      +'<span class="fx-flash-kind">'+(flipped?'NGHĨA':'TỪ VỰNG')+'</span><strong class="fx-flash-word">'+esc(main)+'</strong>'
+      +(flipped&&q.example?'<span class="fx-flash-example">'+esc(q.example)+'</span>':'')
+      +(!flipped&&q.phonetic?'<span class="fx-flash-phonetic">'+esc(q.phonetic)+'</span>':'')
+      +'<span class="fx-flash-hint">Chạm vào thẻ để lật ↻</span></button>'
+      +'<div class="fx-flash-actions"><button type="button" class="fx-btn fx-secondary" data-flip-card>↻ Lật thẻ</button><button type="button" class="fx-btn fx-primary" data-flash-next '+(idx>=qs.length-1?'disabled':'')+'>Tiếp theo →</button></div>'
+      +'<div class="fx-flash-nav"><button type="button" class="fx-btn fx-secondary" data-flash-prev '+(idx<=0?'disabled':'')+'>← Trước</button><button type="button" class="fx-btn fx-secondary" data-nav="learning">Thoát</button></div>'
+      +'<div class="fx-flash-dots">'+dots+'</div></div></article>';
   }
   function content(){
     switch(state()?.page){
@@ -815,9 +821,9 @@
     root().querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>{state().subject=b.getAttribute('data-subject');go('tests');});
     root().querySelectorAll('[data-exam]').forEach(b=>b.onclick=(e)=>{e.preventDefault();e.stopPropagation();startExamById(b.getAttribute('data-exam'))});
     root().querySelectorAll('[data-flashcard]').forEach(b=>b.onclick=async(e)=>{e.preventDefault();e.stopPropagation();await startFlashcardById(b.getAttribute('data-flashcard'))});
-    root().querySelector('[data-flip-card]')?.addEventListener('click',()=>{state().flashFlipped=!state().flashFlipped;renderFinal()});
-    root().querySelector('[data-flash-prev]')?.addEventListener('click',()=>{state().flashIndex=Math.max(0,Number(state().flashIndex||0)-1);state().flashFlipped=false;renderFinal()});
-    root().querySelector('[data-flash-next]')?.addEventListener('click',()=>{state().flashIndex=Math.min(Number(state().flashcardExam?.questions?.length||1)-1,Number(state().flashIndex||0)+1);state().flashFlipped=false;renderFinal()});
+    root().querySelectorAll('[data-flip-card]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashFlipped=!state().flashFlipped;renderFinal();});});
+    root().querySelector('[data-flash-prev]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.max(0,Number(state().flashIndex||0)-1);state().flashFlipped=false;renderFinal();});
+    root().querySelector('[data-flash-next]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.min(Number(state().flashcardExam?.questions?.length||1)-1,Number(state().flashIndex||0)+1);state().flashFlipped=false;renderFinal();});
     root().querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{
       root().querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active')); b.classList.add('active');
       const v=b.getAttribute('data-filter')||'';
@@ -848,12 +854,19 @@
   }
   async function go(p){
     if(!state()) return;
-    if(p==='home'||p==='tests'||p==='subject'||p==='learning'){try{await refreshLearnerExams();}catch(_){}}
-    if(p==='home'||p==='learning'){try{await refreshLearnerFlashcards();}catch(_){}}
-    if(p==='history'||p==='stats'||p==='achievements'){try{if(window.loadHistory)await window.loadHistory();}catch(_){}}
+    const previous=state().page;
     state().page=p;
     renderFinal();
-    if(p==='support' && window.startSupportLive){try{await window.startSupportLive();renderFinal();}catch(_){}}
+    // Never wait on network before changing pages. Slow Supabase requests must not freeze mobile navigation.
+    (async function(){
+      try{
+        if(p==='home'||p==='tests'||p==='subject'||p==='learning') await refreshLearnerExams();
+        if(p==='home'||p==='learning') await refreshLearnerFlashcards();
+        if(p==='history'||p==='stats'||p==='achievements') await window.loadHistory?.();
+        if(state()?.page===p && previous!==p) renderFinal();
+      }catch(_){}
+    })();
+    if(p==='support' && window.startSupportLive){try{await window.startSupportLive();if(state()?.page===p)renderFinal();}catch(_){}}
   }
   function toggleMenu(){
     root().querySelector('#fxSidebar')?.classList.toggle('open');

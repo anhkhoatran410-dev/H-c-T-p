@@ -664,19 +664,19 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 .app.presentation-active .controls{gap:5px!important}
 .app.presentation-active .btn{min-height:32px!important;padding:7px 10px!important;font-size:clamp(11px,1.25vw,15px)!important;border-radius:9px!important}
 .app.presentation-active .btn.icon{width:34px!important;height:34px!important;padding:0!important}
-.app.presentation-active h1{font-size:clamp(29px,5.2vh,54px)!important;line-height:1.04!important;letter-spacing:-.045em!important}
-.app.presentation-active h2{font-size:clamp(25px,4.5vh,43px)!important;line-height:1.08!important}
-.app.presentation-active h3{font-size:clamp(18px,2.9vh,28px)!important;line-height:1.15!important}
-.app.presentation-active .kicker,.app.presentation-active .eyebrow,.app.presentation-active .function-label{font-size:clamp(11px,1.5vh,15px)!important}
-.app.presentation-active .lead{font-size:clamp(16px,2.4vh,23px)!important;line-height:1.35!important}
-.app.presentation-active p,.app.presentation-active .card p,.app.presentation-active .function-card p,.app.presentation-active .detail p,.app.presentation-active .fact p,.app.presentation-active .seq p{font-size:clamp(13px,1.9vh,18px)!important;line-height:1.4!important}
-.app.presentation-active .callout,.app.presentation-active .relationship-callout{font-size:clamp(12px,1.65vh,16px)!important;line-height:1.4!important;padding:9px 12px!important}
-.app.presentation-active .figure,.app.presentation-active .split-figure>.figure{height:clamp(135px,35vh,320px)!important;min-height:0!important;max-height:none!important}
-.app.presentation-active .dna-viz{height:clamp(150px,36vh,325px)!important;min-height:0!important}
-.app.presentation-active .end-art{height:clamp(165px,39vh,350px)!important;min-height:0!important}
+.app.presentation-active h1{font-size:clamp(38px,5.2vh,66px)!important;line-height:1.04!important;letter-spacing:-.045em!important}
+.app.presentation-active h2{font-size:clamp(32px,4.5vh,55px)!important;line-height:1.08!important}
+.app.presentation-active h3{font-size:clamp(22px,2.9vh,34px)!important;line-height:1.15!important}
+.app.presentation-active .kicker,.app.presentation-active .eyebrow,.app.presentation-active .function-label{font-size:clamp(13px,1.5vh,18px)!important}
+.app.presentation-active .lead{font-size:clamp(20px,2.4vh,28px)!important;line-height:1.35!important}
+.app.presentation-active p,.app.presentation-active .card p,.app.presentation-active .function-card p,.app.presentation-active .detail p,.app.presentation-active .fact p,.app.presentation-active .seq p{font-size:clamp(16px,1.9vh,22px)!important;line-height:1.4!important}
+.app.presentation-active .callout,.app.presentation-active .relationship-callout{font-size:clamp(15px,1.65vh,20px)!important;line-height:1.4!important;padding:9px 12px!important}
+.app.presentation-active .figure,.app.presentation-active .split-figure>.figure{height:clamp(180px,35vh,400px)!important;min-height:0!important;max-height:none!important}
+.app.presentation-active .dna-viz{height:clamp(190px,36vh,410px)!important;min-height:0!important}
+.app.presentation-active .end-art{height:clamp(210px,39vh,440px)!important;min-height:0!important}
 .app.presentation-active .team-grid{gap:5px!important}
 .app.presentation-active .member-chip{padding:5px 7px!important}
-.app.presentation-active .member-chip strong{font-size:clamp(10px,1.55vh,15px)!important}
+.app.presentation-active .member-chip strong{font-size:clamp(12px,1.55vh,19px)!important}
 .app.presentation-active .notes-panel{max-height:calc(100dvh - 82px)!important}
 @media (orientation:landscape) and (max-height:540px) and (max-width:1000px){
  .app.presentation-active{grid-template-rows:0 minmax(0,1fr) calc(42px + env(safe-area-inset-bottom))!important}
@@ -707,7 +707,13 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  .app.presentation-active .bottom{gap:4px!important;padding-left:6px!important;padding-right:6px!important}
  .app.presentation-active .btn{min-height:31px!important;padding:6px 8px!important;font-size:11px!important}
  .app.presentation-active .btn.icon{width:31px!important;height:31px!important}
- .app.presentation-active .slide-inner{padding:14px!important}
+ .app.presentation-active .slide{overflow:auto!important}
+ .app.presentation-active .slide-inner{position:relative!important;padding:14px!important;min-height:100%!important}
+ .app.presentation-active h1{font-size:clamp(27px,7.5vw,38px)!important}
+ .app.presentation-active h2{font-size:clamp(23px,6.5vw,32px)!important}
+ .app.presentation-active h3{font-size:clamp(17px,4.6vw,23px)!important}
+ .app.presentation-active .lead{font-size:clamp(15px,4vw,18px)!important}
+ .app.presentation-active p,.app.presentation-active .card p,.app.presentation-active .function-card p{font-size:clamp(14px,3.6vw,17px)!important}
  .orientation-card{border-radius:18px}
 }
 @media(prefers-reduced-motion:reduce){

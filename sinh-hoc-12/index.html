@@ -960,6 +960,17 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  .final-slide.active .end-art svg{animation:none!important}
 }
 
+
+/* While FLIP is active, disable the generic slide-in animations so the shared
+   elements are the only large movement and the surrounding copy lands cleanly. */
+.slide.active.morph-flip-running{
+  animation:none!important;transform:none!important;filter:none!important;clip-path:none!important;
+}
+.slide.active.morph-flip-running .reveal{animation:none!important}
+.slide.active.morph-flip-running .figure svg,
+.slide.active.morph-flip-running .cover-art svg,
+.slide.active.morph-flip-running .end-art svg{animation-play-state:paused!important}
+
 </style>
 </head>
 <body>
@@ -1406,7 +1417,8 @@ function runMorphTransition(oldRects,newSlide,direction){
       }catch(e){}
     });
     window.setTimeout(function(){
-      newSlide.classList.remove('morph-flip-running');
+      /* Keep the FLIP mode until the next navigation, so the default one-page
+         entrance animation does not unexpectedly replay after the morph ends. */
       requestAnimationFrame(fitActiveSlide);
     },1050);
   });

@@ -223,6 +223,51 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  .app:fullscreen .team-panel{max-width:730px}
 }
 
+
+/* Make scientific diagrams readable: captions occupy their own space, never sit on top of labels. */
+.figure{display:flex;flex-direction:column;align-items:stretch;justify-content:center;min-width:0}
+.figure>svg{display:block;flex:1 1 auto;min-height:0;width:100%;height:auto;max-height:calc(100% - 30px);object-fit:contain}
+.figure>.figlabel{position:static;flex:0 0 auto;align-self:flex-start;max-width:100%;padding:5px 12px 9px;line-height:1.25;overflow-wrap:anywhere;pointer-events:none}
+.split-figure>.figure{display:grid;grid-template-columns:minmax(0,1.18fr) minmax(170px,.82fr);grid-template-rows:minmax(0,1fr) auto;align-items:stretch;min-height:310px;max-height:none;padding:9px 9px 0}
+.split-figure>.figure>#chromDiagram{grid-column:1;grid-row:1;width:100%;height:100%;max-height:100%;min-height:0;align-self:center}
+.split-figure>.figure>.figure-explain{grid-column:2;grid-row:1;align-self:center;min-width:0;margin:8px 5px;padding:14px 13px;border:1px solid #d3e7e6;border-left:4px solid #0b8f85;border-radius:12px;background:linear-gradient(150deg,#ffffffed,#eefaf8f5);box-shadow:0 8px 20px #23465b0d}
+.figure-explain .explain-tag{display:block;margin-bottom:9px;color:#087f83;font-size:9px;letter-spacing:.12em;font-weight:950}
+.figure-explain>b{display:block;font-size:clamp(13px,1.1vw,16px);line-height:1.25;color:#1f3b50;margin-bottom:7px}
+.figure-explain>p{font-size:clamp(11px,.95vw,13px);line-height:1.5;color:#536c7d;margin:0}
+.figure-explain>small{display:block;border-top:1px solid #dbe9e8;padding-top:8px;margin-top:10px;font-size:10px;line-height:1.45;color:#6e8495}
+.split-figure>.figure>.figlabel{grid-column:1/-1;grid-row:2;margin:0;padding:8px 8px 10px;font-size:9px;white-space:normal}
+#chromDiagram text{font-size:12px!important;font-weight:900}
+#chromDiagram [data-part-shape]{transition:opacity .22s,filter .22s}
+#chromDiagram [data-part-shape].is-focused{filter:drop-shadow(0 0 5px #16a99b55)}
+/* The final slide has a dedicated layout; keep it visible even if fullscreen fitting runs on mobile. */
+.final-slide.active .slide-inner{display:grid!important;grid-template-columns:minmax(0,1fr)!important;align-content:center!important;justify-content:stretch!important}
+.final-slide.active .final-layout{display:grid!important;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)!important;align-items:center!important;width:100%;min-height:0;visibility:visible!important;opacity:1!important}
+.final-slide.active .final-layout>.reveal,.final-slide.active .final-layout .reveal{visibility:visible!important;opacity:1!important;animation:rise .45s ease both}
+.final-slide.active .end-art{min-width:0;min-height:240px}
+.final-slide.active .thankyou{display:block!important;visibility:visible!important;color:#182a43}
+.final-slide.active .thankyou span{display:block!important;color:#087f83}
+.final-slide.active .final-message,.final-slide.active .thanks-names,.final-slide.active .pillrow{visibility:visible!important;opacity:1!important}
+@media(max-width:900px){
+ .split-figure>.figure{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(170px,1fr) auto auto;min-height:0}
+ .split-figure>.figure>#chromDiagram{grid-column:1;grid-row:1;max-height:220px}
+ .split-figure>.figure>.figure-explain{grid-column:1;grid-row:2;margin:4px 3px 7px;padding:10px 12px}
+ .split-figure>.figure>.figlabel{grid-column:1;grid-row:3}
+ .figure-explain>p{font-size:12px}
+ .figure-explain>small{font-size:10px}
+ .final-slide.active .final-layout{grid-template-columns:minmax(0,1fr)!important}
+ .final-slide.active .end-art{min-height:160px;height:160px}
+}
+@media (orientation:landscape) and (max-height:760px){
+ .app:fullscreen .split-figure>.figure{min-height:0!important;height:36vh!important;grid-template-columns:minmax(0,1.05fr) minmax(150px,.95fr);grid-template-rows:minmax(0,1fr) auto}
+ .app:fullscreen .split-figure>.figure>#chromDiagram{grid-column:1;grid-row:1;max-height:100%}
+ .app:fullscreen .split-figure>.figure>.figure-explain{grid-column:2;grid-row:1;padding:9px;margin:4px}
+ .app:fullscreen .figure-explain>p{font-size:clamp(10px,1.45vh,12px)}
+ .app:fullscreen .figure-explain>small{font-size:clamp(8px,1.2vh,10px);margin-top:6px;padding-top:5px}
+ .app:fullscreen .figure-explain .explain-tag{font-size:8px;margin-bottom:5px}
+ .app:fullscreen .figure-explain>b{font-size:clamp(12px,1.7vh,15px)}
+ .app:fullscreen .final-slide.active .end-art{height:36vh;min-height:0}
+}
+
 </style>
 </head>
 <body>
@@ -319,7 +364,14 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 <g stroke="#72879a" stroke-width="1.5" fill="none" stroke-linecap="round"><path d="M161 44L92 30H24"/><path d="M260 180H100H23"/><path d="M390 108L440 70H520"/><path d="M310 244L420 278H520"/><path d="M346 143L435 129H520"/></g>
 <g fill="#4e667d" font-size="10" font-weight="850"><text x="24" y="21">TELOMERE</text><text x="23" y="169">TÂM ĐỘNG</text><text x="420" y="58">VỊ TRÍ GENE</text><text x="421" y="294">CÁNH q</text><text x="434" y="118">CÁNH p</text></g>
 <text x="270" y="355" text-anchor="middle" fill="#75879b" font-size="9" letter-spacing="1">SƠ ĐỒ GIẢN LƯỢC · KHÔNG THEO TỈ LỆ</text>
-</svg><div class="figlabel">CHÚ THÍCH TỪNG BỘ PHẬN</div>
+</svg>
+<div class="figure-explain" id="figureExplain" aria-live="polite">
+  <span class="explain-tag">ĐANG CHỌN · 01</span>
+  <b id="figureExplainTitle">Chromatid chị em</b>
+  <p id="figureExplainText">Hai chromatid chị em được tạo ra sau khi DNA nhân đôi; chúng gắn nhau ở vùng tâm động trước khi phân li.</p>
+  <small id="figureExplainHint">Chọn một nhãn bên cạnh để làm nổi bật phần tương ứng trên sơ đồ.</small>
+</div>
+<div class="figlabel">SƠ ĐỒ NST KÉP · BẤM NHÃN ĐỂ KHÁM PHÁ</div>
 </div>
 <div>
 <div class="part-buttons" id="partButtons">
@@ -620,7 +672,7 @@ locus:{title:'Gene / locus',text:'Locus là vị trí xác định của gene tr
 'p-arm':{title:'Cánh p',text:'Cánh p là cánh ngắn của NST theo quy ước. Tâm động chia NST thành hai cánh; hình chỉ mang tính khái quát.'},
 'q-arm':{title:'Cánh q',text:'Cánh q là cánh còn lại, thường dài hơn cánh p. Độ dài và vị trí tâm động thực tế phụ thuộc từng NST.'}
 };
-function selectPart(key){var d=parts[key];if(!d)return;document.querySelectorAll('.part-btn').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.part===key?'true':'false')});document.querySelectorAll('[data-part-shape]').forEach(function(g){var k=g.dataset.partShape;g.classList.toggle('is-muted',k!==key&&!(key==='chromatids'&&k==='chromatids'));g.classList.toggle('is-focused',k===key)});var all=document.querySelectorAll('#chromDiagram [data-part-shape]');all.forEach(function(g){var k=g.getAttribute('data-part-shape');g.style.opacity=k===key?'1':(key==='chromatids'&&k==='chromatids'?'1':'.48')});if(key==='p-arm'||key==='q-arm'){document.querySelectorAll('#chromDiagram [data-part-shape="chromatids"] path').forEach(function(p){p.style.opacity='.28'});document.querySelectorAll('#chromDiagram [data-part-shape="'+key+'"] path').forEach(function(p){p.style.opacity='.9';p.style.strokeWidth='27';p.style.filter='drop-shadow(0 0 7px #13bca970)'})}else{document.querySelectorAll('#chromDiagram [data-part-shape="chromatids"] path').forEach(function(p){p.style.opacity=key==='chromatids'?'1':'.48'});document.querySelectorAll('#chromDiagram [data-part-shape="p-arm"] path,#chromDiagram [data-part-shape="q-arm"] path').forEach(function(p){p.style.opacity='0';p.style.filter='none'})}document.getElementById('partDetail').innerHTML='<b>'+d.title+'</b><p>'+d.text+'</p>'}
+function selectPart(key){var d=parts[key];if(!d)return;document.querySelectorAll('.part-btn').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.part===key?'true':'false')});var figureTitle=document.getElementById('figureExplainTitle'),figureText=document.getElementById('figureExplainText'),figureTag=document.querySelector('#figureExplain .explain-tag');if(figureTitle)figureTitle.textContent=d.title;if(figureText)figureText.textContent=d.text;if(figureTag)figureTag.textContent='ĐANG CHỌN · '+String(Object.keys(parts).indexOf(key)+1).padStart(2,'0');document.querySelectorAll('[data-part-shape]').forEach(function(g){var k=g.dataset.partShape;g.classList.toggle('is-muted',k!==key&&!(key==='chromatids'&&k==='chromatids'));g.classList.toggle('is-focused',k===key)});var all=document.querySelectorAll('#chromDiagram [data-part-shape]');all.forEach(function(g){var k=g.getAttribute('data-part-shape');g.style.opacity=k===key?'1':(key==='chromatids'&&k==='chromatids'?'1':'.48')});if(key==='p-arm'||key==='q-arm'){document.querySelectorAll('#chromDiagram [data-part-shape="chromatids"] path').forEach(function(p){p.style.opacity='.28'});document.querySelectorAll('#chromDiagram [data-part-shape="'+key+'"] path').forEach(function(p){p.style.opacity='.9';p.style.strokeWidth='27';p.style.filter='drop-shadow(0 0 7px #13bca970)'})}else{document.querySelectorAll('#chromDiagram [data-part-shape="chromatids"] path').forEach(function(p){p.style.opacity=key==='chromatids'?'1':'.48'});document.querySelectorAll('#chromDiagram [data-part-shape="p-arm"] path,#chromDiagram [data-part-shape="q-arm"] path').forEach(function(p){p.style.opacity='0';p.style.filter='none'})}document.getElementById('partDetail').innerHTML='<b>'+d.title+'</b><p>'+d.text+'</p>'}
 document.getElementById('partButtons').addEventListener('click',function(e){var b=e.target.closest('[data-part]');if(b)selectPart(b.dataset.part)});
 
 var simInfo={

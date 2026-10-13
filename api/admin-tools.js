@@ -3,6 +3,8 @@ import '../lib/api/_gemini-network-guard.js';
 import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
 import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
 import adminAssistantHandler from '../lib/admin-assistant.js';
+import { handleUpload } from '@vercel/blob/client';
+import { list as listBlobs } from '@vercel/blob';
 import { supabasePublicReady, supabasePublicRequest } from '../lib/api/_supabase-public.js';
 
 const SUPABASE_URL = String(process.env.SUPABASE_URL || 'https://mlqaeginqsgqacdqdzbm.supabase.co').trim();
@@ -553,10 +555,71 @@ async function clientMeta(req, res) {
   return res.status(200).json({ ok: true });
 }
 
+const INTRO_BLOB_PREFIX = 'genome-lab-intro-';
+const INTRO_MAX_BYTES = 25 * 1024 * 1024;
+
+async function introSource(req, res) {
+  applySecurityHeaders(res);
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  if (!enforceMethod(req, res, ['GET'])) return;
+  if (!sameOrigin(req, res)) return;
+  if (!rateLimit(req, res, { max: 60, windowMs: 60_000, keyPrefix: 'intro-source' })) return;
+  try {
+    const { blobs } = await listBlobs({ prefix: INTRO_BLOB_PREFIX });
+    const video = (Array.isArray(blobs) ? blobs : [])
+      .filter((blob) => blob.pathname.startsWith(INTRO_BLOB_PREFIX) && blob.pathname.endsWith('.mp4'))
+      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
+    return res.status(200).json({ ready: Boolean(video), url: video?.url || null });
+  } catch (_) {
+    return res.status(503).json({ ready: false, url: null, error: 'Kho video chưa sẵn sàng.' });
+  }
+}
+
+async function introUpload(req, res) {
+  applySecurityHeaders(res);
+  res.setHeader('Cache-Control', 'no-store');
+  if (!enforceMethod(req, res, ['POST'])) return;
+  if (!sameOrigin(req, res)) return;
+  if (!rateLimit(req, res, { max: 5, windowMs: 60 * 60_000, keyPrefix: 'intro-video-upload' })) return;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (_) { return res.status(400).json({ error: 'Yêu cầu tải video không hợp lệ.' }); }
+  }
+  try {
+    const result = await handleUpload({
+      body,
+      request: req,
+      onBeforeGenerateToken: async (pathname) => {
+        if (typeof pathname !== 'string' ||
+            !pathname.startsWith(INTRO_BLOB_PREFIX) ||
+            !pathname.endsWith('.mp4') ||
+            !/^genome-lab-intro-[a-zA-Z0-9_-]+\\.mp4$/.test(pathname)) {
+          throw new Error('Tên tệp intro không hợp lệ.');
+        }
+        const { blobs } = await listBlobs({ prefix: INTRO_BLOB_PREFIX });
+        if (Array.isArray(blobs) && blobs.length > 0) {
+          throw new Error('Video intro đã được cài đặt; không cần tải lại.');
+        }
+        return {
+          allowedContentTypes: ['video/mp4'],
+          maximumSizeInBytes: INTRO_MAX_BYTES,
+          addRandomSuffix: false,
+          tokenPayload: JSON.stringify({ purpose: 'genome-lab-intro' }),
+        };
+      },
+    });
+    return res.status(200).json(result);
+  } catch (e) {
+    return res.status(400).json({ error: e?.message || 'Không thể tạo phiên tải video.' });
+  }
+}
+
 export default async function handler(req, res) {
   applySecurityHeaders(res);
   res.setHeader('Cache-Control', 'no-store');
   const path = String(req.query?.route || '').replace(/^\/+|\/+$/g, '');
+  if (path === 'intro-src') return introSource(req, res);
+  if (path === 'intro-upload') return introUpload(req, res);
   if (path === 'public-exams') return publicExams(req, res);
   if (path === 'admin-health') return health(req, res);
   if (path === 'admin-summary') return adminSummary(req, res);

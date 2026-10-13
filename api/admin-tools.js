@@ -593,7 +593,7 @@ async function introUpload(req, res) {
         if (typeof pathname !== 'string' ||
             !pathname.startsWith(INTRO_BLOB_PREFIX) ||
             !pathname.endsWith('.mp4') ||
-            !/^genome-lab-intro-[a-zA-Z0-9_-]+\\.mp4$/.test(pathname)) {
+            !/^genome-lab-intro-[a-zA-Z0-9_-]+[.]mp4$/.test(pathname)) {
           throw new Error('Tên tệp intro không hợp lệ.');
         }
         const { blobs } = await listBlobs({ prefix: INTRO_BLOB_PREFIX });

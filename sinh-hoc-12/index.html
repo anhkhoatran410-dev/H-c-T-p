@@ -720,6 +720,115 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  .orientation-hint,.orientation-card{scroll-behavior:auto!important}
 }
 
+
+/* True landscape presentation fallback for phones whose browser refuses Screen Orientation lock.
+   Rotate the presentation canvas itself, not just the picture, so text and controls stay readable. */
+@media screen and (orientation:portrait) and (max-width:900px) and (pointer:coarse){
+ .app.presentation-active.force-landscape{
+   position:fixed!important;top:0!important;left:100vw!important;right:auto!important;bottom:auto!important;
+   width:100dvh!important;height:100vw!important;max-width:none!important;max-height:none!important;
+   transform:rotate(90deg)!important;transform-origin:top left!important;
+   overflow:hidden!important;z-index:2147482000!important;
+   grid-template-rows:0 minmax(0,1fr) calc(46px + env(safe-area-inset-bottom))!important;
+ }
+ .app.presentation-active.force-landscape .top{display:none!important}
+ .app.presentation-active.force-landscape .canvas{grid-row:2!important;min-width:0!important;min-height:0!important;width:100%!important;height:100%!important;overflow:hidden!important;padding:0!important}
+ .app.presentation-active.force-landscape .stage{grid-row:1!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-height:0!important;aspect-ratio:auto!important;border:0!important;border-radius:0!important}
+ .app.presentation-active.force-landscape .slide{overflow:hidden!important;padding:0!important;min-height:0!important}
+ .app.presentation-active.force-landscape .slide-inner{
+   display:grid!important;position:absolute!important;inset:0 auto auto 0!important;width:100%!important;min-height:100%!important;
+   grid-template-columns:minmax(0,1fr)!important;grid-auto-rows:max-content!important;
+   align-content:space-evenly!important;justify-content:initial!important;
+   gap:clamp(5px,1.25vh,10px)!important;padding:clamp(10px,2vh,18px) clamp(22px,3.8vw,36px)!important;
+   transform:none!important;box-sizing:border-box!important
+ }
+ .app.presentation-active.force-landscape .bottom{
+   grid-row:3!important;width:100%!important;min-width:0!important;min-height:0!important;
+   height:auto!important;box-sizing:border-box!important;gap:5px!important;
+   padding:3px 8px calc(3px + env(safe-area-inset-bottom))!important;
+   display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important
+ }
+ .app.presentation-active.force-landscape .controls{gap:4px!important;flex-wrap:nowrap!important;flex:0 0 auto!important}
+ .app.presentation-active.force-landscape .btn{font-size:clamp(10px,1.8vh,13px)!important;min-height:30px!important;padding:5px 8px!important}
+ .app.presentation-active.force-landscape .btn.icon{width:30px!important;height:30px!important}
+ .app.presentation-active.force-landscape .counter{font-size:clamp(10px,1.8vh,13px)!important;min-width:39px!important}
+ .app.presentation-active.force-landscape .progress{max-width:100px!important;min-width:24px!important}
+ .app.presentation-active.force-landscape h1{font-size:clamp(26px,5.4vh,44px)!important;line-height:1.02!important;margin-bottom:5px!important}
+ .app.presentation-active.force-landscape h2{font-size:clamp(23px,4.8vh,38px)!important;line-height:1.06!important;margin-bottom:5px!important}
+ .app.presentation-active.force-landscape h3{font-size:clamp(17px,3.3vh,25px)!important;line-height:1.1!important;margin-bottom:4px!important}
+ .app.presentation-active.force-landscape .kicker,.app.presentation-active.force-landscape .eyebrow,.app.presentation-active.force-landscape .function-label{font-size:clamp(10px,1.8vh,13px)!important;margin-bottom:5px!important}
+ .app.presentation-active.force-landscape .lead{font-size:clamp(14px,2.8vh,20px)!important;line-height:1.3!important;margin-bottom:5px!important}
+ .app.presentation-active.force-landscape p,.app.presentation-active.force-landscape .card p,.app.presentation-active.force-landscape .function-card p,.app.presentation-active.force-landscape .detail p,.app.presentation-active.force-landscape .fact p,.app.presentation-active.force-landscape .seq p{font-size:clamp(12px,2.2vh,16px)!important;line-height:1.3!important;margin-bottom:4px!important}
+ .app.presentation-active.force-landscape .callout,.app.presentation-active.force-landscape .relationship-callout{font-size:clamp(11px,2vh,15px)!important;line-height:1.32!important;padding:6px 9px!important;margin-top:5px!important}
+ .app.presentation-active.force-landscape .figure,.app.presentation-active.force-landscape .split-figure>.figure{height:clamp(110px,29vw,185px)!important;min-height:0!important;max-height:none!important}
+ .app.presentation-active.force-landscape .dna-viz{height:clamp(125px,30vw,195px)!important;min-height:0!important}
+ .app.presentation-active.force-landscape .end-art{height:clamp(130px,33vw,210px)!important;min-height:0!important}
+ .app.presentation-active.force-landscape .cover-art{height:clamp(110px,28vw,180px)!important;min-height:0!important}
+ .app.presentation-active.force-landscape .card,.app.presentation-active.force-landscape .function-card{padding:7px!important}
+ .app.presentation-active.force-landscape .team-panel{margin-top:5px!important;padding:6px!important}
+ .app.presentation-active.force-landscape .team-grid{gap:4px!important}
+ .app.presentation-active.force-landscape .member-chip{padding:3px 5px!important}
+ .app.presentation-active.force-landscape .member-chip strong{font-size:clamp(10px,1.7vh,13px)!important}
+ .app.presentation-active.force-landscape .member-no{flex-basis:20px!important;height:20px!important;font-size:10px!important}
+ .app.presentation-active.force-landscape .notes-panel{left:auto!important;right:8px!important;top:6px!important;bottom:calc(50px + env(safe-area-inset-bottom))!important;width:min(350px,45%)!important;max-height:none!important}
+ /* The opening video inherits the rotated canvas, so it covers the whole logical landscape area. */
+ .app.presentation-active.force-landscape .intro-gate{position:absolute!important;inset:0!important;width:100%!important;height:100%!important}
+ .app.presentation-active.force-landscape .intro-frame-chip{position:absolute!important;left:12px!important;top:12px!important}
+ .app.presentation-active.force-landscape #introPlay{position:absolute!important;left:50%!important;top:50%!important}
+ .app.presentation-active.force-landscape #introSkip{position:absolute!important;right:12px!important;bottom:12px!important}
+ .app.presentation-active.force-landscape .intro-copy>.intro-status{position:absolute!important;left:50%!important;bottom:12px!important;max-width:48%!important}
+ .app.presentation-active.force-landscape .intro-copy>.intro-choose{position:absolute!important;left:12px!important;bottom:12px!important}
+}
+@media screen and (orientation:portrait) and (max-width:900px) and (pointer:coarse){
+ .app.presentation-active.force-landscape .slide-inner{align-content:center!important}
+ .app.presentation-active.force-landscape .slide[data-title="DNA đến nhiễm sắc thể"] .dna-layout{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;gap:9px!important}
+ .app.presentation-active.force-landscape .slide[data-title="DNA đến nhiễm sắc thể"] .pack{padding:5px!important;grid-template-columns:27px minmax(0,1fr)!important;gap:5px!important}
+ .app.presentation-active.force-landscape .slide[data-title="DNA đến nhiễm sắc thể"] .pack .sym{width:26px!important;height:26px!important}
+}
+/* Varied, directional transition choreography. Each slide gets a different visual entrance. */
+.slide.active.transition-cinematic-forward{animation:genomeCinematicIn .82s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-cinematic-backward{animation:genomeCinematicBack .82s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-wipe-forward{animation:genomeWipeForward .78s cubic-bezier(.22,.78,.18,1) both!important}
+.slide.active.transition-wipe-backward{animation:genomeWipeBackward .78s cubic-bezier(.22,.78,.18,1) both!important}
+.slide.active.transition-depth-forward{animation:genomeDepthForward .82s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-depth-backward{animation:genomeDepthBackward .82s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-lift-forward{animation:genomeLiftForward .75s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-lift-backward{animation:genomeLiftBackward .75s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-sweep-forward{animation:genomeSweepForward .82s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-sweep-backward{animation:genomeSweepBackward .82s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-zoom-forward{animation:genomeZoomForward .76s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-zoom-backward{animation:genomeZoomBackward .76s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-flip-forward{animation:genomeFlipForward .8s cubic-bezier(.2,.72,.16,1) both!important;backface-visibility:hidden}
+.slide.active.transition-flip-backward{animation:genomeFlipBackward .8s cubic-bezier(.2,.72,.16,1) both!important;backface-visibility:hidden}
+.slide.active.transition-glide-forward{animation:genomeGlideForward .78s cubic-bezier(.16,.82,.2,1) both!important}
+.slide.active.transition-glide-backward{animation:genomeGlideBackward .78s cubic-bezier(.16,.82,.2,1) both!important}
+@keyframes genomeCinematicIn{0%{opacity:0;transform:translateX(8%) scale(.95);filter:blur(8px)}65%{opacity:1;filter:blur(0);transform:translateX(-.6%) scale(1.006)}100%{opacity:1;transform:none;filter:none}}
+@keyframes genomeCinematicBack{0%{opacity:0;transform:translateX(-8%) scale(.95);filter:blur(8px)}65%{opacity:1;filter:blur(0);transform:translateX(.6%) scale(1.006)}100%{opacity:1;transform:none;filter:none}}
+@keyframes genomeWipeForward{0%{opacity:1;clip-path:inset(0 0 0 100%);transform:scale(1.015)}100%{opacity:1;clip-path:inset(0 0 0 0);transform:scale(1)}}
+@keyframes genomeWipeBackward{0%{opacity:1;clip-path:inset(0 100% 0 0);transform:scale(1.015)}100%{opacity:1;clip-path:inset(0 0 0 0);transform:scale(1)}}
+@keyframes genomeDepthForward{0%{opacity:0;transform:perspective(1400px) translateZ(-180px) rotateY(-7deg) scale(.92);filter:blur(5px)}100%{opacity:1;transform:perspective(1400px) translateZ(0) rotateY(0) scale(1);filter:none}}
+@keyframes genomeDepthBackward{0%{opacity:0;transform:perspective(1400px) translateZ(-180px) rotateY(7deg) scale(.92);filter:blur(5px)}100%{opacity:1;transform:perspective(1400px) translateZ(0) rotateY(0) scale(1);filter:none}}
+@keyframes genomeLiftForward{0%{opacity:0;transform:translateY(5%) scale(.975);filter:blur(4px)}75%{opacity:1;transform:translateY(-.6%) scale(1.004);filter:none}100%{opacity:1;transform:none}}
+@keyframes genomeLiftBackward{0%{opacity:0;transform:translateY(-5%) scale(.975);filter:blur(4px)}75%{opacity:1;transform:translateY(.6%) scale(1.004);filter:none}100%{opacity:1;transform:none}}
+@keyframes genomeSweepForward{0%{opacity:0;transform:translateX(12%) skewX(-1.5deg);filter:blur(5px)}70%{opacity:1;transform:translateX(-.7%) skewX(0);filter:none}100%{opacity:1;transform:none}}
+@keyframes genomeSweepBackward{0%{opacity:0;transform:translateX(-12%) skewX(1.5deg);filter:blur(5px)}70%{opacity:1;transform:translateX(.7%) skewX(0);filter:none}100%{opacity:1;transform:none}}
+@keyframes genomeZoomForward{0%{opacity:0;transform:scale(1.08);filter:blur(6px)}100%{opacity:1;transform:scale(1);filter:none}}
+@keyframes genomeZoomBackward{0%{opacity:0;transform:scale(.92);filter:blur(6px)}100%{opacity:1;transform:scale(1);filter:none}}
+@keyframes genomeFlipForward{0%{opacity:0;transform:perspective(1500px) rotateY(-12deg) translateX(5%);filter:blur(4px)}100%{opacity:1;transform:perspective(1500px) rotateY(0) translateX(0);filter:none}}
+@keyframes genomeFlipBackward{0%{opacity:0;transform:perspective(1500px) rotateY(12deg) translateX(-5%);filter:blur(4px)}100%{opacity:1;transform:perspective(1500px) rotateY(0) translateX(0);filter:none}}
+@keyframes genomeGlideForward{0%{opacity:0;transform:translateX(0) translateY(6%) scale(.98);filter:blur(4px)}100%{opacity:1;transform:none;filter:none}}
+@keyframes genomeGlideBackward{0%{opacity:0;transform:translateX(0) translateY(-6%) scale(.98);filter:blur(4px)}100%{opacity:1;transform:none;filter:none}}
+.slide.active.transition-cinematic-forward .reveal,.slide.active.transition-wipe-forward .reveal,.slide.active.transition-depth-forward .reveal,.slide.active.transition-lift-forward .reveal,.slide.active.transition-sweep-forward .reveal,.slide.active.transition-zoom-forward .reveal,.slide.active.transition-flip-forward .reveal,.slide.active.transition-glide-forward .reveal{animation:genomeContentReveal .68s cubic-bezier(.16,.82,.2,1) both}
+.slide.active .reveal:nth-child(2){animation-delay:.08s}
+.slide.active .reveal:nth-child(3){animation-delay:.15s}
+.slide.active .reveal:nth-child(4){animation-delay:.22s}
+.slide.active .reveal:nth-child(5){animation-delay:.29s}
+@keyframes genomeContentReveal{0%{opacity:0;transform:translateY(18px) scale(.985);filter:blur(3px)}100%{opacity:1;transform:none;filter:none}}
+@media(prefers-reduced-motion:reduce){
+ .slide.active[class*="transition-"]{animation:none!important}
+ .slide.active[class*="transition-"] .reveal{animation:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -1088,7 +1197,31 @@ function fitActiveSlide(){
 window.addEventListener('resize',function(){fitActiveSlide();updateOrientationHint()});
 window.addEventListener('orientationchange',function(){setTimeout(function(){fitActiveSlide();updateOrientationHint()},120)});
 if(window.visualViewport)window.visualViewport.addEventListener('resize',function(){setTimeout(function(){fitActiveSlide();updateOrientationHint()},60)});
-function show(n){var old=index;index=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,i){s.classList.toggle('active',i===index);s.classList.toggle('backward',index<old)});Array.prototype.forEach.call(ovgrid.children,function(b,i){b.classList.toggle('active',i===index)});document.getElementById('counter').textContent=String(index+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');document.getElementById('progressFill').style.width=((index+1)/slides.length*100)+'%';document.documentElement.style.setProperty('--progress',((index+1)/slides.length*100)+'%');document.getElementById('prev').disabled=index===0;document.getElementById('next').disabled=index===slides.length-1;slides[index].scrollTop=0;renderNotes();requestAnimationFrame(fitActiveSlide);if(old!==index){stopSim('mitosis');stopSim('meiosis');}}
+function show(n){
+  var old=index;
+  index=Math.max(0,Math.min(slides.length-1,n));
+  var direction=index<old?'backward':'forward';
+  var transitionTypes=['cinematic','wipe','depth','lift','sweep','zoom','flip','glide'];
+  slides.forEach(function(s,i){
+    s.classList.toggle('active',i===index);
+    s.classList.toggle('backward',direction==='backward');
+    s.classList.remove('transition-cinematic-forward','transition-cinematic-backward','transition-wipe-forward','transition-wipe-backward','transition-depth-forward','transition-depth-backward','transition-lift-forward','transition-lift-backward','transition-sweep-forward','transition-sweep-backward','transition-zoom-forward','transition-zoom-backward','transition-flip-forward','transition-flip-backward','transition-glide-forward','transition-glide-backward');
+    if(i===index){
+      var type=transitionTypes[index%transitionTypes.length];
+      s.classList.add('transition-'+type+'-'+direction);
+    }
+  });
+  Array.prototype.forEach.call(ovgrid.children,function(b,i){b.classList.toggle('active',i===index)});
+  document.getElementById('counter').textContent=String(index+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');
+  document.getElementById('progressFill').style.width=((index+1)/slides.length*100)+'%';
+  document.documentElement.style.setProperty('--progress',((index+1)/slides.length*100)+'%');
+  document.getElementById('prev').disabled=index===0;
+  document.getElementById('next').disabled=index===slides.length-1;
+  slides[index].scrollTop=0;
+  renderNotes();
+  requestAnimationFrame(fitActiveSlide);
+  if(old!==index){stopSim('mitosis');stopSim('meiosis');}
+}
 titles.forEach(function(t,i){var b=document.createElement('button');b.type='button';b.className='ovitem';b.innerHTML='<small>SLIDE '+String(i+1).padStart(2,'0')+'</small><b>'+t+'</b>';b.addEventListener('click',function(){overview.classList.remove('open');show(i)});ovgrid.appendChild(b)});
 document.getElementById('prev').addEventListener('click',function(){show(index-1)});document.getElementById('next').addEventListener('click',function(){show(index+1)});
 document.getElementById('notesToggle').addEventListener('click',function(){
@@ -1119,11 +1252,16 @@ function introCurrentlyVisible(){
 function updateOrientationHint(){
   var hint=document.getElementById('orientationHint');
   var app=document.getElementById('appRoot');
-  if(!hint)return;
-  if(window.innerWidth>window.innerHeight)orientationHintDismissed=false;
-  var shouldShow=presentationRequested&&isTouchPortrait()&&!orientationHintDismissed&&!introCurrentlyVisible();
-  hint.hidden=!shouldShow;
-  if(app)app.classList.toggle('portrait-presentation-fallback',presentationRequested&&isTouchPortrait());
+  if(!app)return;
+  var portraitPhone=presentationRequested&&isTouchPortrait();
+  var forceLandscape=portraitPhone;
+  app.classList.toggle('force-landscape',forceLandscape);
+  app.classList.toggle('portrait-presentation-fallback',portraitPhone);
+  if(hint){
+    /* CSS rotates the presentation canvas as a fallback, so never block the user with a prompt. */
+    hint.hidden=true;
+  }
+  requestAnimationFrame(function(){fitActiveSlide()});
 }
 async function enterPresentation(){
   var target=document.getElementById('appRoot')||document.querySelector('.app');
@@ -1160,7 +1298,7 @@ function exitPresentation(){
   presentationRequested=false;
   orientationHintDismissed=false;
   var target=document.getElementById('appRoot');
-  if(target)target.classList.remove('presentation-active','portrait-presentation-fallback');
+  if(target)target.classList.remove('presentation-active','portrait-presentation-fallback','force-landscape');
   var hint=document.getElementById('orientationHint');if(hint)hint.hidden=true;
   if(screen.orientation&&typeof screen.orientation.unlock==='function'){
     try{screen.orientation.unlock()}catch(err){}
@@ -1173,10 +1311,11 @@ document.getElementById('startPresentation').addEventListener('click',function()
 document.getElementById('rotateRetry').addEventListener('click',function(){
   orientationHintDismissed=false;
   enterPresentation();
+  updateOrientationHint();
 });
 document.getElementById('rotateContinue').addEventListener('click',function(){
   orientationHintDismissed=true;
-  var hint=document.getElementById('orientationHint');if(hint)hint.hidden=true;
+  updateOrientationHint();
 });
 document.getElementById('fullscreen').addEventListener('click',function(){
   if(document.fullscreenElement||presentationRequested){exitPresentation()}
@@ -1187,7 +1326,7 @@ document.addEventListener('fullscreenchange',function(){
     var app=document.getElementById('appRoot');
     if(app&&presentationRequested){
       presentationRequested=false;
-      app.classList.remove('presentation-active','portrait-presentation-fallback');
+      app.classList.remove('presentation-active','portrait-presentation-fallback','force-landscape');
       var hint=document.getElementById('orientationHint');if(hint)hint.hidden=true;
     }
   }else{

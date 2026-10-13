@@ -36,7 +36,19 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 .gene-map{border:1px solid #dce7f1;background:linear-gradient(105deg,#f3fbfc,#f5f7ff);border-radius:15px;padding:14px;margin-top:10px}.gene-map svg{width:100%;max-height:240px;display:block}.gene-labels{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}.gene-label{border:1px solid #dce7f0;border-radius:10px;padding:10px;background:#fff;text-align:center}.gene-label b{font-size:11px;color:var(--teal)}.gene-label p{font-size:9px;margin:4px 0 0}
 .sequence{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:13px}.seq{border:1px solid #dce7ef;border-radius:11px;padding:10px;background:#fff;position:relative;overflow:hidden}.seq:after{content:"";position:absolute;inset:0;transform:translateX(-125%);background:linear-gradient(110deg,transparent,#9ee9df51,transparent);animation:shine 5s ease-in-out infinite}.seq:nth-child(2):after{animation-delay:.6s}.seq:nth-child(3):after{animation-delay:1.2s}.seq:nth-child(4):after{animation-delay:1.8s}.seq .n{color:var(--teal);font-size:8px;font-weight:950;letter-spacing:.1em}.seq b{display:block;font-size:10px;margin:6px 0 4px}.seq p{font-size:9px;margin:0}
 .process-controls{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border:1px solid #d7e7ef;border-radius:12px;padding:10px 12px;background:linear-gradient(110deg,#effaf7,#f5f7ff);margin-top:10px}.process-controls .label{font-size:8px;letter-spacing:.13em;font-weight:950;color:var(--teal)}.process-state{font-size:10px;line-height:1.5;color:#405970;margin-top:4px}.ctrl-buttons{display:flex;gap:5px}.ctrl-buttons button{border:1px solid #d1e1ea;border-radius:8px;padding:7px 9px;font-size:8px;font-weight:950;background:#fff;color:#355069}.ctrl-buttons .run{background:var(--teal);border-color:var(--teal);color:#fff}.steps{display:flex;gap:5px;margin-top:9px;grid-column:1/-1}.stepbar{height:4px;flex:1;background:#dce8ef;border-radius:99px;transition:background .25s,box-shadow .25s}.stepbar.on{background:linear-gradient(90deg,#0b8c86,#47cdb7);box-shadow:0 0 9px #2bbda333}
-.phase-art{display:none;animation:revealCell .45s ease both}.phase-art.on{display:block}.sim-cell{transition:filter .3s,stroke .3s}.phase-art.on .sim-cell{filter:drop-shadow(0 0 7px #1fbaa65c)}.phase-step{transition:border .25s,background .25s,transform .25s}.phase-step.on{border-color:#79cbbf;background:#effaf7;transform:translateY(-2px);box-shadow:0 8px 18px #188b8012}
+/* All phases stay in the SVG scene so they can transition between states, not pop in/out. */
+.phase-art{display:block;opacity:0;visibility:hidden;transform:translateX(54px) scale(.94);transform-box:fill-box;transform-origin:center;transition:opacity .62s cubic-bezier(.22,.72,.18,1),transform .78s cubic-bezier(.22,.72,.18,1),visibility 0s linear .78s;pointer-events:none;will-change:opacity,transform}
+.phase-art.on{opacity:1;visibility:visible;transform:translateX(0) scale(1);transition-delay:0s}
+.phase-art.exit-left{opacity:0;visibility:visible;transform:translateX(-54px) scale(.94);transition-delay:0s}
+.phase-art.exit-right{opacity:0;visibility:visible;transform:translateX(54px) scale(.94);transition-delay:0s}
+.phase-art.enter-right{opacity:0;visibility:visible;transform:translateX(54px) scale(.94);transition-delay:0s}
+.phase-art.enter-left{opacity:0;visibility:visible;transform:translateX(-54px) scale(.94);transition-delay:0s}
+.sim-cell{transition:filter .42s ease,stroke .42s ease,stroke-width .42s ease}
+.phase-art.on .sim-cell{filter:drop-shadow(0 0 8px #1fbaa65c)}
+[data-phase-label],[data-meiosis-label]{opacity:0;transform:translateY(7px);transition:opacity .42s ease,transform .52s cubic-bezier(.22,.72,.18,1);pointer-events:none}
+.process-state{transition:color .25s ease}
+.process-state.sim-state-in{animation:stateSlideIn .48s cubic-bezier(.22,.72,.18,1) both}
+@keyframes stateSlideIn{from{opacity:.2;transform:translateX(18px);filter:blur(2px)}to{opacity:1;transform:translateX(0);filter:blur(0)}}.phase-step{transition:border .25s,background .25s,transform .25s}.phase-step.on{border-color:#79cbbf;background:#effaf7;transform:translateY(-2px);box-shadow:0 8px 18px #188b8012}
 .four-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:10px}.phase-step{padding:10px;border:1px solid #dce7ef;border-radius:11px;background:#fff}.phase-step .number{width:22px;height:22px;border-radius:7px;background:#e4f8f2;color:var(--teal);display:grid;place-items:center;font-size:9px;font-weight:950}.phase-step b{font-size:10px;display:block;margin:7px 0 4px}.phase-step p{font-size:9px;margin:0}
 .formula{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 0}.formula .node{flex:1;max-width:150px;padding:12px 8px;text-align:center;border:1px solid #d8e4f0;border-radius:12px;background:#edf5ff}.formula .node strong{font-size:28px;color:#416dd0;display:block}.formula .node span{font-size:9px;color:#71849e;display:block;margin-top:4px}.formula .node.final{background:#e4f8f2;border-color:#b9e8dc}.formula .node.final strong{color:#087e79}.sign{color:var(--teal);font-size:23px;font-weight:950}
 .quiz-layout{display:grid;grid-template-columns:.7fr 1.3fr;gap:13px;margin-top:8px}.quiz-image{min-height:255px;border-radius:15px;border:1px solid #dce7f1;background:radial-gradient(ellipse at center,#dcf7f0,#edf0ff);display:grid;place-items:center;overflow:hidden}.quiz-image svg{width:95%;max-height:265px}.quiz-card{border:1px solid #dae6ef;border-radius:14px;padding:clamp(15px,2vw,24px);background:#fff}.q-count{font-size:8px;color:var(--teal);letter-spacing:.16em;font-weight:950}.quiz-card h3{font-size:clamp(15px,1.8vw,23px);margin:10px 0 12px}.answers{display:grid;gap:7px}.answer{border:1px solid #d6e3ed;border-radius:9px;background:#f8fbff;color:#324c66;text-align:left;padding:10px 12px;font-size:10px;transition:.18s}.answer:hover{background:#eefaf6;border-color:#81cfc2}.answer:disabled{opacity:1;cursor:default}.answer.correct{background:#e3f8ee;border-color:#69c8a2;color:#176b51}.answer.wrong{background:#fff0ed;border-color:#e1a098;color:#9c4239}.q-feedback{min-height:33px;padding-top:8px;color:#087b72;font-size:10px;line-height:1.5}.q-foot{display:flex;align-items:center;justify-content:space-between;gap:8px}.score{font-size:8px;color:#8392a5;font-weight:950;letter-spacing:.08em}
@@ -426,6 +438,36 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 @keyframes chromFlow{0%,100%{stroke-width:31;filter:drop-shadow(0 0 0 #0da89a00)}50%{stroke-width:34;filter:drop-shadow(0 0 7px #0da89a55)}}
 @keyframes cellPulse{0%,100%{filter:drop-shadow(0 0 2px #1fbaa622);transform:scale(1)}50%{filter:drop-shadow(0 0 12px #1fbaa688);transform:scale(1.06)}}
 @keyframes selectedCard{0%,100%{box-shadow:0 5px 16px #188b8017}50%{box-shadow:0 7px 24px #188b8030}}
+
+
+/* Smooth left-to-right reveal for state changes and layered scientific illustrations. */
+@keyframes dnaTracer{0%{stroke-dashoffset:70;opacity:.18}45%{opacity:.8}100%{stroke-dashoffset:-70;opacity:.18}}
+@keyframes locusPing{0%,100%{filter:drop-shadow(0 0 0 #e8ad3900);transform:scale(1)}50%{filter:drop-shadow(0 0 5px #e8ad3970);transform:scale(1.07)}}
+@keyframes compareLeft{from{opacity:0;transform:translateX(-34px) scale(.98);filter:blur(2px)}to{opacity:1;transform:translateX(0) scale(1);filter:blur(0)}}
+@keyframes compareRight{from{opacity:0;transform:translateX(34px) scale(.98);filter:blur(2px)}to{opacity:1;transform:translateX(0) scale(1);filter:blur(0)}}
+@keyframes buildUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes orbitGlow{0%,100%{filter:drop-shadow(0 0 2px #19ad9f25)}50%{filter:drop-shadow(0 0 13px #19ad9f75)}}
+@media (prefers-reduced-motion:no-preference){
+ .slide[data-title="Vì sao khác nhau"].active .split-figure>div:first-child{animation:compareLeft .78s cubic-bezier(.22,.72,.18,1) both}
+ .slide[data-title="Vì sao khác nhau"].active .split-figure>div:nth-child(2){animation:compareRight .78s cubic-bezier(.22,.72,.18,1) .12s both}
+ .slide[data-title="Vì sao khác nhau"].active .split-figure svg circle{animation:orbitGlow 2.5s ease-in-out infinite}
+ .slide[data-title="NST mang thông tin"].active .sequence .seq{animation:buildUp .55s cubic-bezier(.22,.72,.18,1) both}
+ .slide[data-title="NST mang thông tin"].active .sequence .seq:nth-child(2){animation-delay:.1s}
+ .slide[data-title="NST mang thông tin"].active .sequence .seq:nth-child(3){animation-delay:.2s}
+ .slide[data-title="NST mang thông tin"].active .sequence .seq:nth-child(4){animation-delay:.3s}
+ .gene-map svg rect{transform-box:fill-box;transform-origin:center;animation:locusPing 3s ease-in-out infinite}
+ .gene-map svg rect:nth-of-type(2){animation-delay:.35s}
+ .gene-map svg rect:nth-of-type(3){animation-delay:.7s}
+ .gene-map svg rect:nth-of-type(4){animation-delay:1.05s}
+ #dnaDiagram [data-dna-shape="bases"] path{stroke-dasharray:6 10;animation:dnaTracer 3.1s linear infinite}
+ #dnaDiagram [data-dna-shape="bases"] path:nth-child(2n){animation-delay:-1.3s}
+ .dna-viz svg .helix-rung{animation:bob 3s ease-in-out infinite;animation-delay:calc(var(--rung-i, 0) * -.11s)}
+ .cover-art svg,.end-art svg{transform-origin:50% 50%}
+ .function-card .function-visual svg{animation:orbitGlow 3.2s ease-in-out infinite}
+}
+@media (prefers-reduced-motion:reduce){
+ .phase-art,.phase-art.on,.process-state.sim-state-in{animation:none!important;transition:none!important;transform:none!important}
+}
 
 </style>
 </head>
@@ -864,11 +906,54 @@ meiosis:{max:3,state:'meiosisState',steps:'meiosisSteps',arts:'[data-meiosis-art
 'Bước 3/3 · Sau giảm phân II, chromatid chị em phân li; kết quả điển hình là bốn tế bào n.'
 ],cards:null}
 };
-var simPos={mitosis:0,meiosis:0},simTimers={mitosis:null,meiosis:null};
+var simPos={mitosis:0,meiosis:0},simTimers={mitosis:null,meiosis:null},simLastDrawn={mitosis:null,meiosis:null};
 function stopSim(name){if(simTimers[name]){clearInterval(simTimers[name]);simTimers[name]=null}var b=document.getElementById(name+'Play');if(b)b.textContent='Chạy ▶'}
-function drawSim(name){var d=simInfo[name],step=simPos[name];document.getElementById(d.state).textContent=d.texts[step];Array.prototype.forEach.call(document.getElementById(d.steps).children,function(el,i){el.classList.toggle('on',i===step)});document.querySelectorAll(d.arts).forEach(function(el){var k=name==='mitosis'?el.dataset.phaseArt:el.dataset.meiosisArt;el.classList.toggle('on',Number(k)===step)});var labels=document.querySelectorAll(name==='mitosis'?'[data-phase-label]':'[data-meiosis-label]');labels.forEach(function(el){el.style.display=Number(name==='mitosis'?el.dataset.phaseLabel:el.dataset.meiosisLabel)===step?'':'none'});document.getElementById(name+'Prev').disabled=step===0;document.getElementById(name+'Next').disabled=step===d.max-1}
+function drawSim(name){
+  var d=simInfo[name],step=simPos[name],previous=simLastDrawn[name],forward=previous===null||step>=previous;
+  var state=document.getElementById(d.state);
+  state.textContent=d.texts[step];
+  state.classList.remove('sim-state-in');
+  void state.offsetWidth;
+  state.classList.add('sim-state-in');
+  Array.prototype.forEach.call(document.getElementById(d.steps).children,function(el,i){
+    el.classList.toggle('on',i===step);
+  });
+  document.querySelectorAll(d.arts).forEach(function(el){
+    var k=Number(name==='mitosis'?el.dataset.phaseArt:el.dataset.meiosisArt);
+    el.classList.remove('exit-left','exit-right','enter-left','enter-right');
+    if(k===step){
+      if(previous!==null&&previous!==step){
+        el.classList.remove('on');
+        el.classList.add(forward?'enter-right':'enter-left');
+        void el.getBoundingClientRect();
+        requestAnimationFrame(function(){
+          el.classList.remove('enter-right','enter-left');
+          el.classList.add('on');
+        });
+      }else{
+        el.classList.add('on');
+      }
+    }else if(previous!==null&&k===previous&&previous!==step){
+      el.classList.remove('on');
+      el.classList.add(forward?'exit-left':'exit-right');
+    }else{
+      el.classList.remove('on');
+    }
+  });
+  var labels=document.querySelectorAll(name==='mitosis'?'[data-phase-label]':'[data-meiosis-label]');
+  labels.forEach(function(el){
+    var active=Number(name==='mitosis'?el.dataset.phaseLabel:el.dataset.meiosisLabel)===step;
+    el.style.display='';
+    el.style.opacity=active?'1':'0';
+    el.style.visibility='visible';
+    el.style.transform=active?'translateY(0)':'translateY(7px)';
+  });
+  simLastDrawn[name]=step;
+  document.getElementById(name+'Prev').disabled=step===0;
+  document.getElementById(name+'Next').disabled=step===d.max-1;
+}
 function setSim(name,n){stopSim(name);simPos[name]=Math.max(0,Math.min(simInfo[name].max-1,n));drawSim(name)}
-function bindSim(name){var d=simInfo[name];document.getElementById(name+'Prev').addEventListener('click',function(){setSim(name,simPos[name]-1)});document.getElementById(name+'Next').addEventListener('click',function(){setSim(name,simPos[name]+1)});document.getElementById(name+'Reset').addEventListener('click',function(){setSim(name,0)});document.getElementById(name+'Play').addEventListener('click',function(){var btn=this;if(simTimers[name]){stopSim(name);return}if(simPos[name]===d.max-1)simPos[name]=0;drawSim(name);btn.textContent='Dừng Ⅱ';simTimers[name]=setInterval(function(){if(simPos[name]>=d.max-1){stopSim(name);return}simPos[name]++;drawSim(name)},2200)});drawSim(name)}
+function bindSim(name){var d=simInfo[name];document.getElementById(name+'Prev').addEventListener('click',function(){setSim(name,simPos[name]-1)});document.getElementById(name+'Next').addEventListener('click',function(){setSim(name,simPos[name]+1)});document.getElementById(name+'Reset').addEventListener('click',function(){setSim(name,0)});document.getElementById(name+'Play').addEventListener('click',function(){var btn=this;if(simTimers[name]){stopSim(name);return}if(simPos[name]===d.max-1)simPos[name]=0;drawSim(name);btn.textContent='Dừng Ⅱ';simTimers[name]=setInterval(function(){if(simPos[name]>=d.max-1){stopSim(name);return}simPos[name]++;drawSim(name)},2600)});drawSim(name)}
 bindSim('mitosis');bindSim('meiosis');
 
 var questions=[

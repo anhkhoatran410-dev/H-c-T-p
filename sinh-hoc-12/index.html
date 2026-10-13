@@ -45,12 +45,40 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 .overview{display:none;position:absolute;inset:0;z-index:20;overflow:auto;padding:22px;background:#f7fbffef;backdrop-filter:blur(16px)}.overview.open{display:block;animation:rise .2s ease-out}.overview-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;gap:12px}.overview-head h2{font-size:22px;margin:0}.ovgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.ovitem{border:1px solid #d9e5ee;background:#fff;border-radius:10px;padding:12px;text-align:left;min-height:74px;color:var(--ink)}.ovitem.active{border-color:#6bc7bc;background:#eaf9f5}.ovitem small{display:block;color:var(--teal);font-size:8px;font-weight:950;letter-spacing:.1em;margin-bottom:6px}.ovitem b{font-size:10px}
 @media(max-width:900px){.canvas{padding:8px}.stage{width:100%;height:100%;aspect-ratio:auto;max-height:none;border-radius:13px}.chapter{display:none}.slide{padding:clamp(20px,4vw,38px)}.progress{max-width:110px}.ovgrid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:600px){.app{grid-template-rows:48px minmax(0,1fr) 56px}.top{padding:0 10px;gap:8px}.mark{width:29px;height:29px;border-radius:9px;font-size:18px}.brand b{font-size:9px}.brand small{font-size:7px;letter-spacing:.08em}.live{padding:6px 7px;font-size:7px}.canvas{padding:5px}.stage{border-radius:11px}.slide{padding:17px 16px 20px;align-content:start;justify-content:center}.slide h1{font-size:clamp(34px,9.5vw,48px)}.slide h2{font-size:clamp(26px,7.1vw,34px)}.lead{font-size:13px}.cover{grid-template-columns:1fr;gap:12px}.cover-art{height:185px;min-height:185px;max-height:185px}.cover-svg{height:96%;width:120px}.members{font-size:8px;margin-top:9px}.pill{font-size:7px;padding:6px 8px}.two-col{gap:8px}.card{padding:11px;border-radius:11px}.card p{font-size:10px}.stat{font-size:28px}.figure{min-height:185px}.split-figure{grid-template-columns:1fr;gap:10px}.split-figure>.figure{min-height:220px;max-height:255px}.part-buttons{gap:5px}.part-btn{font-size:8px;padding:7px 8px}.detail{min-height:auto}.dna-layout{grid-template-columns:1fr;gap:10px}.dna-viz{min-height:190px;max-height:215px}.dna-viz svg{height:200px;max-height:200px}.packaging{grid-template-columns:1fr 1fr;gap:6px}.pack{grid-template-columns:32px 1fr;padding:8px;gap:7px}.pack .sym{width:30px;height:30px;font-size:11px;border-radius:8px}.pack b{font-size:9px}.pack small{font-size:8px}.gene-map{padding:9px}.gene-map svg{max-height:160px}.gene-labels{gap:5px}.gene-label{padding:7px}.sequence{grid-template-columns:1fr 1fr;gap:6px}.seq{padding:8px}.process-controls{grid-template-columns:1fr;gap:7px}.ctrl-buttons{justify-content:flex-start}.ctrl-buttons button{padding:7px 10px}.steps{margin-top:1px}.four-steps{grid-template-columns:1fr 1fr;gap:7px}.phase-step{padding:8px}.phase-step p{font-size:8px}.phase-step b{font-size:9px}.formula{gap:5px;margin:10px 0}.formula .node{padding:9px 3px;min-width:0}.formula .node strong{font-size:22px}.formula .node span{font-size:8px}.sign{font-size:17px}.quiz-layout{grid-template-columns:1fr;gap:8px}.quiz-image{min-height:125px;max-height:140px}.quiz-image svg{height:130px}.quiz-card{padding:12px}.quiz-card h3{font-size:15px}.answer{font-size:10px;padding:9px 10px}.q-feedback{font-size:9px}.final-layout{grid-template-columns:1fr;gap:10px}.thankyou{font-size:clamp(44px,12vw,60px);margin:8px 0 12px}.final-message{font-size:13px}.end-art{min-height:165px;height:165px;border-radius:15px}.end-art svg{width:125px}.thanks-names{margin-top:9px;font-size:7px}.final-slide{align-content:center}.bottom{padding:0 6px;gap:5px}.counter{min-width:37px;font-size:8px}.progress{max-width:50px;flex:1}.controls{gap:4px}.btn{font-size:8px;padding:8px 9px;border-radius:8px}.btn.icon{width:29px;height:29px;font-size:11px}.btn.notes{font-size:8px;padding:8px}.ovgrid{grid-template-columns:repeat(2,1fr)}.overview{padding:12px}.notes-panel{right:7px;bottom:62px;width:calc(100vw - 14px);max-height:75vh}.notes-body{padding:12px}.notes-body p{font-size:11px}.overview-head h2{font-size:18px}}
+/* Presentation mode: use the whole screen and preserve the 16:9 slide canvas */
+.app:fullscreen{height:100dvh;width:100vw;grid-template-rows:0 minmax(0,1fr) 58px;background:#edf4fa}
+.app:fullscreen .top{display:none}
+.app:fullscreen .canvas{padding:0;overflow:hidden}
+.app:fullscreen .stage{width:100%;height:100%;max-height:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
+.app:fullscreen .slide{align-content:center;justify-content:center;padding:clamp(18px,3.2vw,54px);overflow:auto}
+.app:fullscreen .bottom{padding-bottom:env(safe-area-inset-bottom);background:#fffffff2}
+.app:fullscreen .notes-panel{bottom:calc(68px + env(safe-area-inset-bottom));max-height:calc(100dvh - 90px)}
+.app:fullscreen .overview{position:absolute}
+@media (orientation:landscape) and (max-height:600px){
+.app:fullscreen{grid-template-rows:0 minmax(0,1fr) 48px}
+.app:fullscreen .slide{padding:clamp(12px,2.5vh,28px) clamp(22px,4vw,64px)}
+.app:fullscreen h1{font-size:clamp(28px,5.7vh,58px)}
+.app:fullscreen h2{font-size:clamp(23px,4.6vh,42px)}
+.app:fullscreen .lead{font-size:clamp(12px,2.3vh,17px);margin-bottom:8px}
+.app:fullscreen .cover-art{min-height:0;height: min(68vh,360px)}
+.app:fullscreen .figure{min-height:0;height:42vh}
+.app:fullscreen .split-figure>.figure{min-height:0;height:42vh}
+.app:fullscreen .dna-viz{min-height:0;height:52vh}
+.app:fullscreen .quiz-image{min-height:0;height:42vh}
+.app:fullscreen .end-art{min-height:0;height:55vh}
+.app:fullscreen .bottom{gap:8px;padding-left:14px;padding-right:14px}
+.app:fullscreen .btn{padding:7px 12px}
+}
+@media (orientation:portrait) and (max-width:900px){
+.app:fullscreen .canvas{padding:0}
+.app:fullscreen .stage{width:100%;height:100%;aspect-ratio:auto}
+}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
-<div class="app">
-<header class="top"><div class="brand"><span class="mark">✳</span><div><b>GENOME LAB</b><small>VISUAL BIOLOGY · SINH HỌC 12</small></div></div><div class="top-spacer"></div><span class="chapter">BÀI 7 · DI TRUYỀN HỌC</span><span class="live">TRÌNH CHIẾU</span></header>
+<div class="app" id="appRoot">
+<header class="top"><div class="brand"><span class="mark">✳</span><div><b>GENOME LAB</b><small>VISUAL BIOLOGY · SINH HỌC 12</small></div></div><div class="top-spacer"></div><span class="chapter">BÀI 7 · DI TRUYỀN HỌC</span><button class="live" id="startPresentation" type="button" aria-label="Bắt đầu trình chiếu toàn màn hình">● TRÌNH CHIẾU</button></header>
 <main class="canvas">
 <div class="stage" id="stage">
 <section class="slide active" data-title="Mở đầu">
@@ -292,7 +320,30 @@ titles.forEach(function(t,i){var b=document.createElement('button');b.type='butt
 document.getElementById('prev').addEventListener('click',function(){show(index-1)});document.getElementById('next').addEventListener('click',function(){show(index+1)});
 document.getElementById('notesToggle').addEventListener('click',function(){notesPanel.classList.toggle('open');renderNotes()});document.getElementById('closeNotes').addEventListener('click',function(){notesPanel.classList.remove('open')});
 document.getElementById('overviewToggle').addEventListener('click',function(){overview.classList.toggle('open')});document.getElementById('closeOverview').addEventListener('click',function(){overview.classList.remove('open')});
-document.getElementById('fullscreen').addEventListener('click',function(){if(!document.fullscreenElement){document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}else{document.exitFullscreen&&document.exitFullscreen()}});
+async function enterPresentation(){
+  var target=document.getElementById('appRoot')||document.querySelector('.app');
+  try{
+    if(!document.fullscreenElement){
+      if(target.requestFullscreen) await target.requestFullscreen({navigationUI:'hide'});
+      else if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({navigationUI:'hide'});
+    }
+    /* On Android browsers, locking after entering fullscreen rotates the device UI to landscape. */
+    if(screen.orientation&&screen.orientation.lock){
+      try{await screen.orientation.lock('landscape')}catch(err){/* The user can still rotate the device manually. */}
+    }
+  }catch(err){
+    /* Keep the normal slide controls usable if fullscreen is restricted by the browser. */
+  }
+}
+document.getElementById('startPresentation').addEventListener('click',enterPresentation);
+document.getElementById('fullscreen').addEventListener('click',function(){
+  if(!document.fullscreenElement){enterPresentation()}
+  else{if(screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock()}catch(err){}}document.exitFullscreen&&document.exitFullscreen()}
+});
+document.addEventListener('fullscreenchange',function(){
+  var b=document.getElementById('fullscreen');
+  if(b)b.textContent=document.fullscreenElement?'⤢':'⛶';
+});
 document.getElementById('auto').addEventListener('click',function(){if(autoOn){clearInterval(autoTimer);autoTimer=null;autoOn=false;this.textContent='▶'}else{autoOn=true;this.textContent='Ⅱ';autoTimer=setInterval(function(){if(index>=slides.length-1){clearInterval(autoTimer);autoTimer=null;autoOn=false;document.getElementById('auto').textContent='▶';return}show(index+1)},8500)}});
 document.addEventListener('keydown',function(e){if(/INPUT|TEXTAREA/.test(e.target.tagName))return;if(e.key==='ArrowRight'||e.key==='PageDown'){e.preventDefault();show(index+1)}else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(index-1)}else if(e.key.toLowerCase()==='n'){notesPanel.classList.toggle('open');renderNotes()}else if(e.key.toLowerCase()==='o'){overview.classList.toggle('open')}else if(e.key.toLowerCase()==='f'){document.getElementById('fullscreen').click()}else if(e.key==='Escape'){overview.classList.remove('open');notesPanel.classList.remove('open')}});
 

@@ -545,7 +545,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 <div class="kicker reveal">03 / Từ phân tử đến cấu trúc</div><h2 class="reveal">Thông tin được lưu trong <span class="teal">DNA</span></h2>
 <div class="dna-layout reveal">
 <div class="dna-viz">
-<svg viewBox="0 0 300 340" role="img" aria-label="DNA xoắn kép gồm hai mạch và các cặp base">
+<svg id="dnaDiagram" viewBox="0 0 300 340" role="img" aria-label="DNA xoắn kép gồm hai mạch và các cặp base">
 <defs><linearGradient id="dnaA" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#18bba6"/><stop offset="1" stop-color="#4484e4"/></linearGradient><linearGradient id="dnaB" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#a48be9"/><stop offset="1" stop-color="#e7a844"/></linearGradient></defs>
 <g data-dna-shape="strands"><path d="M80 20C230 50 70 93 220 123S70 197 220 227S70 282 220 320" stroke="url(#dnaA)" stroke-width="9" stroke-linecap="round" fill="none"/><path d="M220 20C70 50 230 93 80 123S230 197 80 227S230 282 80 320" stroke="url(#dnaB)" stroke-width="9" stroke-linecap="round" fill="none"/></g>
 <g data-dna-shape="bases" stroke="#b5c7df" stroke-width="4" stroke-linecap="round"><path class="helix-rung" d="M98 31l104 2"/><path class="helix-rung" d="M131 54l37 3"/><path class="helix-rung" d="M148 82l5 1"/><path class="helix-rung" d="M106 103l87 4"/><path class="helix-rung" d="M96 134l107-6"/><path class="helix-rung" d="M134 157l34-3"/><path class="helix-rung" d="M163 185l-26-1"/><path class="helix-rung" d="M106 207l87 2"/><path class="helix-rung" d="M96 234l107-7"/><path class="helix-rung" d="M134 257l34-2"/><path class="helix-rung" d="M163 284l-26-1"/><path class="helix-rung" d="M105 305l89 7"/></g>
@@ -810,10 +810,11 @@ locus:{title:'Gene / locus',text:'Locus là vị trí xác định của gene tr
 'q-arm':{title:'Cánh q',text:'Cánh q là cánh còn lại, thường dài hơn cánh p. Độ dài và vị trí tâm động thực tế phụ thuộc từng NST.'}
 };
 var dnaPartInfo={
-base:{tag:'01 · THÀNH PHẦN DNA',title:'Cặp base bổ sung',text:'Các base bắt cặp theo nguyên tắc bổ sung: A với T, G với C. Trình tự các nucleotide dọc theo phân tử DNA tạo nên thông tin di truyền.',shape:'bases'},
-gene:{tag:'02 · ĐOẠN DNA CÓ CHỨC NĂNG',title:'Gene là một đoạn DNA',text:'Gene là đoạn DNA mang thông tin để tạo ra sản phẩm chức năng, thường là RNA hoặc RNA tham gia tổng hợp protein. Vì vậy, không phải toàn bộ DNA đều là gene.',shape:'gene-highlight'},
-chromatin:{tag:'03 · ĐÓNG GÓI VẬT CHẤT DI TRUYỀN',title:'DNA liên kết với protein',text:'DNA kết hợp với histone và các protein khác tạo thành chất nhiễm sắc. Cách đóng gói này giúp tổ chức một phân tử DNA rất dài bên trong nhân tế bào.',shape:'protein-highlight'},
-chromosome:{tag:'04 · CẤU TRÚC TỔ CHỨC DNA',title:'Nhiễm sắc thể',text:'Nhiễm sắc thể là cấu trúc tổ chức vật chất di truyền. Khi tế bào phân chia, NST co xoắn, được phân li và giúp phân phối DNA cho các tế bào con.',shape:'chromosome-highlight'}
+strands:{tag:'01 · CẤU TRÚC DNA',title:'Hai mạch DNA bổ sung',text:'DNA gồm hai mạch polynucleotide xoắn quanh nhau. Các nucleotide ở hai mạch bắt cặp bổ sung, giúp lưu giữ thông tin và làm khuôn khi DNA nhân đôi.',shape:'strands'},
+base:{tag:'02 · THÀNH PHẦN DNA',title:'Cặp base bổ sung',text:'Các base bắt cặp theo nguyên tắc bổ sung: A với T, G với C. Trình tự các nucleotide dọc theo phân tử DNA tạo nên thông tin di truyền.',shape:'bases'},
+gene:{tag:'03 · ĐOẠN DNA CÓ CHỨC NĂNG',title:'Gene là một đoạn DNA',text:'Gene là đoạn DNA mang thông tin để tạo ra sản phẩm chức năng, thường là RNA hoặc thông qua RNA để tổng hợp protein. Vì vậy, không phải toàn bộ DNA đều là gene.',shape:'gene-highlight'},
+chromatin:{tag:'04 · ĐÓNG GÓI VẬT CHẤT DI TRUYỀN',title:'DNA liên kết với protein',text:'DNA kết hợp với histone và các protein khác tạo thành chất nhiễm sắc. Cách đóng gói này giúp tổ chức một phân tử DNA rất dài bên trong nhân tế bào.',shape:'protein-highlight'},
+chromosome:{tag:'05 · CẤU TRÚC TỔ CHỨC DNA',title:'Nhiễm sắc thể',text:'Nhiễm sắc thể là cấu trúc tổ chức vật chất di truyền. Khi tế bào phân chia, NST co xoắn, được phân li và giúp phân phối DNA cho các tế bào con.',shape:'chromosome-highlight'}
 };
 function selectDnaPart(key){
  var d=dnaPartInfo[key];if(!d)return;
@@ -821,16 +822,18 @@ function selectDnaPart(key){
  var tag=document.getElementById('dnaDetailTag'),title=document.getElementById('dnaDetailTitle'),txt=document.getElementById('dnaDetailText');
  if(tag)tag.textContent=d.tag;if(title)title.textContent=d.title;if(txt)txt.textContent=d.text;
  document.querySelectorAll('#dnaDiagram [data-dna-shape]').forEach(function(g){
-   var selected=g.getAttribute('data-dna-shape')===d.shape;
-   var keepStrands=(key!=='chromosome'&&g.getAttribute('data-dna-shape')==='strands');
-   var keepBases=(key==='base'&&g.getAttribute('data-dna-shape')==='bases');
-   g.style.opacity=(selected||keepStrands||keepBases)?'1':'0.16';
-   if(selected){g.style.filter='drop-shadow(0 0 5px #16a99b55)';}
-   else{g.style.filter='none';}
+   var shape=g.getAttribute('data-dna-shape');
+   var selected=shape===d.shape;
+   var keepStrands=(key!=='chromosome'&&shape==='strands');
+   var keepBases=(key==='base'&&shape==='bases');
+   if(shape==='strands')g.style.opacity=key==='chromosome'?'.12':'1';
+   else if(shape==='bases')g.style.opacity=key==='base'?'1':'.32';
+   else g.style.opacity=selected?'1':'0';
+   g.style.filter=selected?'drop-shadow(0 0 5px #16a99b55)':'none';
  });
  document.querySelectorAll('#dnaDiagram [data-dna-select]').forEach(function(label){
    var target=label.getAttribute('data-dna-select');
-   label.style.opacity=(key==='base'?target==='base':target==='strands')?'1':'.35';
+   label.style.opacity=(key==='base'?target==='base':key==='strands'?target==='strands':target==='strands')?'1':'.35';
  });
 }
 function bindDnaCard(card){
@@ -840,7 +843,7 @@ function bindDnaCard(card){
 }
 document.querySelectorAll('.dna-pack').forEach(bindDnaCard);
 document.querySelectorAll('#dnaDiagram [data-dna-select]').forEach(function(label){
- var activate=function(){selectDnaPart(label.getAttribute('data-dna-select')==='base'?'base':'gene')};
+ var activate=function(){selectDnaPart(label.getAttribute('data-dna-select')==='base'?'base':'strands')};
  label.addEventListener('click',activate);
  label.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();activate()}});
 });

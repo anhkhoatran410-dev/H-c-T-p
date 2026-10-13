@@ -117,6 +117,112 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 .app:fullscreen .stage{grid-row:1;width:100%;height:100%;aspect-ratio:auto;min-height:0}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+/* Clearer cover credits and an intuitive two-function slide */
+.team-panel{margin-top:16px;padding:13px 14px;border:1px solid #cfe4e7;border-radius:15px;background:linear-gradient(125deg,#f0fbf8,#f4f7ff);box-shadow:0 9px 24px #183b5a0a}
+.team-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.team-heading>b{font-size:11px;letter-spacing:.17em;color:#21384e}
+.team-count{font-size:9px;font-weight:950;letter-spacing:.09em;color:#087f83;background:#dcf7ef;border:1px solid #bee8dd;border-radius:999px;padding:5px 8px}
+.team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:10px}
+.member-chip{min-width:0;display:flex;align-items:center;gap:7px;padding:7px 8px;border:1px solid #dce7ef;background:#fff;border-radius:9px;box-shadow:0 2px 5px #1f416006}
+.member-no{display:grid;place-items:center;flex:0 0 24px;height:24px;border-radius:7px;background:#e8f2ff;color:#476bca;font-size:9px;font-weight:950}
+.member-chip strong{min-width:0;overflow-wrap:anywhere;font-size:11px;line-height:1.15;color:#31465d;font-weight:800}
+.leader-chip{grid-column:1/-1;background:linear-gradient(100deg,#e1f8f0,#f4f6ff);border-color:#8ad4c4;padding:8px 9px}
+.leader-chip .member-no{background:linear-gradient(135deg,#078b83,#36c6af);color:white}
+.leader-chip strong{font-size:12px;color:#153b4b}
+.leader-label{margin-left:auto;white-space:nowrap;padding:5px 7px;background:#087f83;color:white;border-radius:6px;font-size:8px;font-weight:950;letter-spacing:.07em}
+.function-flow{display:grid;grid-template-columns:minmax(0,1fr) 68px minmax(0,1fr);gap:10px;align-items:stretch;margin-top:7px}
+.function-card{min-width:0;border:1px solid #d9e7ef;border-radius:16px;padding:clamp(13px,1.6vw,22px);background:linear-gradient(155deg,#ffffff,#f5fbff);box-shadow:0 10px 28px #2443600a;display:flex;flex-direction:column}
+.function-card.transmit{background:linear-gradient(155deg,#fffdf7,#f5f8ff);border-color:#eadfc8}
+.function-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.function-number{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:#dcf7ef;color:#087f83;font-size:13px;font-weight:950}
+.transmit .function-number{background:#fff0d4;color:#a66d1b}
+.function-label{font-size:10px;letter-spacing:.14em;font-weight:950;color:#087f83}
+.transmit .function-label{color:#a66d1b}
+.function-card h3{font-size:clamp(17px,1.8vw,24px);line-height:1.12;letter-spacing:-.03em;margin:4px 0 7px;color:#1e3047}
+.function-card p{font-size:clamp(13px,1.15vw,16px);line-height:1.45;margin-bottom:7px;color:#50677d}
+.function-visual{height:clamp(110px,19vh,155px);display:grid;place-items:center;overflow:hidden;border-radius:12px;background:radial-gradient(ellipse at center,#e4f8f3,#eef2ff 75%);margin-top:5px}
+.transmit .function-visual{background:radial-gradient(ellipse at center,#fff4dc,#edf2ff 75%)}
+.function-visual svg{width:100%;height:100%;max-height:100%}
+.function-bottom{display:grid;grid-template-columns:44px 1fr;align-items:center;gap:9px;margin-top:9px;padding:9px;border-radius:10px;background:#eaf8f4;color:#35566b}
+.transmit .function-bottom{background:#fff4e2}
+.bottom-icon{display:grid;place-items:center;height:39px;border-radius:9px;background:#0e9189;color:white;font-size:12px;font-weight:950}
+.bottom-icon.gold-icon{background:#d99a32}
+.function-bottom b{display:block;font-size:12px;line-height:1.25;color:#24465a}
+.function-bottom small{display:block;margin-top:3px;color:#647b8f;font-size:10px;line-height:1.35}
+.flow-link{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#0b8a83;text-align:center}
+.flow-link span{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#e2f8f1;border:1px solid #9bdbce;font-size:28px;font-weight:900;box-shadow:0 5px 18px #11988918}
+.flow-link small{font-size:8px;line-height:1.3;letter-spacing:.08em;font-weight:950;color:#698096}
+.relationship-callout{display:flex;align-items:center;gap:12px;padding:13px 16px;margin-top:12px;border-left:4px solid #0b8f85;border-radius:0 12px 12px 0;background:linear-gradient(100deg,#e7f8f2,#eef4ff);font-size:clamp(13px,1.1vw,15px);line-height:1.5;color:#31596a}
+.relationship-callout b{font-size:clamp(14px,1.2vw,16px);color:#18384b}
+.relationship-mark{flex:0 0 30px;height:30px;display:grid;place-items:center;border-radius:9px;background:#087f83;color:#fff;font-weight:950;font-size:16px}
+/* Raise the smallest text sizes in the slide canvas, especially on presentations. */
+.slide .eyebrow,.slide .function-label{font-size:10px}
+.slide .pill{font-size:10px}
+.slide .members,.slide .members b{font-size:12px}
+.slide .small{font-size:11px}
+.slide .figlabel{font-size:10px}
+.slide .part-btn{font-size:10px;padding:8px 11px}
+.slide .detail b{font-size:13px}
+.slide .detail p{font-size:12px;line-height:1.5}
+.slide .pack b{font-size:13px}
+.slide .pack small{font-size:11px}
+.slide .gene-label b{font-size:13px}
+.slide .gene-label p{font-size:11px}
+.slide .fact p{font-size:12px;line-height:1.5}
+.slide .callout{font-size:12px;line-height:1.5}
+.slide .card p{font-size:clamp(12px,1.0vw,14px);line-height:1.5}
+.app:fullscreen .team-panel{margin-top:10px;padding:10px 12px}
+.app:fullscreen .team-grid{gap:5px;margin-top:7px}
+.app:fullscreen .member-chip{padding:5px 7px}
+.app:fullscreen .member-no{flex-basis:22px;height:22px}
+.app:fullscreen .member-chip strong{font-size:clamp(11px,1.7vh,13px)}
+.app:fullscreen .leader-chip strong{font-size:clamp(12px,1.8vh,14px)}
+.app:fullscreen .team-heading>b{font-size:10px}
+.app:fullscreen .team-count{font-size:9px}
+.app:fullscreen .leader-label{font-size:8px}
+.app:fullscreen .function-card p{font-size:clamp(13px,2vh,16px)}
+.app:fullscreen .function-card h3{font-size:clamp(18px,2.8vh,25px)}
+.app:fullscreen .function-label{font-size:10px}
+.app:fullscreen .function-bottom b{font-size:clamp(12px,1.8vh,14px)}
+.app:fullscreen .function-bottom small{font-size:clamp(10px,1.5vh,12px)}
+.app:fullscreen .relationship-callout{font-size:clamp(13px,1.8vh,15px)}
+.app:fullscreen .relationship-callout b{font-size:clamp(14px,2vh,16px)}
+@media(max-width:900px){
+ .function-flow{grid-template-columns:minmax(0,1fr);gap:8px}
+ .flow-link{flex-direction:row}
+ .flow-link span{width:33px;height:33px;font-size:23px}
+ .function-visual{height:110px}
+ .team-panel{margin-top:10px;padding:10px}
+ .member-chip strong{font-size:10px}
+}
+@media(max-width:600px){
+ .team-grid{gap:5px}
+ .member-chip{gap:5px;padding:6px}
+ .member-chip strong{font-size:9px}
+ .leader-label{font-size:7px;padding:4px 5px}
+ .function-card{padding:12px}
+ .function-card p{font-size:12px}
+ .function-visual{height:100px}
+ .function-bottom{grid-template-columns:37px 1fr;padding:7px;gap:7px}
+ .bottom-icon{height:34px}
+ .function-bottom b{font-size:11px}
+ .function-bottom small{font-size:9px}
+ .relationship-callout{padding:10px 11px;font-size:12px}
+}
+@media (orientation:landscape) and (max-height:760px){
+ .app:fullscreen .function-flow{grid-template-columns:minmax(0,1fr) 50px minmax(0,1fr);gap:8px}
+ .app:fullscreen .function-card{padding:10px}
+ .app:fullscreen .function-card h3{font-size:clamp(17px,2.3vh,21px)}
+ .app:fullscreen .function-card p{font-size:clamp(12px,1.8vh,14px)}
+ .app:fullscreen .function-visual{height:clamp(95px,17vh,135px)}
+ .app:fullscreen .function-bottom{grid-template-columns:36px 1fr;padding:7px;gap:7px}
+ .app:fullscreen .function-bottom b{font-size:clamp(11px,1.8vh,13px)}
+ .app:fullscreen .function-bottom small{font-size:clamp(9px,1.4vh,11px)}
+ .app:fullscreen .relationship-callout{margin-top:8px;padding:9px 12px}
+ .app:fullscreen .team-panel{max-width:730px}
+}
+
 </style>
 </head>
 <body>
@@ -131,7 +237,20 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 <h1 class="reveal">CHỨC NĂNG CỦA <span>NHIỄM SẮC THỂ</span></h1>
 <p class="lead reveal">Bộ máy lưu giữ và truyền thông tin di truyền qua các thế hệ tế bào.</p>
 <div class="pillrow reveal"><span class="pill">01 · MANG THÔNG TIN</span><span class="pill gold">02 · TRUYỀN ĐẠT</span></div>
-<div class="members reveal"><b>NHÓM THỰC HIỆN</b><br>Nguyễn Thành Đạt (nhóm trưởng) · Trần Gia Bảo · Trần Anh Khoa · Võ Cao Kỳ<br>Lý Nhã Kỳ · Mai Đỗ Diễm Trang · Từ Kim Quyên · Hồ Trần Phi Yếu · Nguyễn Thành Khôi</div>
+<div class="team-panel reveal" aria-label="Danh sách 9 thành viên nhóm">
+  <div class="team-heading"><b>ĐỘI NGŨ THỰC HIỆN</b><span class="team-count">09 THÀNH VIÊN</span></div>
+  <div class="team-grid">
+    <div class="member-chip leader-chip"><span class="member-no">01</span><strong>Nguyễn Thành Đạt</strong><span class="leader-label">NHÓM TRƯỞNG</span></div>
+    <div class="member-chip"><span class="member-no">02</span><strong>Trần Gia Bảo</strong></div>
+    <div class="member-chip"><span class="member-no">03</span><strong>Trần Anh Khoa</strong></div>
+    <div class="member-chip"><span class="member-no">04</span><strong>Võ Cao Kỳ</strong></div>
+    <div class="member-chip"><span class="member-no">05</span><strong>Lý Nhã Kỳ</strong></div>
+    <div class="member-chip"><span class="member-no">06</span><strong>Mai Đỗ Diễm Trang</strong></div>
+    <div class="member-chip"><span class="member-no">07</span><strong>Từ Kim Quyên</strong></div>
+    <div class="member-chip"><span class="member-no">08</span><strong>Hồ Trần Phi Yếu</strong></div>
+    <div class="member-chip"><span class="member-no">09</span><strong>Nguyễn Thành Khôi</strong></div>
+  </div>
+</div>
 </div>
 <div class="cover-art reveal">
 <span class="orb"></span><span class="orb o2"></span><span class="orb o3"></span><span class="orb o4"></span>
@@ -145,14 +264,45 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 </div>
 </section>
 <section class="slide" data-title="Hai chức năng">
-<div class="kicker reveal">01 / Toàn cảnh</div><h2 class="reveal">Hai nhiệm vụ. <span class="teal">Một hệ thống.</span></h2><p class="lead reveal">Nhiễm sắc thể không chỉ cất giữ thông tin — nó còn giúp thông tin được phân phối qua các lần phân bào.</p>
-<div class="two-col reveal">
-<div class="card"><div class="eyebrow">CHỨC NĂNG 01</div><div class="stat teal">MANG</div><h3>Thông tin di truyền</h3><p>DNA chứa các gene. Trình tự DNA lưu giữ thông tin mà tế bào sử dụng.</p>
-<svg viewBox="0 0 320 110" style="width:100%;max-height:110px" role="img" aria-label="Chuỗi DNA chứa các cặp base"><path d="M10 15C65 15 65 95 115 95S165 15 215 15S265 95 310 95" stroke="#159eaa" stroke-width="5" fill="none"/><path d="M10 95C65 95 65 15 115 15S165 95 215 95S265 15 310 15" stroke="#9778df" stroke-width="5" fill="none"/><g stroke="#e1a440" stroke-width="3"><path d="M31 24v61M63 42v26M96 75V35M128 51v10M162 24v61M197 24v61M230 44v22M265 73V36M293 82V28"/></g></svg><div class="callout">Ghi nhớ: <b>DNA → gene → thông tin.</b></div></div>
-<div class="card warm"><div class="eyebrow">CHỨC NĂNG 02</div><div class="stat amber">TRUYỀN</div><h3>Thông tin di truyền</h3><p>NST nhân đôi và phân li; giảm phân và thụ tinh giúp truyền thông tin qua sinh sản hữu tính.</p>
-<svg viewBox="0 0 320 110" style="width:100%;max-height:110px" role="img" aria-label="Một tế bào tạo thành hai tế bào con"><circle cx="44" cy="52" r="31" fill="#e4f7f2" stroke="#64c7b7" stroke-width="2"/><path d="M32 32l24 40M56 32L32 72" stroke="#108e89" stroke-width="6" stroke-linecap="round"/><path d="M84 52h66m-12-9 12 9-12 9" stroke="#7b92dc" stroke-width="3" fill="none" stroke-linecap="round"/><circle cx="204" cy="31" r="22" fill="#e7efff" stroke="#738bdd" stroke-width="2"/><circle cx="204" cy="78" r="22" fill="#fff1d9" stroke="#e3b261" stroke-width="2"/><path d="M197 20l14 22m0-22-14 22M197 67l14 22m0-22-14 22" stroke="#647ed0" stroke-width="3" stroke-linecap="round"/></svg><div class="callout warm">Ghi nhớ: <b>nhân đôi → phân li → truyền đạt.</b></div></div>
+<div class="kicker reveal">01 / Hai chức năng cốt lõi</div>
+<h2 class="reveal">Nhiễm sắc thể <span class="teal">lưu giữ rồi truyền</span> thông tin</h2>
+<p class="lead reveal">DNA mang thông tin di truyền. Khi tế bào phân chia, nhiễm sắc thể giúp thông tin được phân phối đúng cách.</p>
+<div class="function-flow reveal">
+  <article class="function-card preserve">
+    <div class="function-head"><span class="function-number">01</span><span class="function-label">LƯU GIỮ</span></div>
+    <h3>DNA chứa các gene</h3>
+    <p>Trình tự DNA lưu mã di truyền mà tế bào sử dụng.</p>
+    <div class="function-visual">
+      <svg viewBox="0 0 360 130" role="img" aria-label="Hai mạch DNA và các cặp base lưu giữ thông tin">
+        <defs><linearGradient id="infoDnaA" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#11a99d"/><stop offset="1" stop-color="#6489e8"/></linearGradient><linearGradient id="infoDnaB" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#9672df"/><stop offset="1" stop-color="#e6a541"/></linearGradient></defs>
+        <path d="M16 18C74 18 74 112 132 112S190 18 248 18S306 112 344 112" fill="none" stroke="url(#infoDnaA)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M16 112C74 112 74 18 132 18S190 112 248 112S306 18 344 18" fill="none" stroke="url(#infoDnaB)" stroke-width="8" stroke-linecap="round"/>
+        <g stroke="#dfb05a" stroke-width="4" stroke-linecap="round"><path d="M35 32v66M61 47v36M94 80V50M126 31v68M158 54v23M190 31v68M222 78V51M255 32v66M287 47v36M321 80V50"/></g>
+      </svg>
+    </div>
+    <div class="function-bottom"><span class="bottom-icon">DNA</span><span><b>DNA → gene → thông tin</b><small>Thông tin được lưu giữ trong trình tự DNA.</small></span></div>
+  </article>
+  <div class="flow-link" aria-label="Mối liên hệ giữa hai chức năng"><span>→</span><small>KHI TẾ BÀO CHIA</small></div>
+  <article class="function-card transmit">
+    <div class="function-head"><span class="function-number">02</span><span class="function-label">TRUYỀN ĐẠT</span></div>
+    <h3>Nhân đôi và phân phối NST</h3>
+    <p>Nguyên phân đưa bộ NST đến tế bào con. Giảm phân và thụ tinh truyền thông tin qua sinh sản hữu tính.</p>
+    <div class="function-visual">
+      <svg viewBox="0 0 360 130" role="img" aria-label="Một tế bào phân chia để truyền nhiễm sắc thể đến hai tế bào con">
+        <defs><linearGradient id="parentCell" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d9f8ee"/><stop offset="1" stop-color="#dfe8ff"/></linearGradient></defs>
+        <circle cx="60" cy="62" r="39" fill="url(#parentCell)" stroke="#58bcae" stroke-width="3"/>
+        <path d="M45 43l30 38m0-38L45 81" stroke="#098983" stroke-width="8" stroke-linecap="round"/>
+        <path d="M108 62h75m-13-11 13 11-13 11" stroke="#7a91d8" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="244" cy="38" r="27" fill="#e6f8f2" stroke="#70c7b9" stroke-width="2.5"/>
+        <circle cx="244" cy="88" r="27" fill="#fff1d9" stroke="#e3b25c" stroke-width="2.5"/>
+        <path d="M234 25l20 26m0-26-20 26M234 75l20 26m0-26-20 26" stroke="#587fd0" stroke-width="5" stroke-linecap="round"/>
+        <g fill="#496178" font-size="10" font-weight="850"><text x="60" y="119" text-anchor="middle">TẾ BÀO MẸ</text><text x="302" y="44">TẾ BÀO</text><text x="302" y="57">CON</text><text x="302" y="94">TẾ BÀO</text><text x="302" y="107">CON</text></g>
+      </svg>
+    </div>
+    <div class="function-bottom"><span class="bottom-icon gold-icon">NST</span><span><b>Nhân đôi → phân li → truyền đi</b><small>Mỗi quá trình có vai trò riêng trong việc duy trì và truyền thông tin.</small></span></div>
+  </article>
 </div>
-<div class="callout reveal">Hai chức năng có mối liên hệ: DNA mang thông tin, còn tổ chức và phân li NST giúp thông tin được truyền đi.</div>
+<div class="relationship-callout reveal"><span class="relationship-mark">!</span><span><b>Vì sao hai chức năng đi cùng nhau?</b><br>Phải lưu giữ thông tin trước, rồi mới có thể sao chép và truyền thông tin đó cho tế bào con hoặc thế hệ sau.</span></div>
 </section>
 <section class="slide" data-title="Đọc hình nhiễm sắc thể">
 <div class="kicker reveal">02 / Đọc hình khoa học</div><h2 class="reveal">Đọc đúng từng phần của <span class="teal">NST kép</span></h2><p class="lead reveal">Bấm vào nhãn để làm nổi bật phần tương ứng trên hình, không cần đoán vị trí.</p>

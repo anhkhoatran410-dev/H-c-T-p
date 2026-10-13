@@ -871,6 +871,95 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
 }
 
+
+/* Fail-safe for the final thank-you page: always paint its content in presentation mode. */
+.final-slide.active{
+  display:grid!important;visibility:visible!important;opacity:1!important;
+  filter:none!important;transform:none!important;clip-path:none!important;
+  background:radial-gradient(ellipse at 78% 18%,#d4f7ef 0,#e8efff 46%,#fff 84%)!important;
+}
+.final-slide.active .slide-inner{
+  display:grid!important;position:relative!important;inset:auto!important;
+  width:100%!important;min-height:100%!important;height:auto!important;
+  grid-template-columns:minmax(0,1fr)!important;align-content:center!important;
+  visibility:visible!important;
+}
+.final-slide.active .final-layout{
+  display:grid!important;position:relative!important;z-index:2!important;
+  grid-template-columns:minmax(0,1.08fr) minmax(240px,.92fr)!important;
+  gap:clamp(18px,4vw,64px)!important;align-items:center!important;
+  width:100%!important;min-height:0!important;height:auto!important;
+  visibility:visible!important;opacity:1!important;transform:none!important;
+}
+.final-slide.active .final-layout>div:first-child{
+  display:block!important;min-width:0!important;position:relative!important;z-index:2!important;
+}
+.final-slide.active .kicker,
+.final-slide.active .thankyou,
+.final-slide.active .final-message,
+.final-slide.active .pillrow,
+.final-slide.active .thanks-names,
+.final-slide.active .end-art{
+  display:block!important;visibility:visible!important;
+  color:inherit;
+}
+.final-slide.active .thankyou{
+  color:#172b45!important;font-size:clamp(48px,7.5vw,100px)!important;
+  line-height:.91!important;letter-spacing:-.07em!important;margin:12px 0 18px!important;
+}
+.final-slide.active .thankyou span{display:block!important;color:#078a83!important}
+.final-slide.active .final-message{
+  max-width:620px!important;color:#526b83!important;
+  font-size:clamp(17px,1.75vw,25px)!important;line-height:1.55!important;
+}
+.final-slide.active .pillrow{display:flex!important;flex-wrap:wrap!important;gap:9px!important;margin:18px 0!important}
+.final-slide.active .thanks-names{
+  font-size:clamp(12px,1.18vw,16px)!important;line-height:1.65!important;
+  color:#52677c!important;margin-top:20px!important;
+}
+.final-slide.active .thanks-names b{
+  display:block!important;font-size:clamp(12px,1.05vw,15px)!important;
+  color:#087f83!important;letter-spacing:.13em!important;margin-bottom:6px!important;
+}
+.final-slide.active .end-art{
+  height:clamp(300px,51vh,550px)!important;min-height:280px!important;
+  border-radius:28px!important;display:grid!important;place-items:center!important;
+  overflow:hidden!important;background:radial-gradient(ellipse at 50% 45%,#d8fbf0,#e9edff 58%,#fcfeff)!important;
+}
+.final-slide.active .end-art svg{
+  width:min(94%,390px)!important;height:95%!important;
+  display:block!important;visibility:visible!important;opacity:1!important;
+  animation:finalChromosomeLift 5s ease-in-out infinite!important;
+}
+.final-slide.active .end-stamp{font-size:clamp(10px,.9vw,13px)!important}
+@keyframes finalChromosomeLift{
+  0%,100%{transform:translateY(0) rotate(-1.5deg)}
+  50%{transform:translateY(-12px) rotate(1.5deg)}
+}
+.final-slide.active.morph-flip-running,
+.final-slide.active.morph-flip-running .slide-inner,
+.final-slide.active.morph-flip-running .final-layout{
+  animation:none!important;filter:none!important;clip-path:none!important;
+}
+.final-slide.active.morph-flip-running .reveal{animation:none!important;opacity:1!important}
+@media(max-width:900px){
+ .final-slide.active .final-layout{grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+ .final-slide.active .end-art{height:clamp(180px,28vh,260px)!important;min-height:170px!important}
+ .final-slide.active .thankyou{font-size:clamp(38px,8vw,64px)!important;margin:7px 0 10px!important}
+ .final-slide.active .final-message{font-size:clamp(15px,3.3vw,20px)!important}
+ .final-slide.active .thanks-names{font-size:clamp(11px,2.5vw,14px)!important;margin-top:8px!important}
+}
+@media (orientation:landscape) and (max-height:540px){
+ .final-slide.active .final-layout{grid-template-columns:minmax(0,1fr) minmax(170px,.7fr)!important;gap:12px!important}
+ .final-slide.active .end-art{height:50vh!important;min-height:120px!important}
+ .final-slide.active .thankyou{font-size:clamp(34px,7vh,56px)!important}
+ .final-slide.active .final-message{font-size:clamp(13px,2.8vh,17px)!important}
+ .final-slide.active .thanks-names{font-size:clamp(10px,2.2vh,12px)!important}
+}
+@media (prefers-reduced-motion:reduce){
+ .final-slide.active .end-art svg{animation:none!important}
+}
+
 </style>
 </head>
 <body>
@@ -1239,40 +1328,114 @@ function fitActiveSlide(){
 window.addEventListener('resize',function(){fitActiveSlide();updateOrientationHint()});
 window.addEventListener('orientationchange',function(){setTimeout(function(){fitActiveSlide();updateOrientationHint()},120)});
 if(window.visualViewport)window.visualViewport.addEventListener('resize',function(){setTimeout(function(){fitActiveSlide();updateOrientationHint()},60)});
-var runningViewTransition=null;
-var morphNames=['morph-title','morph-visual','morph-label','morph-takeaway'];
+/* Geometry-aware FLIP transitions: shared slide elements travel from their previous
+   screen position into their new position, instead of each page playing an isolated preset. */
+var morphSelectors={
+  title:'h1,h2',
+  visual:'.cover-art,.function-visual,.dna-viz,.gene-map,.figure,.end-art,.quiz-image',
+  eyebrow:'.kicker,.eyebrow,.section-label,.micro-label',
+  takeaway:'.final-message,.callout,.relationship-callout,.function-bottom,.dna-note,.end-note'
+};
+function morphRoleElements(slide){
+  if(!slide)return {};
+  var out={};
+  Object.keys(morphSelectors).forEach(function(role){
+    var el=slide.querySelector(morphSelectors[role]);
+    if(el)out[role]=el;
+  });
+  /* A child shouldn't get a second transform on top of its parent. */
+  var roles=Object.keys(out);
+  roles.forEach(function(a){
+    roles.forEach(function(b){
+      if(a!==b&&out[a]&&out[b]&&out[a].contains(out[b])){
+        if(a==='visual')delete out[b];
+        else if(b==='visual')delete out[a];
+      }
+    });
+  });
+  return out;
+}
+function getMorphRects(slide){
+  var els=morphRoleElements(slide),rects={};
+  Object.keys(els).forEach(function(role){
+    var r=els[role].getBoundingClientRect();
+    if(r.width>0&&r.height>0)rects[role]={left:r.left,top:r.top,width:r.width,height:r.height};
+  });
+  return rects;
+}
+function runMorphTransition(oldRects,newSlide,direction){
+  if(!newSlide)return;
+  newSlide.classList.add('morph-flip-running');
+  var roles=morphRoleElements(newSlide);
+  var linked=[];
+  Object.keys(roles).forEach(function(role){
+    if(oldRects[role])linked.push(roles[role]);
+  });
+  requestAnimationFrame(function(){
+    var moved=new Set();
+    Object.keys(roles).forEach(function(role){
+      var el=roles[role],from=oldRects[role];
+      if(!from)return;
+      var to=el.getBoundingClientRect();
+      if(!to.width||!to.height||from.width<=0||from.height<=0)return;
+      var dx=from.left-to.left,dy=from.top-to.top;
+      var sx=Math.max(.35,Math.min(2.8,from.width/to.width));
+      var sy=Math.max(.35,Math.min(2.8,from.height/to.height));
+      var transform='translate('+dx+'px,'+dy+'px) scale('+sx+','+sy+')';
+      try{
+        var animation=el.animate([
+          {transformOrigin:'top left',transform:transform,opacity:.3,filter:'blur(5px) saturate(.85)'},
+          {transformOrigin:'top left',transform:'translate(0,0) scale(1,1)',opacity:1,filter:'blur(0) saturate(1)'}
+        ],{duration:920,easing:'cubic-bezier(.18,.82,.18,1)',fill:'both'});
+        moved.add(el);
+        animation.onfinish=function(){try{animation.cancel()}catch(e){}};
+      }catch(e){}
+    });
+    /* Supporting copy and cards land in a staggered sequence around the shared elements. */
+    var revealEls=[].slice.call(newSlide.querySelectorAll('.reveal'));
+    var delayIndex=0;
+    revealEls.forEach(function(el){
+      if(moved.has(el))return;
+      var delay=65*delayIndex++;
+      try{
+        var animation=el.animate([
+          {opacity:0,transform:'translateY(17px) scale(.99)',filter:'blur(2px)'},
+          {opacity:1,transform:'translateY(0) scale(1)',filter:'blur(0)'}
+        ],{duration:560,delay:delay,easing:'cubic-bezier(.18,.82,.18,1)',fill:'both'});
+        animation.onfinish=function(){try{animation.cancel()}catch(e){}};
+      }catch(e){}
+    });
+    window.setTimeout(function(){
+      newSlide.classList.remove('morph-flip-running');
+      requestAnimationFrame(fitActiveSlide);
+    },1050);
+  });
+}
 function clearMorphNames(){
   slides.forEach(function(slide){
+    slide.classList.remove('morph-native','morph-flip-running');
     slide.querySelectorAll('*').forEach(function(el){
       if(el.style&&el.style.viewTransitionName)el.style.viewTransitionName='';
     });
-    slide.classList.remove('morph-native');
   });
 }
 function prepareMorphNames(slide){
-  clearMorphNames();
+  /* Kept only as semantic role tagging for diagnostics; the FLIP engine handles the motion. */
   if(!slide)return;
-  var title=slide.querySelector('h1,h2');
-  var visual=null;
-  var visualCandidates=['.cover-art','.dna-viz','.gene-map','.split-figure','.function-flow','.end-art','.quiz-image','.figure','.team-panel'];
-  for(var i=0;i<visualCandidates.length&&!visual;i++)visual=slide.querySelector(visualCandidates[i]);
-  var label=slide.querySelector('.kicker,.eyebrow,.section-label,.micro-label');
-  var takeaway=slide.querySelector('.callout,.relationship-callout,.function-bottom,.dna-note,.end-note');
-  if(title)title.style.viewTransitionName='morph-title';
-  if(visual&&visual!==title)visual.style.viewTransitionName='morph-visual';
-  if(label&&label!==title&&label!==visual)label.style.viewTransitionName='morph-label';
-  if(takeaway&&takeaway!==title&&takeaway!==visual&&takeaway!==label)takeaway.style.viewTransitionName='morph-takeaway';
+  var roles=morphRoleElements(slide);
+  Object.keys(roles).forEach(function(role){roles[role].dataset.morphRole=role});
 }
-function applySlideState(next,old,direction,type,useNative){
+function applySlideState(next,old,direction,type){
   index=next;
   clearMorphNames();
   slides.forEach(function(s,i){
     s.classList.toggle('active',i===index);
     s.classList.toggle('backward',direction==='backward');
-    s.classList.remove('transition-cinematic-forward','transition-cinematic-backward','transition-wipe-forward','transition-wipe-backward','transition-depth-forward','transition-depth-backward','transition-lift-forward','transition-lift-backward','transition-sweep-forward','transition-sweep-backward','transition-zoom-forward','transition-zoom-backward','transition-flip-forward','transition-flip-backward','transition-glide-forward','transition-glide-backward','morph-native');
+    s.classList.remove('transition-cinematic-forward','transition-cinematic-backward','transition-wipe-forward','transition-wipe-backward','transition-depth-forward','transition-depth-backward','transition-lift-forward','transition-lift-backward','transition-sweep-forward','transition-sweep-backward','transition-zoom-forward','transition-zoom-backward','transition-flip-forward','transition-flip-backward','transition-glide-forward','transition-glide-backward');
     if(i===index){
-      if(useNative)s.classList.add('morph-native');
-      else s.classList.add('transition-'+type+'-'+direction);
+      /* FLIP owns the movement; this class supplies only the safe CSS fallback. */
+      s.classList.add('morph-flip-running');
+      s.dataset.transitionType=type;
     }
   });
   Array.prototype.forEach.call(ovgrid.children,function(b,i){b.classList.toggle('active',i===index)});
@@ -1290,41 +1453,15 @@ function applySlideState(next,old,direction,type,useNative){
 function show(n){
   var old=index;
   var next=Math.max(0,Math.min(slides.length-1,n));
-  if(next===old){
-    applySlideState(next,old,'forward','cinematic',false);
-    return;
-  }
+  if(next===old)return;
+  var oldSlide=slides[old];
+  var oldRects=getMorphRects(oldSlide);
   var direction=next<old?'backward':'forward';
-  var transitionTypes=['cinematic','wipe','depth','lift','sweep','zoom','flip','glide'];
+  var transitionTypes=['morph-flow','morph-zoom','morph-depth','morph-wipe'];
   var type=transitionTypes[next%transitionTypes.length];
-  var nativeOk=typeof document.startViewTransition==='function'&&
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches&&
-    !document.hidden;
-  if(nativeOk){
-    if(runningViewTransition&&typeof runningViewTransition.skipTransition==='function'){
-      try{runningViewTransition.skipTransition()}catch(e){}
-    }
-    prepareMorphNames(slides[old]);
-    try{
-      runningViewTransition=document.startViewTransition(function(){
-        applySlideState(next,old,direction,type,true);
-      });
-      runningViewTransition.finished.then(function(){
-        slides.forEach(function(s){s.classList.remove('morph-native')});
-        prepareMorphNames(slides[index]);
-        runningViewTransition=null;
-        requestAnimationFrame(fitActiveSlide);
-      }).catch(function(){
-        slides.forEach(function(s){s.classList.remove('morph-native')});
-        prepareMorphNames(slides[index]);
-        runningViewTransition=null;
-      });
-      return;
-    }catch(e){
-      runningViewTransition=null;
-    }
-  }
-  applySlideState(next,old,direction,type,false);
+  applySlideState(next,old,direction,type);
+  var newSlide=slides[index];
+  runMorphTransition(oldRects,newSlide,direction);
 }
 titles.forEach(function(t,i){var b=document.createElement('button');b.type='button';b.className='ovitem';b.innerHTML='<small>SLIDE '+String(i+1).padStart(2,'0')+'</small><b>'+t+'</b>';b.addEventListener('click',function(){overview.classList.remove('open');show(i)});ovgrid.appendChild(b)});
 document.getElementById('prev').addEventListener('click',function(){show(index-1)});document.getElementById('next').addEventListener('click',function(){show(index+1)});

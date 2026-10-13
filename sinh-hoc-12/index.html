@@ -469,10 +469,119 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  .phase-art,.phase-art.on,.process-state.sim-state-in{animation:none!important;transition:none!important;transform:none!important}
 }
 
+/* Full-screen cinematic opening for the uploaded video intro */
+.app{position:relative}
+.intro-gate{position:absolute;z-index:100;inset:0;display:grid;grid-template-rows:minmax(0,1fr) auto;padding:clamp(18px,3.5vw,56px);gap:18px;background:radial-gradient(ellipse at 12% 18%,#d7f8f0 0,transparent 34%),radial-gradient(ellipse at 92% 80%,#e2e9ff 0,transparent 38%),linear-gradient(130deg,#f9fcff,#edf6fa);overflow:auto}
+.intro-shell{width:min(1450px,100%);margin:auto;display:grid;grid-template-columns:minmax(360px,.88fr) minmax(420px,1.12fr);align-items:center;gap:clamp(24px,4vw,72px)}
+.intro-copy{max-width:610px;min-width:0}
+.intro-brand{display:flex;align-items:center;gap:11px;font-size:15px;font-weight:950;letter-spacing:.2em;color:#20364e}
+.intro-brand small{display:block;margin-top:5px;color:#8293a5;font-size:9px;letter-spacing:.15em}
+.intro-mark{display:grid;place-items:center;width:44px;height:44px;border-radius:15px;background:linear-gradient(135deg,#088b83,#6685e5);color:white;font-size:27px;box-shadow:0 9px 25px #0b8e8522}
+.intro-eyebrow{display:flex;align-items:center;gap:10px;margin-top:clamp(30px,6vh,70px);font-size:12px;font-weight:950;letter-spacing:.2em;color:#0a8581}
+.intro-eyebrow span{width:34px;height:3px;background:linear-gradient(90deg,#078c82,#42c5b2);border-radius:9px}
+.intro-copy h1{margin:18px 0 16px;font-size:clamp(42px,5.2vw,82px);line-height:.99;letter-spacing:-.065em;color:#192b44;font-weight:950}
+.intro-copy h1 em{display:block;color:#0b9189;font-style:normal}
+.intro-copy>p{max-width:520px;font-size:clamp(17px,1.55vw,23px);line-height:1.55;color:#5c7187;margin:0}
+.intro-progress{display:flex;align-items:center;gap:12px;margin-top:26px}
+.intro-progress span{width:82px;height:4px;border-radius:99px;background:linear-gradient(90deg,#0a9188,#7b8ee9)}
+.intro-progress small{font-size:10px;font-weight:950;letter-spacing:.16em;color:#8191a4}
+.intro-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:28px}
+.intro-btn{border-radius:12px;padding:14px 18px;border:1px solid #cfdfeb;font-size:14px;font-weight:900;cursor:pointer;transition:transform .2s,box-shadow .2s,background .2s}
+.intro-btn:hover{transform:translateY(-2px)}
+.intro-primary{color:white;background:linear-gradient(130deg,#078881,#10a695);border-color:#098d83;box-shadow:0 9px 25px #07888126}
+.intro-secondary{color:#40566d;background:#ffffffc9}
+.intro-secondary span{margin-left:9px}
+.intro-choose{display:none;border:0;background:transparent;color:#0a7f7b;text-decoration:underline;text-underline-offset:4px;font-size:12px;font-weight:850;padding:12px 3px;cursor:pointer}
+.intro-gate.needs-local .intro-choose{display:inline-block}
+.intro-status{min-height:20px;margin-top:6px;color:#7b8fa0;font-size:12px;line-height:1.4}
+.intro-visual{min-width:0}
+.intro-video-frame{position:relative;aspect-ratio:16/9;border:1px solid #d5e4ee;border-radius:24px;overflow:hidden;background:#101c31;box-shadow:0 25px 70px #203f5c20}
+.intro-placeholder{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,#d9f9ee,#e6efff 63%,#eef6fb);transition:opacity .45s}
+.intro-placeholder svg{height:64%;width:auto;max-width:45%;filter:drop-shadow(0 10px 20px #158d8726);animation:introChromFloat 4.5s ease-in-out infinite}
+.intro-placeholder-title{margin-top:1%;font-size:clamp(18px,1.8vw,28px);font-weight:950;letter-spacing:.22em;color:#173951}
+.intro-placeholder-caption{margin-top:9px;color:#6c8198;font-size:10px;font-weight:900;letter-spacing:.22em}
+.intro-orbit{position:absolute;border:1px solid #6fbfb350;border-radius:50%;width:60%;aspect-ratio:1;animation:introOrbit 12s linear infinite}
+.orbit-two{width:83%;animation-duration:18s;animation-direction:reverse;border-color:#7794e540}
+#introVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#101827;display:none}
+.intro-video-frame.has-video #introVideo{display:block}
+.intro-video-frame.has-video .intro-placeholder{opacity:0;pointer-events:none}
+.intro-frame-chip{position:absolute;top:15px;left:15px;background:#ffffffdd;backdrop-filter:blur(10px);border:1px solid #ffffff;padding:7px 10px;border-radius:8px;color:#28465d;font-size:9px;font-weight:950;letter-spacing:.13em}
+.intro-video-controls{position:absolute;left:12px;right:12px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;background:#0b1c2cb5;color:white;font-size:10px;letter-spacing:.08em}
+.intro-video-controls button{border:1px solid #ffffff55;border-radius:7px;background:#ffffff20;color:#fff;padding:7px 10px;font-weight:850;cursor:pointer}
+.intro-visual-caption{display:flex;align-items:center;justify-content:flex-end;gap:9px;margin-top:12px;color:#657e94;font-size:10px;font-weight:950;letter-spacing:.15em}
+.pulse-dot{width:8px;height:8px;border-radius:50%;background:#13ad9a;box-shadow:0 0 0 5px #13ad9a1e;animation:introPulse 2s ease-in-out infinite}
+.intro-foot{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #dce7ef;padding-top:13px;color:#8797a6;font-size:9px;font-weight:950;letter-spacing:.16em}
+@keyframes introChromFloat{0%,100%{transform:translateY(0) rotate(-1deg)}50%{transform:translateY(-9px) rotate(1deg)}}
+@keyframes introOrbit{to{transform:rotate(360deg)}}
+@keyframes introPulse{0%,100%{opacity:1;box-shadow:0 0 0 5px #13ad9a1e}50%{opacity:.55;box-shadow:0 0 0 9px #13ad9a08}}
+@media(max-width:900px){
+ .intro-gate{padding:18px;gap:14px}
+ .intro-shell{grid-template-columns:minmax(0,1fr);gap:22px;max-width:720px}
+ .intro-eyebrow{margin-top:22px}
+ .intro-copy h1{font-size:clamp(39px,8vw,62px)}
+ .intro-copy>p{font-size:16px}
+ .intro-video-frame{border-radius:17px}
+ .intro-foot{font-size:8px;letter-spacing:.1em}
+}
+@media(max-width:600px){
+ .intro-gate{padding:14px;gap:12px}
+ .intro-shell{gap:14px}
+ .intro-brand{font-size:12px}
+ .intro-mark{width:38px;height:38px}
+ .intro-eyebrow{margin-top:16px;font-size:10px}
+ .intro-copy h1{font-size:clamp(34px,9.4vw,48px);margin:12px 0}
+ .intro-copy>p{font-size:14px}
+ .intro-progress{margin-top:15px}
+ .intro-actions{margin-top:15px}
+ .intro-btn{padding:12px 13px;font-size:12px}
+ .intro-placeholder-caption{font-size:8px}
+ .intro-foot span:last-child{display:none}
+}
+@media (prefers-reduced-motion:reduce){
+ .intro-placeholder svg,.intro-orbit,.pulse-dot{animation:none!important}
+}
+
+.intro-gate.intro-closing{opacity:0;transform:scale(1.01);transition:opacity .38s ease,transform .38s ease;pointer-events:none}
 </style>
 </head>
 <body>
 <div class="app" id="appRoot">
+<section class="intro-gate" id="introGate" aria-label="Video giới thiệu bài thuyết trình">
+  <div class="intro-shell">
+    <div class="intro-copy">
+      <div class="intro-brand"><span class="intro-mark">✳</span><span>GENOME LAB <small>SINH HỌC 12 · BÀI 7</small></span></div>
+      <div class="intro-eyebrow"><span></span> VIDEO MỞ ĐẦU</div>
+      <h1>CHỨC NĂNG CỦA <em>NHIỄM SẮC THỂ</em></h1>
+      <p>Hành trình khám phá cách sự sống lưu giữ và truyền thông tin di truyền.</p>
+      <div class="intro-progress"><span></span><small>INTRO · 30 GIÂY</small></div>
+      <div class="intro-actions">
+        <button type="button" id="introPlay" class="intro-btn intro-primary">▶ Phát video giới thiệu</button>
+        <button type="button" id="introSkip" class="intro-btn intro-secondary">Bỏ qua intro <span>→</span></button>
+      </div>
+      <button type="button" id="introChoose" class="intro-choose">Chọn video từ máy tính</button>
+      <input type="file" id="introFile" accept="video/mp4,video/webm,video/quicktime" hidden>
+      <div class="intro-status" id="introStatus" aria-live="polite">Video sẽ phát trước khi vào slide 1.</div>
+    </div>
+    <div class="intro-visual">
+      <div class="intro-video-frame" id="introVideoFrame">
+        <div class="intro-placeholder" id="introPlaceholder">
+          <div class="intro-orbit orbit-one"></div><div class="intro-orbit orbit-two"></div>
+          <svg viewBox="0 0 240 300" role="img" aria-label="Hình nhiễm sắc thể minh họa"><defs><linearGradient id="introChromA" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#20c4ad"/><stop offset="1" stop-color="#438ee0"/></linearGradient><linearGradient id="introChromB" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#8e70e4"/><stop offset="1" stop-color="#e9ac49"/></linearGradient></defs><path d="M66 35C42 73 83 104 117 141S164 216 172 264" stroke="url(#introChromA)" stroke-width="32" fill="none" stroke-linecap="round"/><path d="M174 35C198 73 157 104 123 141S76 216 68 264" stroke="url(#introChromB)" stroke-width="32" fill="none" stroke-linecap="round"/><ellipse cx="120" cy="143" rx="19" ry="12" fill="#fff" stroke="#315b7e" stroke-width="4"/></svg>
+          <div class="intro-placeholder-title">THE CODE OF LIFE</div>
+          <div class="intro-placeholder-caption">DNA · GENES · CHROMOSOMES</div>
+        </div>
+        <video id="introVideo" playsinline preload="auto" aria-label="Video giới thiệu trước bài thuyết trình"></video>
+        <div class="intro-video-controls" id="introVideoControls" hidden>
+          <span id="introTime">VIDEO GIỚI THIỆU</span>
+          <button type="button" id="introReplay">↻ Phát lại</button>
+        </div>
+        <span class="intro-frame-chip">01 · INTRO</span>
+      </div>
+      <div class="intro-visual-caption"><span class="pulse-dot"></span> LƯU GIỮ · TỔ CHỨC · TRUYỀN ĐẠT</div>
+    </div>
+  </div>
+  <div class="intro-foot"><span>TRÌNH CHIẾU SINH HỌC 12</span><span>NHẤN PHÁT VIDEO ĐỂ BẮT ĐẦU</span></div>
+</section>
 <header class="top"><div class="brand"><span class="mark">✳</span><div><b>GENOME LAB</b><small>VISUAL BIOLOGY · SINH HỌC 12</small></div></div><div class="top-spacer"></div><span class="chapter">BÀI 7 · DI TRUYỀN HỌC</span><button class="live" id="startPresentation" type="button" aria-label="Bắt đầu trình chiếu toàn màn hình">● TRÌNH CHIẾU</button></header>
 <main class="canvas">
 <div class="stage" id="stage">
@@ -965,6 +1074,81 @@ var qCount=document.getElementById('qCount'),qTitle=document.getElementById('qTi
 function drawQ(){var q=questions[qi];qCount.textContent='CÂU '+String(qi+1).padStart(2,'0')+' / 03';qTitle.textContent=q.q;qOptions.innerHTML='';q.a.forEach(function(a,i){var b=document.createElement('button');b.className='answer';b.type='button';b.dataset.answer=String(i);b.textContent=String.fromCharCode(65+i)+'. '+a;qOptions.appendChild(b)});qFeedback.textContent='';qScore.textContent='ĐIỂM: '+score+' / 3';qNext.textContent=qi===2?'Làm lại ↻':'Câu tiếp →';answered=false}
 qOptions.addEventListener('click',function(e){var b=e.target.closest('[data-answer]');if(!b||answered)return;answered=true;var q=questions[qi],v=Number(b.dataset.answer);if(v===q.c)score++;Array.prototype.forEach.call(qOptions.children,function(el,i){el.disabled=true;if(i===q.c)el.classList.add('correct');if(i===v&&v!==q.c)el.classList.add('wrong')});qFeedback.textContent=(v===q.c?'✓ Chính xác! ':'Chưa chính xác. ')+q.why;qScore.textContent='ĐIỂM: '+score+' / '+(qi+1)});
 qNext.addEventListener('click',function(){if(!answered){qFeedback.textContent='Chọn một đáp án trước nhé.';return}if(qi===questions.length-1){qi=0;score=0;drawQ();return}qi++;drawQ()});
+
+// Intro video layer: use the public asset if present, otherwise let the presenter pick the same local MP4.
+var introGate=document.getElementById('introGate');
+var introVideo=document.getElementById('introVideo');
+var introFrame=document.getElementById('introVideoFrame');
+var introPlaceholder=document.getElementById('introPlaceholder');
+var introStatus=document.getElementById('introStatus');
+var introFile=document.getElementById('introFile');
+var introSourceReady=false;
+function closeIntro(){
+  if(!introGate)return;
+  introGate.classList.add('intro-closing');
+  setTimeout(function(){introGate.style.display='none';},420);
+  try{introVideo.pause()}catch(e){}
+}
+function tryPlayIntro(){
+  var p=introVideo.play();
+  if(p&&p.catch)p.catch(function(){
+    introGate.classList.add('needs-local');
+    introStatus.textContent='Video chưa có trên máy chủ của website. Hãy chọn tệp intro MP4 từ máy tính để phát, hoặc bỏ qua để vào bài.';
+  });
+}
+introVideo.addEventListener('loadedmetadata',function(){
+  introSourceReady=true;
+  introFrame.classList.add('has-video');
+  var duration=Math.round(introVideo.duration||30);
+  document.getElementById('introTime').textContent='INTRO · '+duration+' GIÂY';
+  if(introStatus)introStatus.textContent='Video sẵn sàng. Bấm phát để xem intro trước bài.';
+});
+introVideo.addEventListener('error',function(){
+  if(introSourceReady)return;
+  introGate.classList.add('needs-local');
+  if(introStatus)introStatus.textContent='Chưa tìm thấy video intro trên máy chủ. Bạn có thể chọn tệp MP4 đang có trên máy tính để phát ngay tại lớp.';
+});
+introVideo.src='./intro.mp4';
+introVideo.load();
+document.getElementById('introPlay').addEventListener('click',function(){
+  enterPresentation();
+  if(introVideo.readyState>=2){tryPlayIntro();return;}
+  if(introSourceReady){tryPlayIntro();return;}
+  introGate.classList.add('needs-local');
+  introStatus.textContent='Đang kiểm tra video trên website. Nếu không phát được, bấm “Chọn video từ máy tính”.';
+  setTimeout(function(){
+    if(introVideo.readyState<2&&!introVideo.ended){
+      introGate.classList.add('needs-local');
+      introStatus.textContent='Video chưa được lưu trên máy chủ website. Chọn tệp intro MP4 từ máy tính để phát trực tiếp.';
+    }
+  },700);
+});
+document.getElementById('introChoose').addEventListener('click',function(){introFile.click()});
+introFile.addEventListener('change',function(){
+  var file=introFile.files&&introFile.files[0];if(!file)return;
+  if(introVideo.dataset.localUrl)URL.revokeObjectURL(introVideo.dataset.localUrl);
+  var url=URL.createObjectURL(file);
+  introVideo.dataset.localUrl=url;
+  introVideo.src=url;
+  introVideo.load();
+  introVideo.play().then(function(){
+    enterPresentation();
+    introStatus.textContent='Đang phát video giới thiệu. Hết video sẽ tự chuyển sang bài.';
+  }).catch(function(){introStatus.textContent='Video đã nạp. Bấm “Phát video giới thiệu” để bắt đầu.'});
+});
+document.getElementById('introSkip').addEventListener('click',function(){
+  closeIntro();
+  if(document.fullscreenElement)fitActiveSlide();
+});
+introVideo.addEventListener('ended',function(){
+  closeIntro();
+  if(document.fullscreenElement)fitActiveSlide();
+});
+document.getElementById('introReplay').addEventListener('click',function(){
+  introVideo.currentTime=0;tryPlayIntro();
+});
+introGate.addEventListener('animationend',function(e){if(e.target===introGate&&introGate.classList.contains('intro-closing'))introGate.style.display='none'});
+
 show(0);selectPart('chromatids');drawQ();
 })();
 </script>

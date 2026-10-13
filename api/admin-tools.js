@@ -415,8 +415,6 @@ async function getAdminSummaryCounts() {
   ]);
   return { tests, students, attempts };
 }
-  return Number.isFinite(total) ? total : 0;
-}
 
 async function publicExams(req, res) {
   if (!enforceMethod(req, res, ['GET'])) return;

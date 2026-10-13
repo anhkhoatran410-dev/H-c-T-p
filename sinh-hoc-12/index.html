@@ -9,6 +9,7 @@
 <style>
 :root{--ink:#172740;--muted:#667b91;--teal:#087f83;--aqua:#36c9b2;--blue:#5478e8;--violet:#9671e5;--amber:#e4a13d;--rose:#eb7c83;--line:#dbe6ef;--paper:#f7fbff;--shadow:0 24px 80px #203b5a21;--progress:8.33%}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;color:var(--ink);background:#edf4fa}body{overflow:hidden}button{font:inherit;cursor:pointer}button:focus-visible{outline:3px solid #6ed8c9;outline-offset:3px}button:disabled{opacity:.35;cursor:not-allowed}
+.slide-inner{display:contents}
 .app{height:100dvh;display:grid;grid-template-rows:54px minmax(0,1fr) 58px;background:radial-gradient(ellipse at 80% 0%,#ddf6f1 0,transparent 38%),#f2f7fc;overflow:hidden}
 .top{display:flex;align-items:center;gap:12px;padding:0 20px;background:#ffffffd9;border-bottom:1px solid #dce7f0;z-index:5;backdrop-filter:blur(14px)}
 .brand{display:flex;align-items:center;gap:9px}.mark{width:32px;height:32px;border-radius:11px;background:linear-gradient(135deg,#0a918a,#647be7);display:grid;place-items:center;color:#fff;font-size:20px;box-shadow:0 6px 18px #178d9c2b}.brand b{display:block;font-size:10px;letter-spacing:.19em}.brand small{display:block;margin-top:3px;font-size:8px;color:#8493a4;letter-spacing:.14em}.top-spacer{flex:1}.chapter{font-size:9px;font-weight:900;letter-spacing:.13em;color:#71839a}.live{border:1px solid #bae6da;background:#edfbf6;color:#0b7e73;border-radius:99px;padding:6px 10px;font-size:8px;letter-spacing:.11em;font-weight:950}.live:before{content:"";width:6px;height:6px;border-radius:50%;display:inline-block;background:#19b79b;margin-right:6px;box-shadow:0 0 0 4px #19b79b1f}
@@ -55,27 +56,53 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 .app:fullscreen .stage{grid-row:1;width:100%;height:100%;min-height:0;max-height:none;aspect-ratio:auto;border:0;border-radius:0;box-shadow:none}
 /* In presentation mode, fit the entire slide to the available stage instead of
    requiring the presenter to scroll. The JS sets --fit-scale from the real content size. */
-.app:fullscreen .slide{min-height:0;align-content:center;justify-content:center;padding:clamp(12px,2.2vw,34px);overflow:visible;transform-origin:center center;scale:var(--fit-scale,1)}
-.app:fullscreen .bottom{padding-bottom:env(safe-area-inset-bottom);background:#fffffff2}
+.app:fullscreen .slide{min-height:0;padding:0;overflow:hidden;align-content:initial;justify-content:initial}
+.app:fullscreen .slide-inner{
+  display:grid;position:absolute;top:0;left:0;width:100%;box-sizing:border-box;
+  grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;align-content:center;
+  padding:clamp(16px,2.6vw,40px);transform-origin:top left;will-change:transform;
+}
+.app:fullscreen .bottom{padding-bottom:env(safe-area-inset-bottom);background:#fffffff7;backdrop-filter:blur(12px)}
 .app:fullscreen .notes-panel{bottom:calc(68px + env(safe-area-inset-bottom));max-height:calc(100dvh - 90px)}
 .app:fullscreen .overview{position:absolute}
-@media (orientation:landscape) and (max-height:600px){
-.app:fullscreen{grid-template-rows:0 minmax(0,1fr) 48px}
-.app:fullscreen .canvas{grid-row:2}
-.app:fullscreen .bottom{grid-row:3}
-.app:fullscreen .stage{grid-row:1}
-.app:fullscreen .slide{padding:clamp(12px,2.5vh,28px) clamp(22px,4vw,64px)}
-.app:fullscreen h1{font-size:clamp(28px,5.7vh,58px)}
-.app:fullscreen h2{font-size:clamp(23px,4.6vh,42px)}
-.app:fullscreen .lead{font-size:clamp(12px,2.3vh,17px);margin-bottom:8px}
-.app:fullscreen .cover-art{min-height:0;height: min(68vh,360px)}
-.app:fullscreen .figure{min-height:0;height:42vh}
-.app:fullscreen .split-figure>.figure{min-height:0;height:42vh}
-.app:fullscreen .dna-viz{min-height:0;height:52vh}
-.app:fullscreen .quiz-image{min-height:0;height:42vh}
-.app:fullscreen .end-art{min-height:0;height:55vh}
-.app:fullscreen .bottom{gap:8px;padding-left:14px;padding-right:14px}
-.app:fullscreen .btn{padding:7px 12px}
+@media (orientation:landscape) and (max-height:760px){
+  .app:fullscreen{grid-template-rows:0 minmax(0,1fr) 48px}
+  .app:fullscreen .canvas{grid-row:2}
+  .app:fullscreen .bottom{grid-row:3}
+  .app:fullscreen .stage{grid-row:1}
+  .app:fullscreen .slide-inner{padding:clamp(9px,1.8vh,18px) clamp(24px,3vw,44px)}
+  .app:fullscreen h1{font-size:clamp(27px,5.2vh,50px);margin-bottom:9px}
+  .app:fullscreen h2{font-size:clamp(22px,4.3vh,39px);margin-bottom:8px}
+  .app:fullscreen h3{font-size:clamp(12px,2.1vh,17px);margin-bottom:5px}
+  .app:fullscreen .kicker{font-size:8px;margin-bottom:8px}
+  .app:fullscreen .lead{font-size:clamp(11px,2vh,15px);line-height:1.4;margin-bottom:7px}
+  .app:fullscreen p{font-size:clamp(9px,1.55vh,12px);line-height:1.45;margin-bottom:5px}
+  .app:fullscreen .cover-art{min-height:0!important;height:33vh!important}
+  .app:fullscreen .cover-svg{height:90%;width:min(70%,245px)}
+  .app:fullscreen .figure{min-height:0!important;height:29vh!important;max-height:none!important}
+  .app:fullscreen .split-figure>.figure{min-height:0!important;height:31vh!important}
+  .app:fullscreen .dna-viz{min-height:0!important;height:34vh!important}
+  .app:fullscreen .gene-map svg{max-height:24vh}
+  .app:fullscreen .quiz-image{min-height:0!important;height:30vh!important}
+  .app:fullscreen .quiz-image svg{max-height:28vh}
+  .app:fullscreen .end-art{min-height:0!important;height:39vh!important}
+  .app:fullscreen .callout{font-size:clamp(8px,1.4vh,10px);line-height:1.45;padding:7px 10px;margin-top:7px}
+  .app:fullscreen .card{padding:clamp(8px,1.3vh,13px)}
+  .app:fullscreen .two-col{gap:8px;margin-top:7px}
+  .app:fullscreen .split-figure{gap:9px;margin-top:5px}
+  .app:fullscreen .sequence{gap:6px;margin-top:7px}
+  .app:fullscreen .seq{padding:7px}
+  .app:fullscreen .seq p,.app:fullscreen .fact p{font-size:clamp(8px,1.35vh,10px)}
+  .app:fullscreen .process-controls{padding:7px 10px;margin-top:7px}
+  .app:fullscreen .formula{margin:7px 0}
+  .app:fullscreen .bottom{gap:8px;padding-left:12px;padding-right:12px}
+  .app:fullscreen .btn{padding:7px 10px}
+}
+@media (orientation:portrait) and (max-width:900px){
+  .app:fullscreen .canvas{grid-row:2;padding:0}
+  .app:fullscreen .bottom{grid-row:3}
+  .app:fullscreen .stage{grid-row:1;width:100%;height:100%;aspect-ratio:auto;min-height:0}
+  .app:fullscreen .slide-inner{padding:12px 15px}
 }
 @media (orientation:portrait) and (max-width:900px){
 .app:fullscreen .canvas{grid-row:2;padding:0}
@@ -292,6 +319,15 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 (function(){
 'use strict';
 var slides=[].slice.call(document.querySelectorAll('.slide')),stage=document.getElementById('stage');
+// Wrap slide contents once. In normal browsing this wrapper uses display:contents;
+// in full-screen mode it becomes the fit-to-screen canvas, leaving the footer untouched.
+slides.forEach(function(slide){
+  if(slide.querySelector(':scope > .slide-inner')) return;
+  var inner=document.createElement('div');
+  inner.className='slide-inner';
+  while(slide.firstChild) inner.appendChild(slide.firstChild);
+  slide.appendChild(inner);
+});
 var titles=slides.map(function(s){return s.dataset.title||'Slide';}),thumbs=null,overview=document.getElementById('overview'),ovgrid=document.getElementById('ovgrid');
 var index=0,autoTimer=null,autoOn=false;
 var notes=[
@@ -327,22 +363,41 @@ function renderNotes(){document.getElementById('notesTitle').textContent='Lời 
 function fitActiveSlide(){
   var active=slides[index];
   if(!active||!document.fullscreenElement){
-    slides.forEach(function(s){s.style.setProperty('--fit-scale','1')});
+    slides.forEach(function(s){
+      var inner=s.querySelector('.slide-inner');
+      if(inner){inner.style.width='';inner.style.transform='';}
+      s.scrollTop=0;
+    });
     return;
   }
-  active.style.setProperty('--fit-scale','1');
+  var inner=active.querySelector('.slide-inner');
+  if(!inner)return;
   active.scrollTop=0;
+  /* Measure the inner composition at full width, then enlarge its CSS canvas
+     as it scales down. This keeps the visible slide edge-to-edge instead of
+     shrinking the whole slide frame into a small centered rectangle. */
   requestAnimationFrame(function(){
     var h=stage.clientHeight,w=stage.clientWidth;
-    var contentH=Math.max(active.scrollHeight,active.offsetHeight);
-    var contentW=Math.max(active.scrollWidth,active.offsetWidth);
-    if(!h||!w||!contentH||!contentW)return;
-    var scale=Math.min(1,(h-20)/contentH,(w-24)/contentW);
-    active.style.setProperty('--fit-scale',String(Math.max(.48,scale)));
+    if(!h||!w)return;
+    var scale=1;
+    for(var i=0;i<5;i++){
+      inner.style.transform='none';
+      inner.style.width=(w/scale)+'px';
+      inner.getBoundingClientRect();
+      var contentH=Math.max(inner.scrollHeight,inner.offsetHeight);
+      if(!contentH)break;
+      var next=Math.min(1,(h-14)/contentH);
+      if(Math.abs(next-scale)<0.01){scale=next;break;}
+      scale=next;
+    }
+    scale=Math.max(.5,Math.min(1,scale));
+    inner.style.width=(w/scale)+'px';
+    inner.style.transform='scale('+scale+')';
   });
 }
 window.addEventListener('resize',fitActiveSlide);
 window.addEventListener('orientationchange',function(){setTimeout(fitActiveSlide,120)});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',function(){setTimeout(fitActiveSlide,60)});
 function show(n){var old=index;index=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,i){s.classList.toggle('active',i===index);s.classList.toggle('backward',index<old)});Array.prototype.forEach.call(ovgrid.children,function(b,i){b.classList.toggle('active',i===index)});document.getElementById('counter').textContent=String(index+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');document.getElementById('progressFill').style.width=((index+1)/slides.length*100)+'%';document.documentElement.style.setProperty('--progress',((index+1)/slides.length*100)+'%');document.getElementById('prev').disabled=index===0;document.getElementById('next').disabled=index===slides.length-1;slides[index].scrollTop=0;renderNotes();requestAnimationFrame(fitActiveSlide);if(old!==index){stopSim('mitosis');stopSim('meiosis');}}
 titles.forEach(function(t,i){var b=document.createElement('button');b.type='button';b.className='ovitem';b.innerHTML='<small>SLIDE '+String(i+1).padStart(2,'0')+'</small><b>'+t+'</b>';b.addEventListener('click',function(){overview.classList.remove('open');show(i)});ovgrid.appendChild(b)});
 document.getElementById('prev').addEventListener('click',function(){show(index-1)});document.getElementById('next').addEventListener('click',function(){show(index+1)});
@@ -371,9 +426,21 @@ document.getElementById('fullscreen').addEventListener('click',function(){
 document.addEventListener('fullscreenchange',function(){
   var b=document.getElementById('fullscreen');
   if(b)b.textContent=document.fullscreenElement?'⤢':'⛶';
-  requestAnimationFrame(fitActiveSlide);
+  setTimeout(fitActiveSlide,60);
+  setTimeout(fitActiveSlide,260);
 });
 document.getElementById('auto').addEventListener('click',function(){if(autoOn){clearInterval(autoTimer);autoTimer=null;autoOn=false;this.textContent='▶'}else{autoOn=true;this.textContent='Ⅱ';autoTimer=setInterval(function(){if(index>=slides.length-1){clearInterval(autoTimer);autoTimer=null;autoOn=false;document.getElementById('auto').textContent='▶';return}show(index+1)},8500)}});
+var touchStart=null;
+stage.addEventListener('touchstart',function(e){
+  if(e.touches.length!==1||e.target.closest('button,.part-btn,.answer,.ctrl-buttons')){touchStart=null;return;}
+  touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
+},{passive:true});
+stage.addEventListener('touchend',function(e){
+  if(!touchStart||!e.changedTouches.length)return;
+  var dx=e.changedTouches[0].clientX-touchStart.x,dy=e.changedTouches[0].clientY-touchStart.y;
+  if(Math.abs(dx)>65&&Math.abs(dx)>Math.abs(dy)*1.3)show(index+(dx<0?1:-1));
+  touchStart=null;
+},{passive:true});
 document.addEventListener('keydown',function(e){if(/INPUT|TEXTAREA/.test(e.target.tagName))return;if(e.key==='ArrowRight'||e.key==='PageDown'){e.preventDefault();show(index+1)}else if(e.key==='ArrowLeft'||e.key==='PageUp'){show(index-1)}else if(e.key.toLowerCase()==='n'){notesPanel.classList.toggle('open');renderNotes()}else if(e.key.toLowerCase()==='o'){overview.classList.toggle('open')}else if(e.key.toLowerCase()==='f'){document.getElementById('fullscreen').click()}else if(e.key==='Escape'){overview.classList.remove('open');notesPanel.classList.remove('open')}});
 
 var parts={

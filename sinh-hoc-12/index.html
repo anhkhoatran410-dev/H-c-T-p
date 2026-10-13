@@ -625,6 +625,13 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  #introPlay,.intro-gate.intro-closing,.intro-placeholder svg{transition:none!important;animation:none!important}
 }
 
+
+#introChoose{max-width:300px}
+.intro-gate.uploading #introChoose{display:inline-flex!important;opacity:.8;cursor:wait}
+.intro-gate.uploading #introChoose::before{content:"";width:13px;height:13px;flex:0 0 13px;border:2px solid #ffffff70;border-top-color:#fff;border-radius:50%;animation:introSpin .75s linear infinite}
+@keyframes introSpin{to{transform:rotate(360deg)}}
+.intro-gate.uploading .intro-status{border-color:#32c7b755;color:#f3fffd}
+
 </style>
 </head>
 <body>
@@ -641,7 +648,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
         <button type="button" id="introPlay" class="intro-btn intro-primary">▶ Phát video giới thiệu</button>
         <button type="button" id="introSkip" class="intro-btn intro-secondary">Bỏ qua intro <span>→</span></button>
       </div>
-      <button type="button" id="introChoose" class="intro-choose">Chọn video từ máy tính</button>
+      <button type="button" id="introChoose" class="intro-choose">Tải video lên website</button>
       <input type="file" id="introFile" accept="video/mp4,video/webm,video/quicktime" hidden>
       <div class="intro-status" id="introStatus" aria-live="polite">Video sẽ phát trước khi vào slide 1.</div>
     </div>
@@ -1158,7 +1165,7 @@ function drawQ(){var q=questions[qi];qCount.textContent='CÂU '+String(qi+1).pad
 qOptions.addEventListener('click',function(e){var b=e.target.closest('[data-answer]');if(!b||answered)return;answered=true;var q=questions[qi],v=Number(b.dataset.answer);if(v===q.c)score++;Array.prototype.forEach.call(qOptions.children,function(el,i){el.disabled=true;if(i===q.c)el.classList.add('correct');if(i===v&&v!==q.c)el.classList.add('wrong')});qFeedback.textContent=(v===q.c?'✓ Chính xác! ':'Chưa chính xác. ')+q.why;qScore.textContent='ĐIỂM: '+score+' / '+(qi+1)});
 qNext.addEventListener('click',function(){if(!answered){qFeedback.textContent='Chọn một đáp án trước nhé.';return}if(qi===questions.length-1){qi=0;score=0;drawQ();return}qi++;drawQ()});
 
-// Intro video layer: use the public asset if present, otherwise let the presenter pick the same local MP4.
+// Shared intro: the first upload is stored publicly in Vercel Blob and reused by every device.
 var introGate=document.getElementById('introGate');
 var introVideo=document.getElementById('introVideo');
 var introFrame=document.getElementById('introVideoFrame');
@@ -1166,6 +1173,10 @@ var introPlaceholder=document.getElementById('introPlaceholder');
 var introStatus=document.getElementById('introStatus');
 var introFile=document.getElementById('introFile');
 var introSourceReady=false;
+var introHostedReady=false;
+var introCheckingHosted=true;
+var introUploadBusy=false;
+
 function closeIntro(){
   if(!introGate)return;
   introGate.classList.add('intro-closing');
@@ -1173,11 +1184,37 @@ function closeIntro(){
   try{introVideo.pause()}catch(e){}
 }
 function tryPlayIntro(){
+  if(!introVideo.src || (!introSourceReady && !introHostedReady)){
+    introStatus.textContent='Video đang được nạp. Đợi một chút rồi bấm Phát video giới thiệu lần nữa.';
+    return;
+  }
   var p=introVideo.play();
   if(p&&p.catch)p.catch(function(){
-    introGate.classList.add('needs-local');
-    introStatus.textContent='Video chưa có trên máy chủ của website. Hãy chọn tệp intro MP4 từ máy tính để phát, hoặc bỏ qua để vào bài.';
+    introStatus.textContent='Trình duyệt chưa bắt đầu phát. Bấm lại nút Phát video giới thiệu.';
   });
+}
+function loadHostedIntro(){
+  introCheckingHosted=true;
+  fetch('/api/intro-src',{cache:'no-store'})
+    .then(function(r){if(!r.ok)throw new Error('source lookup failed');return r.json()})
+    .then(function(data){
+      introCheckingHosted=false;
+      if(data&&data.url){
+        introVideo.src=data.url;
+        introHostedReady=true;
+        introGate.classList.remove('needs-local');
+        introStatus.textContent='Video intro đã được lưu trên website và dùng chung cho mọi máy.';
+        introVideo.load();
+      }else{
+        introGate.classList.add('needs-local');
+        introStatus.textContent='Cài video intro một lần: bấm “Tải video lên website” và chọn tệp MP4. Sau đó mọi máy sẽ dùng chung video này.';
+      }
+    })
+    .catch(function(){
+      introCheckingHosted=false;
+      introGate.classList.add('needs-local');
+      introStatus.textContent='Kho video đang khởi động. Bạn vẫn có thể tải tệp MP4 lên website từ đây.';
+    });
 }
 introVideo.addEventListener('loadedmetadata',function(){
   introSourceReady=true;
@@ -1185,7 +1222,7 @@ introVideo.addEventListener('loadedmetadata',function(){
   var playbackControls=document.getElementById('introVideoControls');if(playbackControls)playbackControls.hidden=false;
   var duration=Math.round(introVideo.duration||30);
   document.getElementById('introTime').textContent='INTRO · '+duration+' GIÂY';
-  if(introStatus)introStatus.textContent='Video sẵn sàng. Bấm phát để xem intro trước bài.';
+  if(introStatus&&!introUploadBusy)introStatus.textContent='Video sẵn sàng. Bấm phát để xem intro trước bài.';
 });
 introVideo.addEventListener('playing',function(){
   introGate.classList.add('video-playing');
@@ -1194,36 +1231,77 @@ introVideo.addEventListener('playing',function(){
 introVideo.addEventListener('pause',function(){introGate.classList.remove('video-playing')});
 introVideo.addEventListener('error',function(){
   if(introSourceReady)return;
+  if(introCheckingHosted)return;
   introGate.classList.add('needs-local');
-  if(introStatus)introStatus.textContent='Chưa tìm thấy video intro trên máy chủ. Bạn có thể chọn tệp MP4 đang có trên máy tính để phát ngay tại lớp.';
+  if(introStatus&&!introUploadBusy)introStatus.textContent='Chưa đọc được video đã lưu. Nếu đây là lần cài đầu tiên, tải tệp MP4 lên website một lần.';
 });
-introVideo.src='./intro.mp4';
-introVideo.load();
 document.getElementById('introPlay').addEventListener('click',function(){
   enterPresentation();
   if(introVideo.readyState>=2){tryPlayIntro();return;}
   if(introSourceReady){tryPlayIntro();return;}
+  if(introCheckingHosted){
+    introStatus.textContent='Đang kiểm tra video intro đã lưu trên website…';
+    setTimeout(function(){if(introVideo.readyState>=2)tryPlayIntro()},900);
+    return;
+  }
+  if(introVideo.src){
+    introStatus.textContent='Đang nạp video intro…';
+    setTimeout(function(){if(introVideo.readyState>=2)tryPlayIntro()},900);
+    return;
+  }
   introGate.classList.add('needs-local');
-  introStatus.textContent='Đang kiểm tra video trên website. Nếu không phát được, bấm “Chọn video từ máy tính”.';
-  setTimeout(function(){
-    if(introVideo.readyState<2&&!introVideo.ended){
-      introGate.classList.add('needs-local');
-      introStatus.textContent='Video chưa được lưu trên máy chủ website. Chọn tệp intro MP4 từ máy tính để phát trực tiếp.';
-    }
-  },700);
+  introStatus.textContent='Video chưa được cài đặt. Bấm “Tải video lên website” để lưu một lần cho cả lớp.';
 });
-document.getElementById('introChoose').addEventListener('click',function(){introFile.click()});
-introFile.addEventListener('change',function(){
+document.getElementById('introChoose').addEventListener('click',function(){
+  if(!introUploadBusy)introFile.click();
+});
+introFile.addEventListener('change',async function(){
   var file=introFile.files&&introFile.files[0];if(!file)return;
-  enterPresentation();
-  if(introVideo.dataset.localUrl)URL.revokeObjectURL(introVideo.dataset.localUrl);
-  var url=URL.createObjectURL(file);
-  introVideo.dataset.localUrl=url;
-  introVideo.src=url;
-  introVideo.load();
-  introVideo.play().then(function(){
-    introStatus.textContent='Đang phát video giới thiệu. Hết video sẽ tự chuyển sang bài.';
-  }).catch(function(){introStatus.textContent='Video đã nạp. Bấm “Phát video giới thiệu” để bắt đầu.'});
+  if(!(file.type==='video/mp4'||/\.mp4$/i.test(file.name))){
+    introStatus.textContent='Hãy chọn tệp MP4 để bảo đảm phát được trên máy tính và TV.';
+    introFile.value='';return;
+  }
+  if(file.size>25*1024*1024){
+    introStatus.textContent='Tệp quá lớn. Chọn video MP4 nhỏ hơn 25 MB.';
+    introFile.value='';return;
+  }
+  introUploadBusy=true;
+  var uploadButton=document.getElementById('introChoose');
+  uploadButton.textContent='Đang tải video lên…';
+  uploadButton.style.pointerEvents='none';
+  introGate.classList.add('uploading');
+  introStatus.textContent='Đang tải video lên kho chung của website. Giữ trang này mở đến khi hoàn tất…';
+  try{
+    var clientModule=await import('https://esm.sh/@vercel/blob@2.7.0/client?bundle');
+    var upload=clientModule.upload;
+    var pathname='genome-lab-intro-'+Date.now()+'.mp4';
+    var blob=await upload(pathname,file,{
+      access:'public',
+      contentType:'video/mp4',
+      handleUploadUrl:'/api/intro-upload',
+      multipart:file.size>4*1024*1024,
+      onUploadProgress:function(event){
+        var percent=Math.max(0,Math.min(100,Math.round(event.percentage||0)));
+        introStatus.textContent='Đang lưu video lên website… '+percent+'%';
+      }
+    });
+    introVideo.src=blob.url;
+    introVideo.load();
+    introHostedReady=true;
+    introGate.classList.remove('needs-local');
+    introStatus.textContent='Đã lưu intro trên website. Từ giờ mọi máy mở bài đều dùng video này; không cần tải lại.';
+    uploadButton.textContent='Video đã được lưu';
+  }catch(error){
+    console.error('Intro video upload failed',error);
+    introGate.classList.add('needs-local');
+    uploadButton.textContent='Thử tải lại video';
+    introStatus.textContent='Chưa tải được lên kho chung. Kiểm tra kết nối mạng rồi thử lại; đừng đóng trang trong lúc tải.';
+  }finally{
+    introUploadBusy=false;
+    introGate.classList.remove('uploading');
+    uploadButton.style.pointerEvents='';
+    introFile.value='';
+  }
 });
 document.getElementById('introSkip').addEventListener('click',function(){
   enterPresentation();
@@ -1238,6 +1316,7 @@ document.getElementById('introReplay').addEventListener('click',function(){
   introVideo.currentTime=0;tryPlayIntro();
 });
 introGate.addEventListener('animationend',function(e){if(e.target===introGate&&introGate.classList.contains('intro-closing'))introGate.style.display='none'});
+loadHostedIntro();
 
 show(0);selectPart('chromatids');drawQ();
 })();

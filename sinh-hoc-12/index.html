@@ -41,6 +41,27 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(37px,5.1vw,76px);line-height:.96;lett
 @media(max-width:950px){.workspace{grid-template-columns:minmax(0,1fr)}.rail{display:none}.stage{height:auto;max-height:100%;width:100%;aspect-ratio:16/9}.canvas{padding:12px}.topic{display:none}.bottom{padding:0 11px;gap:8px}.progress{display:none}.process-step{padding:8px}.process-glyph{height:66px}.split-figure>.figure{min-height:240px}.overview-grid{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:620px){.app{grid-template-rows:51px minmax(0,1fr) 58px}.top{padding:0 10px}.brand strong{font-size:10px}.brand small{font-size:8px}.live{font-size:8px;padding:6px 7px}.canvas{padding:7px}.stage{aspect-ratio:auto;height:100%;border-radius:13px}.slide{padding:18px;align-content:start;justify-content:center}.slide h1{font-size:clamp(35px,10vw,48px)}h2{font-size:27px}.cover,.split-figure,.quiz-layout{grid-template-columns:1fr;gap:10px}.hero-visual{height:160px;min-height:160px;max-height:160px}.hero-chrom{width:115px;height:150px}.cover h1{margin-bottom:12px}.cover .members{font-size:8px;margin-top:8px}.slide .lead{font-size:13px}.two-col{gap:8px}.card{padding:12px}.card p{font-size:10px}.stat{font-size:31px}.split-figure>.figure{min-height:210px;max-height:245px;order:-1}.figure{min-height:165px}.dna-art{min-height:180px}.dna-art svg{max-height:205px}.hierarchy-step{padding:7px}.process{grid-template-columns:1fr 1fr;gap:8px}.process-step{padding:10px}.process-glyph{height:68px}.process-step h3{font-size:11px}.process-step p{font-size:9px}.sequence{grid-template-columns:1fr 1fr;gap:7px}.sequence-step{padding:9px}.formula-node{min-width:0;flex:1;padding:8px 4px}.formula-node strong{font-size:22px}.formula-row{gap:5px}.formula-sign{font-size:17px}.quiz-visual{min-height:130px;max-height:150px}.quiz-visual svg{max-height:145px}.quiz-card{padding:13px}.recap-grid{gap:7px}.recap-item{padding:9px}.bottom{padding:0 7px}.counter{min-width:40px;font-size:9px}.bottom-actions{gap:5px}.btn{padding:8px 9px;font-size:8px}.icon-btn{width:31px;height:31px}.notes-toggle{font-size:8px!important}.notes-toggle .key{display:none}.overview{padding:12px}.overview-grid{grid-template-columns:repeat(2,1fr)}.ovitem{min-height:70px}.notes-panel{right:8px;bottom:65px;max-height:72vh;width:calc(100vw - 16px)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+
+.sim-mitosis-cell.sim-active{filter:drop-shadow(0 0 8px #18bba777)}
+.simulation-control .btn:disabled{opacity:.35}
+/* guided simulation controls + explicit arm highlighting */
+.diagram-part[data-part-shape="p-arm"] path,.diagram-part[data-part-shape="q-arm"] path{fill:none;stroke:#16c4b0;stroke-width:22;stroke-linecap:round;opacity:.02;transition:opacity .2s,stroke-width .2s,stroke .2s}
+.diagram-part[data-part-shape="q-arm"] path{stroke:#e9a43e}
+.diagram-part[data-part-shape="p-arm"].is-focused path,.diagram-part[data-part-shape="q-arm"].is-focused path{opacity:.78;stroke-width:34;filter:drop-shadow(0 0 7px #13bca970)}
+.simulation-control{margin-top:10px;border:1px solid #d5e5ed;border-radius:12px;padding:10px 12px;background:linear-gradient(110deg,#f2fbfa,#f7f9ff);display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.simulation-title{font-size:9px;letter-spacing:.12em;font-weight:950;color:#087f83}
+.simulation-state{font-size:10px;color:#425d75;line-height:1.5;margin-top:4px}
+.simulation-buttons{display:flex;align-items:center;gap:5px}
+.simulation-buttons .btn{padding:7px 9px;font-size:8px}
+.sim-step-dots{grid-column:1/-1;display:flex;gap:5px}
+.sim-step-dot{height:4px;border-radius:5px;background:#dce8ef;flex:1;transition:background .25s,box-shadow .25s}
+.sim-step-dot.active{background:linear-gradient(90deg,#087f83,#5acdb8);box-shadow:0 0 8px #2bbda333}
+.process-step.sim-active{border-color:#6ec8bc;background:#effaf7;box-shadow:0 0 0 2px #a7e4d82b,0 8px 20px #148f8b13;transform:translateY(-2px)}
+.process-step{transition:background .25s,border .25s,box-shadow .25s,transform .25s}
+.sim-mitosis-cell circle{transition:stroke .25s,filter .25s}.sim-mitosis-cell.sim-active circle{stroke:#089c91!important;stroke-width:4!important;filter:drop-shadow(0 0 8px #3ccdbb99)}
+#meiosisDiagram [data-phase]{transition:opacity .25s,filter .25s,stroke .25s}#meiosisDiagram [data-phase].sim-active{filter:drop-shadow(0 0 7px #2ec3ad9c);stroke:#128f89!important;stroke-width:4!important}
+@media(max-width:620px){.simulation-control{grid-template-columns:1fr;gap:7px}.simulation-buttons{justify-content:flex-start}.simulation-buttons .btn{font-size:8px}}
 </style>
 </head>
 <body>
@@ -95,6 +116,8 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(37px,5.1vw,76px);line-height:.96;lett
 <defs><linearGradient id="chromL" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#28bead"/><stop offset="1" stop-color="#4d88e7"/></linearGradient><linearGradient id="chromR" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#f2bd61"/><stop offset="1" stop-color="#9679df"/></linearGradient></defs>
 <g class="diagram-part is-focused" data-part-shape="chromatids"><path class="shape" d="M165 38 C105 93 151 132 241 169 C311 198 273 258 215 326" stroke="url(#chromL)" stroke-width="31" stroke-linecap="round" fill="none"/><path class="shape" d="M365 38 C425 93 379 132 289 169 C219 198 257 258 315 326" stroke="url(#chromR)" stroke-width="31" stroke-linecap="round" fill="none"/></g>
 <g class="diagram-part" data-part-shape="telomere" fill="#193b5b" stroke="#fff" stroke-width="2"><circle class="shape" cx="165" cy="38" r="6"/><circle class="shape" cx="365" cy="38" r="6"/><circle class="shape" cx="215" cy="326" r="6"/><circle class="shape" cx="315" cy="326" r="6"/></g>
+<g class="diagram-part" data-part-shape="p-arm"><path d="M165 38 C105 93 151 132 241 169" /><path d="M365 38 C425 93 379 132 289 169" /></g>
+<g class="diagram-part" data-part-shape="q-arm"><path d="M241 169 C311 198 273 258 215 326" /><path d="M289 169 C219 198 257 258 315 326" /></g>
 <g class="diagram-part" data-part-shape="centromere"><ellipse class="shape" cx="265" cy="181" rx="31" ry="17" fill="#f5fbff" stroke="#315f84" stroke-width="4"/><path class="shape" d="M246 181h38" stroke="#315f84" stroke-width="4" stroke-linecap="round"/></g>
 <g class="diagram-part" data-part-shape="locus"><rect class="shape" x="135" y="102" width="22" height="7" rx="3.5" transform="rotate(22 135 102)" fill="#fff" stroke="#e5a23b" stroke-width="3"/><rect class="shape" x="376" y="105" width="22" height="7" rx="3.5" transform="rotate(-22 376 105)" fill="#fff" stroke="#e5a23b" stroke-width="3"/></g>
 <g stroke="#6d8297" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -170,7 +193,7 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(37px,5.1vw,76px);line-height:.96;lett
 <div class="figure reveal" style="min-height:175px;max-height:210px">
 <svg viewBox="0 0 700 210" role="img" aria-label="Sơ đồ nguyên phân: tế bào mẹ, NST kép, phân li chromatid và hai tế bào con">
 <defs><linearGradient id="mito" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#25bba9"/><stop offset="1" stop-color="#5a88ed"/></linearGradient></defs>
-<g fill="#e6f8f3" stroke="#71cabb" stroke-width="2"><circle cx="78" cy="100" r="47"/><circle cx="289" cy="100" r="47"/><circle cx="502" cy="100" r="42"/><circle cx="611" cy="100" r="42"/></g>
+<g class="sim-mitosis-cell" data-phase="0" fill="#e6f8f3" stroke="#71cabb" stroke-width="2"><circle cx="78" cy="100" r="47"/></g><g class="sim-mitosis-cell" data-phase="1" fill="#e6f8f3" stroke="#71cabb" stroke-width="2"><circle cx="289" cy="100" r="47"/></g><g class="sim-mitosis-cell" data-phase="2" fill="#e6f8f3" stroke="#71cabb" stroke-width="2"><circle cx="502" cy="100" r="42"/></g><g class="sim-mitosis-cell" data-phase="3" fill="#e6f8f3" stroke="#71cabb" stroke-width="2"><circle cx="611" cy="100" r="42"/></g>
 <g stroke="url(#mito)" stroke-width="8" stroke-linecap="round" fill="none"><path d="M63 76l24 24-24 24M87 76L63 100l24 24"/><path d="M274 76l24 24-24 24M298 76l-24 24 24 24"/><path d="M492 75l-12 25 12 25M514 75l12 25-12 25"/><path d="M601 75l-12 25 12 25M623 75l12 25-12 25"/></g>
 <path class="trace" d="M135 100H221m-13-9 13 9-13 9M347 100H444m-13-9 13 9-13 9" stroke="#7c92af" stroke-width="3" stroke-linecap="round" fill="none"/>
 <g fill="#405a73" font-size="11" font-weight="850" text-anchor="middle"><text x="78" y="170">TẾ BÀO MẸ</text><text x="289" y="170">NST NHÂN ĐÔI</text><text x="502" y="170">TẾ BÀO CON</text><text x="611" y="170">TẾ BÀO CON</text></g>
@@ -183,6 +206,11 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(37px,5.1vw,76px);line-height:.96;lett
 <div class="process-step"><span class="badge-num">3</span><div class="process-glyph"><svg viewBox="0 0 100 80"><circle cx="33" cy="40" r="23" fill="#e2f8f2" stroke="#5bbcac" stroke-width="2"/><circle cx="68" cy="40" r="23" fill="#edf1ff" stroke="#8194df" stroke-width="2"/><path d="M24 32l16 16M40 32L24 48M59 32l16 16M75 32L59 48" stroke="#167f87" stroke-width="3" stroke-linecap="round"/></svg></div><h3>Hình thành tế bào con</h3><p>Mỗi tế bào con thường có bộ NST giống tế bào mẹ ban đầu.</p></div>
 <div class="process-step"><span class="badge-num">4</span><div class="process-glyph"><svg viewBox="0 0 100 80"><circle cx="50" cy="40" r="33" fill="#fff3df" stroke="#e7b35d" stroke-width="2"/><path d="M31 40l12 12 27-28" stroke="#ba811e" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><h3>Ý nghĩa</h3><p>Giúp sinh trưởng, thay thế tế bào và duy trì ổn định di truyền.</p></div>
 </div>
+<div class="simulation-control reveal" data-simulation="mitosis">
+  <div><div class="simulation-title">▶ MÔ PHỎNG NGUYÊN PHÂN</div><div class="simulation-state" id="mitosisState">Bước 1/4 · DNA nhân đôi trước khi NST phân li.</div></div>
+  <div class="simulation-buttons"><button class="btn" id="mitosisPrev" type="button">←</button><button class="btn primary" id="mitosisPlay" type="button">Chạy ▶</button><button class="btn" id="mitosisNext" type="button">Tiếp →</button><button class="btn" id="mitosisReset" type="button">↺</button></div>
+  <div class="sim-step-dots" id="mitosisDots"><span class="sim-step-dot active"></span><span class="sim-step-dot"></span><span class="sim-step-dot"></span><span class="sim-step-dot"></span></div>
+</div>
 <div class="callout reveal">Lưu ý: DNA nhân đôi trước nguyên phân; không phải nguyên phân làm tăng gấp đôi số NST ở mỗi tế bào con.</div>
 </section>
 <!-- 07 -->
@@ -190,13 +218,13 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(37px,5.1vw,76px);line-height:.96;lett
 <div class="kicker reveal">06 / Giảm phân</div><h2 class="reveal">Giảm số lượng NST, <span class="purple">tạo tổ hợp mới</span></h2>
 <div class="split-figure reveal">
 <div class="figure">
-<svg viewBox="0 0 520 325" role="img" aria-label="Mô phỏng giảm phân từ tế bào lưỡng bội qua hai lần phân bào tạo bốn tế bào đơn bội">
+<svg id="meiosisDiagram" viewBox="0 0 520 325" role="img" aria-label="Mô phỏng giảm phân từ tế bào lưỡng bội qua hai lần phân bào tạo bốn tế bào đơn bội">
 <defs><linearGradient id="mei" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1eb5a3"/><stop offset="1" stop-color="#6e86e6"/></linearGradient></defs>
-<circle cx="78" cy="152" r="42" fill="#e8f8f4" stroke="#64c4b5" stroke-width="2"/><path d="M63 132l30 40M93 132l-30 40" stroke="#168e8c" stroke-width="7" stroke-linecap="round"/>
+<circle data-phase="0" cx="78" cy="152" r="42" fill="#e8f8f4" stroke="#64c4b5" stroke-width="2"/><path d="M63 132l30 40M93 132l-30 40" stroke="#168e8c" stroke-width="7" stroke-linecap="round"/>
 <path d="M125 152h56m-10-9 10 9-10 9" stroke="#8b9ab2" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-<circle cx="220" cy="105" r="30" fill="#e6f4ff" stroke="#82b1da" stroke-width="2"/><circle cx="220" cy="198" r="30" fill="#fff1dc" stroke="#e3b45f" stroke-width="2"/><path d="M211 91l18 28m0-28-18 28M211 184l18 28m0-28-18 28" stroke="#6f8ad9" stroke-width="4" stroke-linecap="round"/>
+<circle data-phase="1" cx="220" cy="105" r="30" fill="#e6f4ff" stroke="#82b1da" stroke-width="2"/><circle data-phase="1" cx="220" cy="198" r="30" fill="#fff1dc" stroke="#e3b45f" stroke-width="2"/><path d="M211 91l18 28m0-28-18 28M211 184l18 28m0-28-18 28" stroke="#6f8ad9" stroke-width="4" stroke-linecap="round"/>
 <path d="M254 105h45v47m0 0v46m-9-12 9 12 9-12" stroke="#8b9ab2" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-<g fill="#e7f8f3" stroke="#78c8bc" stroke-width="2"><circle cx="343" cy="94" r="24"/><circle cx="401" cy="94" r="24"/><circle cx="343" cy="210" r="24"/><circle cx="401" cy="210" r="24"/></g>
+<g fill="#e7f8f3" stroke="#78c8bc" stroke-width="2"><circle data-phase="2" cx="343" cy="94" r="24"/><circle data-phase="2" cx="401" cy="94" r="24"/><circle data-phase="2" cx="343" cy="210" r="24"/><circle data-phase="2" cx="401" cy="210" r="24"/></g>
 <g stroke-width="4" stroke-linecap="round" fill="none"><path d="M336 82l14 24m0-24-14 24" stroke="#188d8b"/><path d="M394 82l14 24m0-24-14 24" stroke="#9a79d9"/><path d="M336 198l14 24m0-24-14 24" stroke="#d8a03d"/><path d="M394 198l14 24m0-24-14 24" stroke="#478edc"/></g>
 <g fill="#466079" text-anchor="middle" font-size="10" font-weight="850"><text x="78" y="211">TẾ BÀO 2n</text><text x="220" y="252">GIẢM PHÂN I</text><text x="373" y="256">GIẢM PHÂN II</text></g>
 <text x="373" y="285" fill="#71859a" text-anchor="middle" font-size="10">4 tế bào n</text><path d="M337 118l0 54M401 118l0 54" stroke="#9aa9bc" stroke-dasharray="4 5"/>
@@ -209,6 +237,11 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(37px,5.1vw,76px);line-height:.96;lett
 <div class="fact"><span class="fact-no">3</span><p><b>Biến dị tổ hợp</b><br>Phân li độc lập và trao đổi chéo góp phần tạo giao tử khác nhau.</p></div>
 <div class="callout gold">Hình đọc từ trái sang phải: tế bào 2n → hai tế bào sau giảm phân I → bốn tế bào n sau giảm phân II.</div>
 </div>
+</div>
+<div class="simulation-control reveal" data-simulation="meiosis">
+  <div><div class="simulation-title">▶ MÔ PHỎNG GIẢM PHÂN</div><div class="simulation-state" id="meiosisState">Bước 1/3 · NST tương đồng phân li ở giảm phân I.</div></div>
+  <div class="simulation-buttons"><button class="btn" id="meiosisPrev" type="button">←</button><button class="btn primary" id="meiosisPlay" type="button">Chạy ▶</button><button class="btn" id="meiosisNext" type="button">Tiếp →</button><button class="btn" id="meiosisReset" type="button">↺</button></div>
+  <div class="sim-step-dots" id="meiosisDots"><span class="sim-step-dot active"></span><span class="sim-step-dot"></span><span class="sim-step-dot"></span></div>
 </div>
 </section>
 <!-- 08 -->
@@ -321,7 +354,7 @@ var prompts=[
 'Kết thúc bằng câu chốt in đậm; không cần đọc lại toàn bộ slide.'
 ];
 function renderNotes(){notesTitle.textContent='Lời thoại · '+String(index+1).padStart(2,'0')+' / '+titles[index];notesText.textContent=notes[index]||'';notesPrompt.textContent=prompts[index]||'Hãy nói tự nhiên và dùng hình minh họa làm điểm tựa.'}
-function show(n,fromKey){var old=index;index=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,i){s.classList.remove('active','prev');if(i===index){s.classList.add('active');if(index<old)s.classList.add('prev')}});Array.prototype.slice.call(thumbs.children).forEach(function(b,i){b.classList.toggle('active',i===index)});Array.prototype.slice.call(ovgrid.children).forEach(function(b,i){b.classList.toggle('active',i===index)});counter.textContent=String(index+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');railCount.textContent=String(index+1).padStart(2,'0')+'/'+String(slides.length).padStart(2,'0');progressFill.style.width=((index+1)/slides.length*100)+'%';document.getElementById('prev').disabled=index===0;document.getElementById('next').disabled=index===slides.length-1;slides[index].scrollTop=0;renderNotes();if(fromKey&&notesPanel.classList.contains('open'))notesPanel.scrollTop=0}
+function show(n,fromKey){var old=index;var target=Math.max(0,Math.min(slides.length-1,n));if(target!==index){stopSimulation('mitosis');stopSimulation('meiosis')}index=target;slides.forEach(function(s,i){s.classList.remove('active','prev');if(i===index){s.classList.add('active');if(index<old)s.classList.add('prev')}});Array.prototype.slice.call(thumbs.children).forEach(function(b,i){b.classList.toggle('active',i===index)});Array.prototype.slice.call(ovgrid.children).forEach(function(b,i){b.classList.toggle('active',i===index)});counter.textContent=String(index+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');railCount.textContent=String(index+1).padStart(2,'0')+'/'+String(slides.length).padStart(2,'0');progressFill.style.width=((index+1)/slides.length*100)+'%';document.getElementById('prev').disabled=index===0;document.getElementById('next').disabled=index===slides.length-1;slides[index].scrollTop=0;renderNotes();if(fromKey&&notesPanel.classList.contains('open'))notesPanel.scrollTop=0}
 titles.forEach(function(title,i){var b=document.createElement('button');b.type='button';b.className='thumb'+(i===0?' active':'');b.innerHTML='<span class="thumb-art"><span>'+String(i+1).padStart(2,'0')+'</span></span><span><b>'+title+'</b><small>SLIDE '+String(i+1).padStart(2,'0')+'</small></span>';b.addEventListener('click',function(){show(i);overview.classList.remove('open')});thumbs.appendChild(b);var o=document.createElement('button');o.type='button';o.className='ovitem';o.innerHTML='<small>SLIDE '+String(i+1).padStart(2,'0')+'</small><b>'+title+'</b>';o.addEventListener('click',function(){overview.classList.remove('open');show(i)});ovgrid.appendChild(o)});
 document.getElementById('next').addEventListener('click',function(){show(index+1)});document.getElementById('prev').addEventListener('click',function(){show(index-1)});
 document.getElementById('notesToggle').addEventListener('click',function(){notesPanel.classList.toggle('open');renderNotes()});document.getElementById('closeNotes').addEventListener('click',function(){notesPanel.classList.remove('open')});
@@ -338,8 +371,38 @@ var partData={
 'p-arm':{title:'Cánh p',text:'Cánh p là cánh ngắn của NST theo quy ước. Chữ p bắt nguồn từ “petit”, nghĩa là nhỏ/ngắn.'},
 'q-arm':{title:'Cánh q',text:'Cánh q là cánh còn lại, thường được gọi là cánh dài. Chiều dài thực và vị trí tâm động khác nhau giữa các NST.'}
 };
-function selectPart(key){var data=partData[key];if(!data)return;document.querySelectorAll('.part-button').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-part')===key?'true':'false')});document.querySelectorAll('[data-part-shape]').forEach(function(g){g.classList.toggle('is-focused',g.getAttribute('data-part-shape')===key||((key==='p-arm'||key==='q-arm')&&g.getAttribute('data-part-shape')==='chromatids'));g.classList.toggle('is-muted',key!=='chromatids'&&g.getAttribute('data-part-shape')!==key&&g.getAttribute('data-part-shape')!=='chromatids')});document.getElementById('partDetail').innerHTML='<strong>'+data.title+'</strong><p>'+data.text+'</p>'}
+function selectPart(key){var data=partData[key];if(!data)return;document.querySelectorAll('.part-button').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-part')===key?'true':'false')});document.querySelectorAll('[data-part-shape]').forEach(function(g){g.classList.toggle('is-focused',g.getAttribute('data-part-shape')===key);g.classList.toggle('is-muted',key!=='chromatids'&&g.getAttribute('data-part-shape')!==key&&g.getAttribute('data-part-shape')!=='chromatids')});document.getElementById('partDetail').innerHTML='<strong>'+data.title+'</strong><p>'+data.text+'</p>'}
 document.getElementById('partTools').addEventListener('click',function(e){var b=e.target.closest('[data-part]');if(b)selectPart(b.getAttribute('data-part'))});
+
+/* Guided, clickable simulations: phases highlight in sync with the explanation. */
+var simDefinitions={
+ mitosis:{
+  max:4,stateId:'mitosisState',dotsId:'mitosisDots',cellSelector:'.sim-mitosis-cell',
+  cardsSelector:'.slide[data-title="Nguyên phân"] .process-step',
+  texts:[
+   'Bước 1/4 · DNA được nhân đôi trước khi tế bào bước vào nguyên phân.',
+   'Bước 2/4 · NST kép sắp xếp; các chromatid chị em được chuẩn bị để phân li.',
+   'Bước 3/4 · Hai tế bào con hình thành và nhận các NST tương ứng.',
+   'Bước 4/4 · Bộ NST thường được duy trì ở hai tế bào con.'
+  ]
+ },
+ meiosis:{
+  max:3,stateId:'meiosisState',dotsId:'meiosisDots',cellSelector:'#meiosisDiagram [data-phase]',
+  cardsSelector:'.slide[data-title="Giảm phân"] .fact',
+  texts:[
+   'Bước 1/3 · Ở giảm phân I, các NST tương đồng phân li; số bộ NST giảm 2n → n.',
+   'Bước 2/3 · Ở giảm phân II, các chromatid chị em phân li.',
+   'Bước 3/3 · Kết quả điển hình là bốn tế bào đơn bội; tổ hợp allele có thể khác nhau.'
+  ]
+ }
+};
+var simState={mitosis:0,meiosis:0},simTimers={mitosis:null,meiosis:null};
+function stopSimulation(name){if(simTimers[name]){clearInterval(simTimers[name]);simTimers[name]=null;}var b=document.getElementById(name+'Play');if(b)b.textContent='Chạy ▶';}
+function renderSimulation(name){var d=simDefinitions[name];if(!d)return;var step=simState[name];var state=document.getElementById(d.stateId);if(state)state.textContent=d.texts[step];var dots=document.getElementById(d.dotsId);if(dots)Array.prototype.forEach.call(dots.children,function(dot,i){dot.classList.toggle('active',i===step)});var cells=document.querySelectorAll(d.cellSelector);Array.prototype.forEach.call(cells,function(el){var phase=Number(el.getAttribute('data-phase'));var active=name==='mitosis' ? phase===step || (step===3&&phase>=2) : phase===step;el.classList.toggle('sim-active',active)});var cards=document.querySelectorAll(d.cardsSelector);Array.prototype.forEach.call(cards,function(el,i){el.classList.toggle('sim-active',i===step)});var prev=document.getElementById(name+'Prev'),next=document.getElementById(name+'Next');if(prev)prev.disabled=step===0;if(next)next.disabled=step===d.max-1;}
+function setSimulation(name,step){var d=simDefinitions[name];if(!d)return;stopSimulation(name);simState[name]=Math.max(0,Math.min(d.max-1,step));renderSimulation(name);}
+function bindSimulation(name){var d=simDefinitions[name];if(!d)return;document.getElementById(name+'Prev').addEventListener('click',function(){setSimulation(name,simState[name]-1)});document.getElementById(name+'Next').addEventListener('click',function(){setSimulation(name,simState[name]+1)});document.getElementById(name+'Reset').addEventListener('click',function(){setSimulation(name,0)});document.getElementById(name+'Play').addEventListener('click',function(){var button=this;if(simTimers[name]){stopSimulation(name);return;}if(simState[name]>=d.max-1)simState[name]=0;renderSimulation(name);button.textContent='Dừng Ⅱ';simTimers[name]=setInterval(function(){if(simState[name]>=d.max-1){stopSimulation(name);return;}simState[name]++;renderSimulation(name);},2100);});renderSimulation(name);}
+bindSimulation('mitosis');bindSimulation('meiosis');
+
 /* quiz */
 var questions=[
 {q:'Phần nào trên NST kép gắn hai chromatid chị em?',a:['Telomere','Tâm động','Gene'],correct:1,why:'Tâm động là vùng gắn hai chromatid chị em và liên quan đến sự phân li của NST.'},

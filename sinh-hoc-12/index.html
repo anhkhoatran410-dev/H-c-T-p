@@ -268,6 +268,69 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
  .app:fullscreen .final-slide.active .end-art{height:36vh;min-height:0}
 }
 
+
+/* CLASSROOM / TV PRESENTATION MODE — keep type readable at a distance */
+.app:fullscreen{background:#eef4f8}
+.app:fullscreen .stage{background:#fff}
+.app:fullscreen .slide-inner{display:grid;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;align-content:space-evenly;gap:clamp(8px,1.2vh,18px);padding:clamp(24px,2.8vw,54px) clamp(32px,3.8vw,72px);transform:none!important;width:100%!important;min-height:100%!important}
+.app:fullscreen .slide{overflow:hidden}
+.app:fullscreen h1{font-size:clamp(44px,5.2vh,68px)!important;line-height:1.02!important;letter-spacing:-.045em;margin-bottom:12px}
+.app:fullscreen h2{font-size:clamp(38px,4.5vh,56px)!important;line-height:1.08!important;margin-bottom:10px}
+.app:fullscreen h3{font-size:clamp(25px,2.8vh,34px)!important;line-height:1.15!important;margin-bottom:9px}
+.app:fullscreen .kicker,.app:fullscreen .eyebrow,.app:fullscreen .function-label{font-size:clamp(14px,1.55vh,18px)!important;letter-spacing:.13em;margin-bottom:10px}
+.app:fullscreen .lead{font-size:clamp(22px,2.45vh,29px)!important;line-height:1.38!important;margin-bottom:12px}
+.app:fullscreen p,.app:fullscreen .card p,.app:fullscreen .function-card p,.app:fullscreen .detail p,.app:fullscreen .fact p,.app:fullscreen .seq p{font-size:clamp(19px,2.05vh,24px)!important;line-height:1.42!important;margin-bottom:8px}
+.app:fullscreen .callout,.app:fullscreen .relationship-callout{font-size:clamp(18px,1.9vh,22px)!important;line-height:1.45!important;padding:12px 16px;margin-top:10px}
+.app:fullscreen .small,.app:fullscreen .figlabel,.app:fullscreen .pack small,.app:fullscreen .gene-label p,.app:fullscreen .phase-step p,.app:fullscreen .function-bottom small{font-size:clamp(15px,1.55vh,18px)!important;line-height:1.35!important}
+.app:fullscreen .part-btn,.app:fullscreen .pill,.app:fullscreen .answer,.app:fullscreen .phase-step b,.app:fullscreen .pack b,.app:fullscreen .gene-label b{font-size:clamp(16px,1.7vh,20px)!important;padding:10px 14px}
+.app:fullscreen .card,.app:fullscreen .function-card{padding:clamp(14px,1.8vh,22px)}
+.app:fullscreen .function-flow{gap:clamp(12px,1.6vw,24px)}
+.app:fullscreen .function-visual{height:clamp(135px,19vh,205px)}
+.app:fullscreen .figure{min-height:0!important;height:clamp(290px,43vh,450px)!important;max-height:none!important}
+.app:fullscreen .split-figure>.figure{height:clamp(300px,45vh,470px)!important}
+.app:fullscreen .figure-explain>b{font-size:clamp(22px,2.3vh,28px)!important}
+.app:fullscreen .figure-explain>p{font-size:clamp(18px,1.9vh,22px)!important;line-height:1.45!important}
+.app:fullscreen .figure-explain>small{font-size:clamp(15px,1.5vh,18px)!important}
+.app:fullscreen .figure-explain .explain-tag{font-size:clamp(14px,1.4vh,17px)!important}
+.app:fullscreen .dna-viz{min-height:0!important;height:clamp(300px,43vh,450px)!important}
+.app:fullscreen .dna-viz svg{max-height:100%!important}
+.app:fullscreen .gene-map svg{max-height:clamp(240px,35vh,360px)!important}
+.app:fullscreen .quiz-image{min-height:0!important;height:clamp(220px,32vh,340px)!important}
+.app:fullscreen .quiz-image svg{max-height:100%!important}
+.app:fullscreen .end-art{min-height:0!important;height:clamp(280px,42vh,440px)!important}
+.app:fullscreen .thankyou{font-size:clamp(58px,7vh,88px)!important}
+.app:fullscreen .final-message{font-size:clamp(22px,2.4vh,29px)!important;line-height:1.45!important}
+.app:fullscreen .thanks-names{font-size:clamp(15px,1.55vh,18px)!important}
+.app:fullscreen .team-panel{padding:16px 18px;margin-top:12px}
+.app:fullscreen .team-heading>b{font-size:clamp(16px,1.7vh,20px)!important}
+.app:fullscreen .team-count,.app:fullscreen .member-chip strong{font-size:clamp(16px,1.7vh,20px)!important}
+.app:fullscreen .member-chip{padding:8px 10px}
+.app:fullscreen .member-no{height:30px;flex-basis:30px;font-size:15px}
+.app:fullscreen .slide.active{animation:projectorIn .7s cubic-bezier(.2,.8,.2,1) both}
+.app:fullscreen .slide.active .reveal{animation:projectorRise .75s cubic-bezier(.2,.8,.2,1) both}
+.app:fullscreen .slide.active .reveal:nth-child(2){animation-delay:.12s}
+.app:fullscreen .slide.active .reveal:nth-child(3){animation-delay:.24s}
+.app:fullscreen .slide.active .reveal:nth-child(4){animation-delay:.36s}
+.app:fullscreen .slide.active .reveal:nth-child(5){animation-delay:.48s}
+@keyframes projectorIn{from{opacity:.2;transform:translateX(70px) scale(.975);filter:blur(4px)}to{opacity:1;transform:translateX(0) scale(1);filter:blur(0)}}
+@keyframes projectorRise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+/* Persistent, visible motion on scientific visuals rather than transition-only effects */
+.cover-svg{transform-origin:50% 50%;animation:bob 3.4s ease-in-out infinite!important}
+.cover-art .orb{animation:orbitPulse 2.8s ease-in-out infinite}
+.cover-art .o2{animation-delay:.45s}.cover-art .o3{animation-delay:.9s}.cover-art .o4{animation-delay:1.35s}
+.function-visual svg path[stroke-dasharray],.dna-viz svg path[stroke-dasharray]{animation:dash 2.2s linear infinite}
+.dna-viz svg .helix-rung{animation:bob 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+.end-art svg{animation:bob 3.2s ease-in-out infinite}
+@media(max-width:900px){
+ .app:fullscreen .slide-inner{padding:16px 18px;gap:8px}
+ .app:fullscreen h1{font-size:clamp(30px,5vw,46px)!important}
+ .app:fullscreen h2{font-size:clamp(27px,4.5vw,39px)!important}
+ .app:fullscreen h3{font-size:clamp(20px,3.2vw,28px)!important}
+ .app:fullscreen .lead{font-size:clamp(17px,2.4vw,22px)!important}
+ .app:fullscreen p,.app:fullscreen .card p,.app:fullscreen .function-card p{font-size:clamp(15px,2vw,19px)!important}
+ .app:fullscreen .figure,.app:fullscreen .split-figure>.figure{height:34vh!important}
+}
+
 </style>
 </head>
 <body>
@@ -571,39 +634,27 @@ var notesPanel=document.getElementById('notesPanel');
 function renderNotes(){document.getElementById('notesTitle').textContent='Lời thoại · '+String(index+1).padStart(2,'0')+' / '+titles[index];document.getElementById('notesText').textContent=notes[index];document.getElementById('notesTip').textContent='Gợi ý trình bày: '+tips[index]}
 function fitActiveSlide(){
   var active=slides[index];
-  if(!active||!document.fullscreenElement){
-    slides.forEach(function(s){
-      var inner=s.querySelector('.slide-inner');
-      if(inner){inner.style.width='';inner.style.minHeight='';inner.style.transform='';inner.style.alignContent='';}
-      s.scrollTop=0;
-    });
-    return;
-  }
+  slides.forEach(function(s){
+    var inner=s.querySelector('.slide-inner');
+    if(inner){
+      inner.style.width='';
+      inner.style.minHeight='';
+      inner.style.transform='';
+      inner.style.alignContent='';
+    }
+    if(s!==active)s.scrollTop=0;
+  });
+  if(!active)return;
+  active.scrollTop=0;
+  if(!document.fullscreenElement)return;
   var inner=active.querySelector('.slide-inner');
   if(!inner)return;
-  active.scrollTop=0;
-  requestAnimationFrame(function(){
-    var h=stage.clientHeight,w=stage.clientWidth;
-    if(!h||!w)return;
-    var scale=1,contentH=0;
-    inner.style.minHeight='0px';
-    inner.style.alignContent='start';
-    for(var i=0;i<6;i++){
-      inner.style.transform='none';
-      inner.style.width=(w/scale)+'px';
-      inner.getBoundingClientRect();
-      contentH=Math.max(inner.scrollHeight,inner.offsetHeight);
-      if(!contentH)break;
-      var next=Math.min(1,(h-24)/contentH);
-      if(Math.abs(next-scale)<0.008){scale=next;break;}
-      scale=next;
-    }
-    scale=Math.max(.48,Math.min(1,scale));
-    inner.style.width=(w/scale)+'px';
-    inner.style.minHeight=(h/scale)+'px';
-    inner.style.alignContent='space-evenly';
-    inner.style.transform='scale('+scale+')';
-  });
+  /* Projector mode: never shrink the whole slide to tiny text. Keep the type at
+     readable CSS sizes; individual slide layouts use their own responsive grids. */
+  inner.style.width='100%';
+  inner.style.minHeight='100%';
+  inner.style.transform='none';
+  inner.style.alignContent='space-evenly';
 }
 window.addEventListener('resize',fitActiveSlide);
 window.addEventListener('orientationchange',function(){setTimeout(fitActiveSlide,120)});

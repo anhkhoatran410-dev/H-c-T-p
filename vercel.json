@@ -95,6 +95,14 @@
   ],
   "rewrites": [
     {
+      "source": "/api/intro-src",
+      "destination": "/api/admin-tools?route=intro-src"
+    },
+    {
+      "source": "/api/intro-upload",
+      "destination": "/api/admin-tools?route=intro-upload"
+    },
+    {
       "source": "/api/generate-flashcards-v3",
       "destination": "/api/generate-flashcards"
     },

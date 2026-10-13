@@ -632,6 +632,88 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
 @keyframes introSpin{to{transform:rotate(360deg)}}
 .intro-gate.uploading .intro-status{border-color:#32c7b755;color:#f3fffd}
 
+
+/* Device-aware presentation: attempt native landscape lock, then guide manual rotation when blocked. */
+.orientation-hint[hidden]{display:none!important}
+.orientation-hint{position:fixed;inset:0;z-index:2147483600;display:grid;place-items:center;padding:20px;background:radial-gradient(ellipse at 50% 0%,#163247,#07111e 70%);color:#f5fbff;overflow:auto}
+.orientation-card{width:min(520px,100%);padding:clamp(20px,5vw,34px);border:1px solid #ffffff22;border-radius:22px;background:linear-gradient(150deg,#10283aee,#081625f5);box-shadow:0 28px 90px #0007;text-align:left}
+.orientation-icon{display:grid;place-items:center;width:100%;height:78px;color:#9eb8cc;margin-bottom:17px}
+.orientation-icon svg{height:100%;width:auto}
+.orientation-eyebrow{font-size:10px;letter-spacing:.18em;font-weight:950;color:#53d5c2}
+.orientation-card h2{margin:10px 0 12px;font-size:clamp(27px,6.4vw,38px);line-height:1.05;letter-spacing:-.035em;color:#fff}
+.orientation-card h2 span{color:#45d0bb}
+.orientation-card>p{margin:0 0 20px;color:#c0d1df;font-size:15px;line-height:1.6}
+.orientation-steps{display:flex;align-items:flex-start;gap:12px;margin:10px 0;padding:11px;border:1px solid #ffffff12;border-radius:12px;background:#ffffff07}
+.orientation-steps>span{display:grid;place-items:center;flex:0 0 28px;height:28px;border-radius:8px;background:#1a887f;color:#fff;font-size:12px;font-weight:950}
+.orientation-steps b{display:block;font-size:14px;color:#fff;margin-bottom:4px}
+.orientation-steps small{display:block;color:#adc1d2;font-size:12px;line-height:1.45}
+.orientation-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:19px}
+.orientation-actions button{border-radius:10px;padding:12px 14px;font-size:13px;font-weight:900;border:1px solid #ffffff26;cursor:pointer}
+.rotate-primary{background:#0b9c90;color:#fff;box-shadow:0 8px 23px #0c9b8f30}
+.rotate-secondary{background:#ffffff0d;color:#e1ecf5}
+.orientation-note{color:#8ca4b9;font-size:10px;line-height:1.5;margin-top:14px}
+.app.presentation-active{position:fixed!important;inset:0!important;width:100vw!important;height:100dvh!important;grid-template-rows:0 minmax(0,1fr) calc(50px + env(safe-area-inset-bottom))!important;overflow:hidden!important;z-index:9000;background:#eef4f8}
+.app.presentation-active .top{display:none!important}
+.app.presentation-active .canvas{grid-row:2!important;min-height:0!important;padding:0!important;overflow:hidden!important}
+.app.presentation-active .stage{grid-row:1!important;width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;aspect-ratio:auto!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+.app.presentation-active .slide{min-height:0!important;padding:0!important;overflow:hidden!important;align-content:initial!important;justify-content:initial!important}
+.app.presentation-active .slide-inner{display:grid!important;position:absolute!important;top:0!important;left:0!important;width:100%!important;box-sizing:border-box!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-rows:max-content!important;align-content:space-evenly!important;gap:clamp(5px,1vh,12px)!important;padding:clamp(12px,2.4vw,34px) clamp(18px,3vw,54px)!important;min-height:100%!important;transform:none!important;transform-origin:top left!important}
+.app.presentation-active .bottom{grid-row:3!important;min-height:0!important;width:100%!important;gap:6px!important;padding:5px 10px calc(4px + env(safe-area-inset-bottom))!important;z-index:10!important}
+.app.presentation-active .counter{font-size:clamp(11px,1.3vw,15px)!important;min-width:48px}
+.app.presentation-active .progress{height:4px;max-width:200px}
+.app.presentation-active .controls{gap:5px!important}
+.app.presentation-active .btn{min-height:32px!important;padding:7px 10px!important;font-size:clamp(11px,1.25vw,15px)!important;border-radius:9px!important}
+.app.presentation-active .btn.icon{width:34px!important;height:34px!important;padding:0!important}
+.app.presentation-active h1{font-size:clamp(29px,5.2vh,54px)!important;line-height:1.04!important;letter-spacing:-.045em!important}
+.app.presentation-active h2{font-size:clamp(25px,4.5vh,43px)!important;line-height:1.08!important}
+.app.presentation-active h3{font-size:clamp(18px,2.9vh,28px)!important;line-height:1.15!important}
+.app.presentation-active .kicker,.app.presentation-active .eyebrow,.app.presentation-active .function-label{font-size:clamp(11px,1.5vh,15px)!important}
+.app.presentation-active .lead{font-size:clamp(16px,2.4vh,23px)!important;line-height:1.35!important}
+.app.presentation-active p,.app.presentation-active .card p,.app.presentation-active .function-card p,.app.presentation-active .detail p,.app.presentation-active .fact p,.app.presentation-active .seq p{font-size:clamp(13px,1.9vh,18px)!important;line-height:1.4!important}
+.app.presentation-active .callout,.app.presentation-active .relationship-callout{font-size:clamp(12px,1.65vh,16px)!important;line-height:1.4!important;padding:9px 12px!important}
+.app.presentation-active .figure,.app.presentation-active .split-figure>.figure{height:clamp(135px,35vh,320px)!important;min-height:0!important;max-height:none!important}
+.app.presentation-active .dna-viz{height:clamp(150px,36vh,325px)!important;min-height:0!important}
+.app.presentation-active .end-art{height:clamp(165px,39vh,350px)!important;min-height:0!important}
+.app.presentation-active .team-grid{gap:5px!important}
+.app.presentation-active .member-chip{padding:5px 7px!important}
+.app.presentation-active .member-chip strong{font-size:clamp(10px,1.55vh,15px)!important}
+.app.presentation-active .notes-panel{max-height:calc(100dvh - 82px)!important}
+@media (orientation:landscape) and (max-height:540px) and (max-width:1000px){
+ .app.presentation-active{grid-template-rows:0 minmax(0,1fr) calc(42px + env(safe-area-inset-bottom))!important}
+ .app.presentation-active .slide-inner{padding:5px 16px!important;gap:3px!important;align-content:center!important}
+ .app.presentation-active .bottom{padding:3px 8px calc(2px + env(safe-area-inset-bottom))!important}
+ .app.presentation-active .btn{min-height:29px!important;padding:5px 8px!important;font-size:12px!important}
+ .app.presentation-active .btn.icon{width:29px!important;height:29px!important}
+ .app.presentation-active .counter{font-size:11px!important}
+ .app.presentation-active h1{font-size:clamp(22px,6.5vh,34px)!important;margin:0 0 5px!important}
+ .app.presentation-active h2{font-size:clamp(20px,5.6vh,30px)!important;margin:0 0 5px!important}
+ .app.presentation-active h3{font-size:clamp(16px,4.6vh,23px)!important;margin:0 0 4px!important}
+ .app.presentation-active .kicker,.app.presentation-active .eyebrow,.app.presentation-active .function-label{font-size:10px!important;margin-bottom:4px!important}
+ .app.presentation-active .lead{font-size:clamp(12px,3.5vh,17px)!important;margin-bottom:4px!important}
+ .app.presentation-active p,.app.presentation-active .card p,.app.presentation-active .function-card p,.app.presentation-active .detail p,.app.presentation-active .fact p,.app.presentation-active .seq p{font-size:clamp(11px,3.2vh,15px)!important;line-height:1.25!important;margin-bottom:3px!important}
+ .app.presentation-active .callout,.app.presentation-active .relationship-callout{font-size:clamp(10px,2.9vh,14px)!important;padding:5px 7px!important;margin-top:4px!important}
+ .app.presentation-active .figure,.app.presentation-active .split-figure>.figure{height:clamp(85px,31vh,145px)!important}
+ .app.presentation-active .dna-viz{height:clamp(100px,33vh,155px)!important}
+ .app.presentation-active .end-art{height:clamp(100px,35vh,170px)!important}
+ .app.presentation-active .card,.app.presentation-active .function-card{padding:7px!important}
+ .app.presentation-active .two-col{gap:6px!important;margin-top:4px!important}
+ .app.presentation-active .process-controls{padding:5px 7px!important;margin-top:4px!important}
+ .app.presentation-active .team-panel{padding:6px!important;margin-top:5px!important}
+ .app.presentation-active .member-chip{padding:3px 5px!important}
+ .app.presentation-active .member-chip strong{font-size:11px!important}
+ .app.presentation-active .notes-panel{width:min(360px,48vw)!important;top:4px!important;bottom:48px!important}
+}
+@media (orientation:portrait) and (max-width:700px){
+ .app.presentation-active .bottom{gap:4px!important;padding-left:6px!important;padding-right:6px!important}
+ .app.presentation-active .btn{min-height:31px!important;padding:6px 8px!important;font-size:11px!important}
+ .app.presentation-active .btn.icon{width:31px!important;height:31px!important}
+ .app.presentation-active .slide-inner{padding:14px!important}
+ .orientation-card{border-radius:18px}
+}
+@media(prefers-reduced-motion:reduce){
+ .orientation-hint,.orientation-card{scroll-behavior:auto!important}
+}
+
 </style>
 </head>
 <body>
@@ -672,6 +754,20 @@ h1,h2,h3,p{margin-top:0}h1{font-size:clamp(35px,5.15vw,76px);line-height:.94;let
   </div>
   <div class="intro-foot"><span>TRÌNH CHIẾU SINH HỌC 12</span><span>NHẤN PHÁT VIDEO ĐỂ BẮT ĐẦU</span></div>
 </section>
+<div class="orientation-hint" id="orientationHint" role="dialog" aria-modal="true" aria-labelledby="orientationTitle" hidden>
+  <div class="orientation-card">
+    <div class="orientation-icon" aria-hidden="true">
+      <svg viewBox="0 0 120 88" fill="none"><rect x="17" y="27" width="34" height="49" rx="6" stroke="currentColor" stroke-width="4" transform="rotate(-90 34 51.5)"/><path d="M78 17a28 28 0 0 1 21 28" stroke="#16a995" stroke-width="5" stroke-linecap="round"/><path d="m92 39 8 8 8-8" stroke="#16a995" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M96 68a28 28 0 0 1-21-28" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".45"/><path d="m81 46-7-7-8 7" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/></svg>
+    </div>
+    <div class="orientation-eyebrow">CHẾ ĐỘ TRÌNH CHIẾU · ĐIỆN THOẠI</div>
+    <h2 id="orientationTitle">Xoay điện thoại <span>ngang</span></h2>
+    <p>Trang chiếu được thiết kế theo tỉ lệ ngang 16:9 để chữ và hình đủ lớn cho cả lớp nhìn. Trình duyệt này chưa cho phép tự xoay màn hình.</p>
+    <div class="orientation-steps"><span>01</span><div><b>Bật tự động xoay</b><small>Mở Cài đặt nhanh và bật “Tự động xoay / Auto-rotate”.</small></div></div>
+    <div class="orientation-steps"><span>02</span><div><b>Quay điện thoại sang ngang</b><small>Bài trình chiếu sẽ tự căn lại theo chiều ngang.</small></div></div>
+    <div class="orientation-actions"><button type="button" id="rotateRetry" class="rotate-primary">↻ Thử xoay tự động</button><button type="button" id="rotateContinue" class="rotate-secondary">Tiếp tục ở dọc</button></div>
+    <div class="orientation-note">Một số iPhone/trình duyệt không hỗ trợ khóa hướng bằng website. Khi đó cần xoay máy thủ công.</div>
+  </div>
+</div>
 <header class="top"><div class="brand"><span class="mark">✳</span><div><b>GENOME LAB</b><small>VISUAL BIOLOGY · SINH HỌC 12</small></div></div><div class="top-spacer"></div><span class="chapter">BÀI 7 · DI TRUYỀN HỌC</span><button class="live" id="startPresentation" type="button" aria-label="Bắt đầu trình chiếu toàn màn hình">● TRÌNH CHIẾU</button></header>
 <main class="canvas">
 <div class="stage" id="stage">
@@ -983,9 +1079,9 @@ function fitActiveSlide(){
   inner.style.transform='none';
   inner.style.alignContent='space-evenly';
 }
-window.addEventListener('resize',fitActiveSlide);
-window.addEventListener('orientationchange',function(){setTimeout(fitActiveSlide,120)});
-if(window.visualViewport)window.visualViewport.addEventListener('resize',function(){setTimeout(fitActiveSlide,60)});
+window.addEventListener('resize',function(){fitActiveSlide();updateOrientationHint()});
+window.addEventListener('orientationchange',function(){setTimeout(function(){fitActiveSlide();updateOrientationHint()},120)});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',function(){setTimeout(function(){fitActiveSlide();updateOrientationHint()},60)});
 function show(n){var old=index;index=Math.max(0,Math.min(slides.length-1,n));slides.forEach(function(s,i){s.classList.toggle('active',i===index);s.classList.toggle('backward',index<old)});Array.prototype.forEach.call(ovgrid.children,function(b,i){b.classList.toggle('active',i===index)});document.getElementById('counter').textContent=String(index+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');document.getElementById('progressFill').style.width=((index+1)/slides.length*100)+'%';document.documentElement.style.setProperty('--progress',((index+1)/slides.length*100)+'%');document.getElementById('prev').disabled=index===0;document.getElementById('next').disabled=index===slides.length-1;slides[index].scrollTop=0;renderNotes();requestAnimationFrame(fitActiveSlide);if(old!==index){stopSim('mitosis');stopSim('meiosis');}}
 titles.forEach(function(t,i){var b=document.createElement('button');b.type='button';b.className='ovitem';b.innerHTML='<small>SLIDE '+String(i+1).padStart(2,'0')+'</small><b>'+t+'</b>';b.addEventListener('click',function(){overview.classList.remove('open');show(i)});ovgrid.appendChild(b)});
 document.getElementById('prev').addEventListener('click',function(){show(index-1)});document.getElementById('next').addEventListener('click',function(){show(index+1)});
@@ -1002,27 +1098,95 @@ document.getElementById('closeNotes').addEventListener('click',function(){
 });
 notesPanel.addEventListener('click',function(e){e.stopPropagation()});
 document.getElementById('overviewToggle').addEventListener('click',function(){overview.classList.toggle('open')});document.getElementById('closeOverview').addEventListener('click',function(){overview.classList.remove('open')});
+var presentationRequested=false;
+var orientationHintDismissed=false;
+var orientationLockLastResult='unknown';
+function isTouchPortrait(){
+  return matchMedia('(pointer: coarse)').matches &&
+    Math.min(window.innerWidth||screen.width,window.innerHeight||screen.height)<1000 &&
+    window.innerHeight>window.innerWidth;
+}
+function introCurrentlyVisible(){
+  var gate=document.getElementById('introGate');
+  return !!gate&&getComputedStyle(gate).display!=='none'&&!gate.classList.contains('intro-closing');
+}
+function updateOrientationHint(){
+  var hint=document.getElementById('orientationHint');
+  var app=document.getElementById('appRoot');
+  if(!hint)return;
+  if(window.innerWidth>window.innerHeight)orientationHintDismissed=false;
+  var shouldShow=presentationRequested&&isTouchPortrait()&&!orientationHintDismissed&&!introCurrentlyVisible();
+  hint.hidden=!shouldShow;
+  if(app)app.classList.toggle('portrait-presentation-fallback',presentationRequested&&isTouchPortrait());
+}
 async function enterPresentation(){
   var target=document.getElementById('appRoot')||document.querySelector('.app');
+  presentationRequested=true;
+  orientationHintDismissed=false;
+  if(target)target.classList.add('presentation-active');
   try{
     if(!document.fullscreenElement){
-      if(target.requestFullscreen) await target.requestFullscreen({navigationUI:'hide'});
+      if(target&&target.requestFullscreen) await target.requestFullscreen({navigationUI:'hide'});
       else if(document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({navigationUI:'hide'});
     }
-    /* On Android browsers, locking after entering fullscreen rotates the device UI to landscape. */
-    if(screen.orientation&&screen.orientation.lock){
-      try{await screen.orientation.lock('landscape')}catch(err){/* The user can still rotate the device manually. */}
-    }
   }catch(err){
-    /* Keep the normal slide controls usable if fullscreen is restricted by the browser. */
+    /* Some mobile browsers do not support fullscreen on arbitrary elements. */
   }
+  var lockWorked=false;
+  if(screen.orientation&&typeof screen.orientation.lock==='function'){
+    try{
+      await screen.orientation.lock('landscape');
+      lockWorked=true;
+      orientationLockLastResult='locked';
+    }catch(err){
+      orientationLockLastResult='unsupported-or-blocked';
+    }
+  }else{
+    orientationLockLastResult='unsupported';
+  }
+  await new Promise(function(resolve){setTimeout(resolve,180)});
+  updateOrientationHint();
+  setTimeout(updateOrientationHint,550);
+  setTimeout(fitActiveSlide,100);
+  return lockWorked;
 }
-document.getElementById('startPresentation').addEventListener('click',enterPresentation);
+function exitPresentation(){
+  presentationRequested=false;
+  orientationHintDismissed=false;
+  var target=document.getElementById('appRoot');
+  if(target)target.classList.remove('presentation-active','portrait-presentation-fallback');
+  var hint=document.getElementById('orientationHint');if(hint)hint.hidden=true;
+  if(screen.orientation&&typeof screen.orientation.unlock==='function'){
+    try{screen.orientation.unlock()}catch(err){}
+  }
+  if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen();
+  setTimeout(fitActiveSlide,100);
+}
+
+document.getElementById('startPresentation').addEventListener('click',function(){enterPresentation()});
+document.getElementById('rotateRetry').addEventListener('click',function(){
+  orientationHintDismissed=false;
+  enterPresentation();
+});
+document.getElementById('rotateContinue').addEventListener('click',function(){
+  orientationHintDismissed=true;
+  var hint=document.getElementById('orientationHint');if(hint)hint.hidden=true;
+});
 document.getElementById('fullscreen').addEventListener('click',function(){
-  if(!document.fullscreenElement){enterPresentation()}
-  else{if(screen.orientation&&screen.orientation.unlock){try{screen.orientation.unlock()}catch(err){}}document.exitFullscreen&&document.exitFullscreen()}
+  if(document.fullscreenElement||presentationRequested){exitPresentation()}
+  else{enterPresentation()}
 });
 document.addEventListener('fullscreenchange',function(){
+  if(!document.fullscreenElement){
+    var app=document.getElementById('appRoot');
+    if(app&&presentationRequested){
+      presentationRequested=false;
+      app.classList.remove('presentation-active','portrait-presentation-fallback');
+      var hint=document.getElementById('orientationHint');if(hint)hint.hidden=true;
+    }
+  }else{
+    presentationRequested=true;
+  }
   var b=document.getElementById('fullscreen');
   if(b)b.textContent=document.fullscreenElement?'⤢':'⛶';
   setTimeout(fitActiveSlide,60);
@@ -1180,7 +1344,10 @@ var introUploadBusy=false;
 function closeIntro(){
   if(!introGate)return;
   introGate.classList.add('intro-closing');
-  setTimeout(function(){introGate.style.display='none';},420);
+  setTimeout(function(){
+    introGate.style.display='none';
+    updateOrientationHint();
+  },440);
   try{introVideo.pause()}catch(e){}
 }
 function tryPlayIntro(){

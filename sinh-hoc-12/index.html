@@ -1126,13 +1126,13 @@ document.getElementById('introPlay').addEventListener('click',function(){
 document.getElementById('introChoose').addEventListener('click',function(){introFile.click()});
 introFile.addEventListener('change',function(){
   var file=introFile.files&&introFile.files[0];if(!file)return;
+  enterPresentation();
   if(introVideo.dataset.localUrl)URL.revokeObjectURL(introVideo.dataset.localUrl);
   var url=URL.createObjectURL(file);
   introVideo.dataset.localUrl=url;
   introVideo.src=url;
   introVideo.load();
   introVideo.play().then(function(){
-    enterPresentation();
     introStatus.textContent='Đang phát video giới thiệu. Hết video sẽ tự chuyển sang bài.';
   }).catch(function(){introStatus.textContent='Video đã nạp. Bấm “Phát video giới thiệu” để bắt đầu.'});
 });

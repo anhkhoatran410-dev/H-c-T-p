@@ -564,6 +564,91 @@
       +'<div class="fx-flash-nav"><button type="button" class="fx-btn fx-secondary" data-flash-prev '+(idx<=0?'disabled':'')+'>← Trước</button><button type="button" class="fx-btn fx-secondary" data-nav="learning">Thoát</button></div>'
       +'<div class="fx-flash-dots">'+dots+'</div></div></article>';
   }
+
+  function examQuestionAnswered(answer){
+    if(Array.isArray(answer)) return answer.some(function(v){return v!==undefined && v!==null && v!=='';});
+    return answer!==undefined && answer!==null && answer!=='';
+  }
+  function examAnsweredCount(){
+    const qs=Array.isArray(state()?.exam?.questions)?state().exam.questions:[];
+    const answers=state()?.answers||{};
+    let count=0;
+    qs.forEach(function(_,i){if(examQuestionAnswered(answers[i]))count++;});
+    return count;
+  }
+  function learnerExamQuestion(q,i){
+    q=q&&typeof q==='object'?q:{};
+    const title=esc(q.q||q.question||'Nội dung câu hỏi chưa có');
+    const type=String(q.type||'mcq');
+    const current=state()?.answers?.[i];
+    let body='';
+    if(type==='true_false'){
+      const statements=Array.isArray(q.statements)?q.statements:[];
+      const picked=Array.isArray(current)?current:[];
+      body=statements.map(function(statement,j){
+        const isTrue=picked[j]===true, isFalse=picked[j]===false;
+        return '<div class="fx-exam-statement"><p>'+String.fromCharCode(97+j)+'. '+esc(statement)+'</p><div class="fx-exam-binary">'
+          +'<label><input type="radio" name="fx-tf-'+i+'-'+j+'" data-exam-tf-q="'+i+'" data-exam-tf-statement="'+j+'" data-exam-tf-value="true" '+(isTrue?'checked':'')+'> Đúng</label>'
+          +'<label><input type="radio" name="fx-tf-'+i+'-'+j+'" data-exam-tf-q="'+i+'" data-exam-tf-statement="'+j+'" data-exam-tf-value="false" '+(isFalse?'checked':'')+'> Sai</label>'
+          +'</div></div>';
+      }).join('');
+      if(!statements.length) body='<p class="fx-exam-missing">Câu này chưa có mệnh đề để trả lời.</p>';
+    }else if(type==='short'){
+      const saved=Array.isArray(current)?current:String(current||'').split('');
+      body='<div class="fx-exam-short">'+[0,1,2,3].map(function(j){
+        const value=Array.isArray(saved)?(saved[j]||''):(saved[j]||'');
+        return '<input maxlength="1" inputmode="text" aria-label="Ký tự '+(j+1)+' của câu '+(i+1)+'" data-exam-short-q="'+i+'" data-exam-short-slot="'+j+'" value="'+esc(value)+'">';
+      }).join('')+'</div><small class="fx-exam-help">Nhập tối đa 4 ký tự theo đáp án của đề.</small>';
+    }else{
+      const options=Array.isArray(q.opts)?q.opts:(Array.isArray(q.options)?q.options:[]);
+      body=options.slice(0,4).map(function(option,j){
+        const checked=current!==undefined && current!==null && Number(current)===j;
+        return '<label class="fx-exam-option"><input type="radio" name="fx-mcq-'+i+'" data-exam-choice-q="'+i+'" data-exam-choice="'+j+'" '+(checked?'checked':'')+'><span><b>'+String.fromCharCode(65+j)+'.</b> '+esc(option)+'</span></label>';
+      }).join('');
+      if(!options.length) body='<p class="fx-exam-missing">Câu này chưa có phương án trả lời.</p>';
+    }
+    return '<section class="fx-exam-question"><div class="fx-exam-question-title"><span>Câu '+(i+1)+'</span><p>'+title+'</p></div><div class="fx-exam-answer">'+body+'</div></section>';
+  }
+  function learnerExamPage(){
+    const e=state()?.exam;
+    if(!e) return '<div class="fx-empty"><b>Chưa chọn bài kiểm tra.</b><button class="fx-btn fx-secondary" data-nav="tests">Quay lại thư viện</button></div>';
+    const qs=Array.isArray(e.questions)?e.questions:[];
+    if(!qs.length) return '<div class="fx-page-head"><div><span class="fx-eyebrow">THI THỬ</span><h2>'+esc(e.title||'Bài kiểm tra')+'</h2><p>Đề chưa tải được câu hỏi.</p></div></div><article class="fx-card fx-pad"><p class="fx-exam-missing">Không có dữ liệu câu hỏi để hiển thị. Hãy tải lại đề hoặc quay lại thư viện.</p><button type="button" class="fx-btn fx-secondary" data-nav="tests">← Quay lại</button></article>';
+    const answered=examAnsweredCount();
+    const duration=Number(e.duration||0);
+    return '<div class="fx-page-head"><div><span class="fx-eyebrow">BÀI KIỂM TRA</span><h2>'+esc(e.title||'Bài kiểm tra')+'</h2><p>'+esc(e.subject||'STUDY TH')+' · '+qs.length+' câu · '+(duration>0?duration+' phút':'Không giới hạn thời gian')+'</p></div><button class="fx-btn fx-secondary" data-nav="tests">← Thoát</button></div>'
+      +'<article class="fx-card fx-pad fx-exam-session"><div class="fx-exam-session-head"><div><b>Phiếu làm bài</b><small>Chọn đáp án cho từng câu, sau đó nộp bài để xem kết quả.</small></div><span class="fx-exam-timer" id="timer">⏱ --:--</span></div>'
+      +'<div class="fx-exam-progress"><span id="fxExamAnsweredCount">'+answered+' / '+qs.length+' câu đã trả lời</span><span>'+qs.length+' câu</span></div>'
+      +'<div class="fx-exam-questions">'+qs.map(function(q,i){return learnerExamQuestion(q,i);}).join('')+'</div>'
+      +'<div class="fx-exam-actions"><button type="button" class="fx-btn fx-primary" data-exam-submit>Nộp bài và xem kết quả →</button><button type="button" class="fx-btn fx-secondary" data-nav="tests">Thoát bài làm</button></div></article>';
+  }
+  function updateExamProgress(){
+    const el=root()?.querySelector('#fxExamAnsweredCount');
+    const total=Array.isArray(state()?.exam?.questions)?state().exam.questions.length:0;
+    if(el)el.textContent=examAnsweredCount()+' / '+total+' câu đã trả lời';
+  }
+  function ensureExamSessionStyle(){
+    if(document.getElementById('study-exam-session-style'))return;
+    const s=document.createElement('style');s.id='study-exam-session-style';
+    s.textContent=[
+      '.fx-exam-session{max-width:1080px;margin:0 auto}',
+      '.fx-exam-session-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:4px 0 16px;border-bottom:1px solid var(--fx-line,#e4eaf4)}',
+      '.fx-exam-session-head b{display:block;font-size:18px}.fx-exam-session-head small{display:block;margin-top:6px;color:var(--fx-muted,#718096);line-height:1.5}',
+      '.fx-exam-timer{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;min-width:100px;padding:10px 14px;border-radius:14px;background:#eef2ff;color:#3649a4;font-weight:800;font-variant-numeric:tabular-nums}',
+      '.fx-exam-progress{display:flex;justify-content:space-between;gap:12px;margin:16px 0;color:var(--fx-muted,#718096);font-size:13px;font-weight:750}',
+      '.fx-exam-question{padding:22px 0;border-bottom:1px solid var(--fx-line,#e4eaf4)}.fx-exam-question:last-child{border-bottom:0}',
+      '.fx-exam-question-title{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}.fx-exam-question-title>span{flex:0 0 62px;display:inline-flex;align-items:center;justify-content:center;padding:7px 9px;border-radius:10px;background:#edf2ff;color:#4757bb;font-size:12px;font-weight:850}',
+      '.fx-exam-question-title p{margin:5px 0 0;line-height:1.7;font-size:16px;font-weight:750;color:var(--fx-text,#172033);white-space:pre-wrap}',
+      '.fx-exam-answer{display:grid;gap:9px;margin-left:74px}.fx-exam-option{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid var(--fx-line,#e4eaf4);border-radius:13px;background:var(--fx-surface,#fff);cursor:pointer;line-height:1.5;transition:border-color .15s,background .15s}',
+      '.fx-exam-option:hover{border-color:#9caefc;background:#f7f8ff}.fx-exam-option input,.fx-exam-binary input{margin-top:4px;accent-color:#5268e8;flex:0 0 auto}.fx-exam-option span{display:block;min-width:0}.fx-exam-option span b{margin-right:5px}',
+      '.fx-exam-statement{padding:12px 14px;border:1px solid var(--fx-line,#e4eaf4);border-radius:13px;background:var(--fx-surface,#fff)}.fx-exam-statement p{margin:0 0 10px;line-height:1.6}.fx-exam-binary{display:flex;gap:16px;flex-wrap:wrap}.fx-exam-binary label{display:inline-flex;align-items:center;gap:7px;cursor:pointer}',
+      '.fx-exam-short{display:flex;gap:9px;flex-wrap:wrap}.fx-exam-short input{width:48px;height:48px;text-align:center;font-size:18px;font-weight:800;border:1px solid var(--fx-line,#dbe2ef);border-radius:12px;background:var(--fx-surface,#fff);color:var(--fx-text,#172033)}.fx-exam-help{color:var(--fx-muted,#718096);display:block;margin-top:8px}',
+      '.fx-exam-missing{padding:12px;border-radius:12px;background:#fff7e6;color:#855f13;line-height:1.6}.fx-exam-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid var(--fx-line,#e4eaf4)}',
+      '@media(max-width:650px){.fx-exam-session-head{align-items:flex-start;flex-direction:column}.fx-exam-answer{margin-left:0}.fx-exam-question-title>span{flex-basis:54px}.fx-exam-question-title p{font-size:15px}.fx-exam-question{padding:17px 0}.fx-exam-actions{display:grid}.fx-exam-actions .fx-btn{width:100%;justify-content:center}}'
+    ].join('');
+    document.head.appendChild(s);
+  }
+
   function content(){
     switch(state()?.page){
       case 'home': return dashboard();
@@ -576,8 +661,8 @@
       case 'settings': return settings();
       case 'support': return supportPage();
       case 'flashcard': return flashcardPage();
+      case 'exam': return learnerExamPage();
       case 'subject':
-      case 'exam':
       case 'result':
       case 'review':
         return typeof window.page==='function' ? window.page() : '<div class="fx-empty"><b>Chức năng đang tải...</b></div>';
@@ -824,6 +909,7 @@
   function bindShell(){
     ensureSyncBarStyle();
     ensureFlashcardStyle();
+    ensureExamSessionStyle();
     root().querySelectorAll('[data-nav]').forEach(b=>b.onclick=async()=>{
       const target=b.getAttribute('data-nav');
       closeMenu();
@@ -853,6 +939,48 @@
     root().querySelectorAll('[data-subject]').forEach(b=>b.onclick=()=>{state().subject=b.getAttribute('data-subject');go('tests');});
     root().querySelectorAll('[data-exam]').forEach(b=>b.onclick=(e)=>{e.preventDefault();e.stopPropagation();startExamById(b.getAttribute('data-exam'))});
     root().querySelectorAll('[data-flashcard]').forEach(b=>b.onclick=async(e)=>{e.preventDefault();e.stopPropagation();await startFlashcardById(b.getAttribute('data-flashcard'))});
+
+    root().querySelectorAll('[data-exam-choice-q]').forEach(function(input){
+      input.addEventListener('change',function(){
+        if(!this.checked)return;
+        const qi=Number(this.getAttribute('data-exam-choice-q'));
+        const answer=Number(this.getAttribute('data-exam-choice'));
+        if(!state().answers)state().answers={};
+        state().answers[qi]=answer;
+        updateExamProgress();
+      });
+    });
+    root().querySelectorAll('[data-exam-tf-q]').forEach(function(input){
+      input.addEventListener('change',function(){
+        if(!this.checked)return;
+        const qi=Number(this.getAttribute('data-exam-tf-q'));
+        const si=Number(this.getAttribute('data-exam-tf-statement'));
+        const value=this.getAttribute('data-exam-tf-value')==='true';
+        if(!state().answers)state().answers={};
+        const current=Array.isArray(state().answers[qi])?state().answers[qi]:[];
+        current[si]=value;state().answers[qi]=current;
+        updateExamProgress();
+      });
+    });
+    root().querySelectorAll('[data-exam-short-q]').forEach(function(input){
+      input.addEventListener('input',function(){
+        const qi=Number(this.getAttribute('data-exam-short-q'));
+        const si=Number(this.getAttribute('data-exam-short-slot'));
+        if(!state().answers)state().answers={};
+        const current=Array.isArray(state().answers[qi])?state().answers[qi]:[];
+        current[si]=String(this.value||'').slice(0,1);state().answers[qi]=current;
+        updateExamProgress();
+      });
+    });
+    const examSubmit=root().querySelector('[data-exam-submit]');
+    if(examSubmit)examSubmit.addEventListener('click',async function(){
+      if(examSubmit.disabled)return;
+      if(typeof window.submitExam!=='function'){alert('Chức năng nộp bài chưa sẵn sàng. Hãy tải lại trang.');return;}
+      examSubmit.disabled=true;examSubmit.textContent='Đang nộp bài…';
+      try{await window.submitExam(false);}catch(e){alert('Không nộp được bài: '+String(e?.message||e));}
+      if(state()?.page==='exam'){examSubmit.disabled=false;examSubmit.textContent='Nộp bài và xem kết quả →';}
+    });
+
     root().querySelectorAll('[data-flip-card]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashFlipped=!state().flashFlipped;renderFinal();});});
     root().querySelector('[data-flash-prev]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.max(0,Number(state().flashIndex||0)-1);state().flashFlipped=false;renderFinal();});
     root().querySelector('[data-flash-next]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.min(Number(state().flashcardExam?.questions?.length||1)-1,Number(state().flashIndex||0)+1);state().flashFlipped=false;renderFinal();});

@@ -17,14 +17,21 @@ async function login(password){const r=await fetch("/api/admin-login",{method:"P
 async function logout(){try{await fetch("/api/admin-login?logout=1",{method:"POST",headers:{"Accept":"application/json"},credentials:"same-origin",cache:"no-store"})}catch(_){}location.reload()}
 function startAdminDataSync(){
   clearInterval(admin.dataSyncTimer);
-  admin.dataSyncTimer=setInterval(async()=>{
+  const syncActiveTab=async()=>{
+    if(document.hidden)return;
     try{
       if(admin.tab==="dashboard")await loadDashboard();
       else if(admin.tab==="participants")await loadParticipants();
       else if(admin.tab==="users")await loadUsers();
       else if(admin.tab==="history")await loadHistory();
     }catch(_){}
-  },30000);
+  };
+  admin.dataSyncTimer=setInterval(syncActiveTab,10000);
+  if(!admin.dataSyncEventsBound){
+    admin.dataSyncEventsBound=true;
+    window.addEventListener("focus",syncActiveTab);
+    document.addEventListener("visibilitychange",()=>{if(!document.hidden)syncActiveTab()});
+  }
 }
 function openTab(id){admin.tab=id;document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".nav-item[data-tab]").forEach(x=>x.classList.remove("active"));$(id)?.classList.add("active");document.querySelector(`[data-tab="${id}"]`)?.classList.add("active");const titles={dashboard:"Tổng quan",support:"Hỗ trợ",participants:"Người tham gia",users:"Tài khoản người học",history:"Lịch sử làm bài",tests:"Bài kiểm tra",accounts:"Tài khoản hỗ trợ",bot:"Bot tự động",assistant:"Admin Copilot"};$("pageTitle").textContent=titles[id]||"Admin";if(id==="dashboard")loadDashboard();if(id==="support")startSupportLive();if(id==="participants")loadParticipants();if(id==="users")loadUsers();if(id==="history")loadHistory();if(id==="tests")renderTests();if(id==="accounts")loadAccounts();if(id==="bot"){loadAccounts();loadBotRules()}if(id==="assistant")loadAssistant()}
 
@@ -36,7 +43,11 @@ async function loadDashboard(){
     $("statTests").textContent=Number(stats.tests||0);$("statStudents").textContent=Number(stats.students||0);$("statAttempts").textContent=Number(stats.attempts||0);
     const unread=Number(stats.unread||0);$("statUnread").textContent=unread;$("unreadBadge").textContent=unread;$("unreadBadge").classList.toggle("show",unread>0);
     const recent=data.recentActivity||[];
-    $("recentActivity").innerHTML=recent.map(x=>`<div class="activity"><span class="activity-icon">📝</span><div><b>Lượt làm bài mới</b><small>${esc(new Date(x.created_at||Date.now()).toLocaleString("vi-VN"))}</small></div></div>`).join("")||`<div class="empty-chat"><span>✨</span><small>Chưa có hoạt động.</small></div>`;
+    $("recentActivity").innerHTML=recent.map(x=>{
+      const score=x.score==null?"Chưa có điểm":`${Number(x.score)}% · ${Number(x.correct||0)}/${Number(x.total||0)} câu đúng`;
+      const code=x.student_code?`Mã học sinh: ${x.student_code}`:"Chưa có mã học sinh";
+      return `<div class="activity"><span class="activity-icon">📝</span><div><b>${esc(x.student_name||"Người học")} · ${esc(x.exam_title||"Lượt làm bài")}</b><small>${esc(code)} · ${esc(score)} · ${esc(new Date(x.created_at||Date.now()).toLocaleString("vi-VN"))}</small></div></div>`;
+    }).join("")||`<div class="empty-chat"><span>✨</span><small>Chưa có hoạt động.</small></div>`;
     setSyncStatus("Đã đồng bộ");
   }catch(e){setSyncStatus("Lỗi đồng bộ");toast("Không đọc được tổng quan: "+e.message)}
 }

@@ -410,7 +410,7 @@ async function exactCount(table, filter = '') {
 async function getAdminSummaryCounts() {
   const [tests, students, attempts] = await Promise.all([
     exactCount('exams', 'status=eq.active&flashcard_only=eq.false').catch(() => 0),
-    exactCount('admin_student_accounts_snapshot').catch(() => 0),
+    exactCount('admin_participants_snapshot').catch(() => 0),
     exactCount('admin_attempts_snapshot').catch(() => 0),
   ]);
   return { tests, students, attempts };
@@ -436,7 +436,7 @@ async function adminSummary(req, res) {
   const safe = async (fn, fallback) => { try { return await fn(); } catch (_) { return fallback; } };
   const [countStats, attemptRows, threadRows] = await Promise.all([
     getAdminSummaryCounts(),
-    safe(() => sbReadOnly('admin_attempts_snapshot?select=id,created_at&order=created_at.desc&limit=20'), []),
+    safe(() => sbReadOnly('admin_attempts_snapshot?select=id,created_at,student_name,student_code,exam_title,score,correct,total&order=created_at.desc&limit=20'), []),
     safe(() => sbReadOnly('support_threads?select=unread_admin&limit=2000'), []),
   ]);
   const unread = (threadRows || []).reduce((sum, row) => sum + Number(row.unread_admin || 0), 0);

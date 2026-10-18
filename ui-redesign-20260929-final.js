@@ -1004,13 +1004,24 @@
   }
 
   let learnerSyncTimer=null;
+  async function syncLearnerData(){
+    await refreshLearnerExams();
+    await refreshLearnerFlashcards();
+    // Đồng bộ cả lịch sử/điểm khi học sinh làm bài ở thiết bị khác.
+    const page=state()?.page;
+    if(loggedIn() && ['home','history','stats','achievements'].includes(page)){
+      try{await window.loadHistory?.();}catch(_){}
+    }
+    if(['home','learning','tests','history','stats','achievements'].includes(page))renderFinal();
+  }
   function startLearnerAutoSync(){
     if(learnerSyncTimer)return;
     learnerSyncTimer=setInterval(async function(){
       if(document.hidden)return;
-      try{await refreshLearnerExams();await refreshLearnerFlashcards();if(state()?.page==='home'||state()?.page==='learning'||state()?.page==='tests')renderFinal();}catch(_){}
+      try{await syncLearnerData();}catch(_){}
     },30000);
-    window.addEventListener('focus',async function(){try{await refreshLearnerExams();await refreshLearnerFlashcards();if(state()?.page==='home'||state()?.page==='learning'||state()?.page==='tests')renderFinal();}catch(_){}},{passive:true});
+    window.addEventListener('focus',async function(){try{await syncLearnerData();}catch(_){}},{passive:true});
+    document.addEventListener('visibilitychange',async function(){if(!document.hidden){try{await syncLearnerData();}catch(_){}}},{passive:true});
   }
   async function go(p){
     if(!state()) return;

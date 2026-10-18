@@ -87,7 +87,7 @@ async function processOne(msg){
       if(ok!==true){lostLease=true;return;}
       await rpc('ai_solver_queue_set_vt',{p_msg_id:msg.msg_id,p_seconds:LEASE_SECONDS+30}).catch(()=>{});
     }catch(_e){}
-  },Math.max(5000,Math.floor(LEASE_SECONDS*1000/3));
+  },Math.max(5000,Math.floor(LEASE_SECONDS*1000/3)));
 
   const stage=async(name,detail={})=>{
     await rpc('ai_solver_update_stage',{p_job_id:jobId,p_worker_id:WORKER_ID,p_stage:name,p_detail:detail}).catch(()=>{});

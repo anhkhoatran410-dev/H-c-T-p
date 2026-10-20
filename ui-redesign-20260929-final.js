@@ -1224,11 +1224,6 @@
     document.body.classList.remove('redesign-pending');
     document.documentElement.classList.remove('fx-final-booting');
 
-    // Public exam metadata is safe to read before login. Prime the learner
-    // cache so the dashboard never renders a false "0 đề" while data exists.
-    try{await refreshLearnerExams();}catch(_){}
-    try{await refreshLearnerFlashcards();}catch(_){}
-
     // Email-confirmation redirects must exchange the Supabase URL tokens first,
     // then request a student code only for the authenticated, confirmed user.
     if(emailConfirmationRedirect){
@@ -1264,6 +1259,11 @@
       }
       return;
     }
+
+    // For ordinary visits, prime public data after the confirmation redirect
+    // has been handled so slow exam endpoints cannot delay account activation.
+    try{await refreshLearnerExams();}catch(_){}
+    try{await refreshLearnerFlashcards();}catch(_){}
 
     // Reconcile with the real server-side student session after the runtime becomes ready.
     if(window.loadSupabase){

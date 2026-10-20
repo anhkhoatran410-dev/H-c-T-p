@@ -1,5 +1,6 @@
 (function(){
  const M=window.__MOCK__;
+ const HAS_CONFIRMATION_SESSION=/access_token/.test(location.hash+location.search)||!!window.__SESSION__;
  function builder(t){const s={t,op:'select',filters:[],payload:null,one:false};const api={
  select(){return api},insert(p){s.op='insert';s.payload=p;return api},upsert(p){s.op='insert';s.payload=p;return api},update(p){s.op='update';s.payload=p;return api},delete(){s.op='delete';return api},
  eq(c,v){s.filters.push([c,v]);return api},neq(){return api},in(){return api},is(){return api},gte(){return api},lte(){return api},or(){return api},ilike(){return api},order(){return api},limit(){return api},maybeSingle(){s.one=true;return api},single(){s.one=true;return api},
@@ -8,7 +9,7 @@
  return api}
  const client={from:builder,rpc(name,args){M.calls.push({rpc:name,args});const h=M.rpc[name];return Promise.resolve(h?{data:h(args),error:null}:{data:null,error:{message:'rpc '+name+' not mocked'}})},auth:{
  signUp:async(a)=>{M.calls.push({signUp:a});return {data:{user:{id:'u-new',email:a.email,user_metadata:{full_name:a.options?.data?.full_name}},session:null},error:null}},
- getSession:async()=>({data:{session:/access_token/.test(location.hash+location.search)||window.__SESSION__?{access_token:'mock',user:{id:'u-new',email:'new@gmail.com',email_confirmed_at:'2026-10-20T00:00:00Z',user_metadata:{full_name:'Nguyễn Văn C'}}}:null},error:null}),
+ getSession:async()=>({data:{session:HAS_CONFIRMATION_SESSION?{access_token:'mock',user:{id:'u-new',email:'new@gmail.com',email_confirmed_at:'2026-10-20T00:00:00Z',user_metadata:{full_name:'Nguyễn Văn C'}}}:null},error:null}),
  getUser:async()=>({data:{user:null},error:null}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}}),signInWithPassword:async()=>({data:{},error:{message:'mock'}}),signOut:async()=>({error:null})},
  channel(){const c={on(){return c},subscribe(){return c},unsubscribe(){}};return c},removeChannel(){}};
  window.supabase={createClient:()=>client};

@@ -1208,7 +1208,7 @@
   async function boot(){
     // Supabase may clean auth tokens from the URL during initialization, so
     // capture the email-confirmation redirect before any awaited network work.
-    const emailConfirmationRedirect =
+    const emailConfirmationRedirect = !!window.__studyEmailConfirmationRedirect ||
       new URLSearchParams(location.search).get('email_confirmed')==='1' ||
       new URLSearchParams(String(location.hash||'').replace(/^#/, '')).get('type')==='signup';
 

@@ -40,8 +40,13 @@ failed=[]
 for name,fn in [('student',flow_student),('register',flow_register),('confirmed',flow_confirmed),('admin',flow_admin)]:
  LOG['reqs'].clear();LOG['console'].clear()
  try:
-  out={};run(lambda pg:out.update(fn(pg)));print(name,'PASS',json.dumps(out,ensure_ascii=False))
+  out={};run(lambda pg:out.update(fn(pg)))
+  page_errors=[entry for entry in LOG['console'] if entry and entry[0]=='PAGEERROR']
+  if page_errors: raise AssertionError('Uncaught browser page error(s): '+repr(page_errors[:3]))
+  print(name,'PASS',json.dumps(out,ensure_ascii=False))
  except Exception as e:
-  failed.append(name);print(name,'FAIL',str(e)[:300])
+  failed.append(name);print(name,'FAIL',str(e)[:500].replace('\\n',' '))
+  page_errors=[entry for entry in LOG['console'] if entry and entry[0]=='PAGEERROR']
+  if page_errors: print('page errors',json.dumps(page_errors[:3],ensure_ascii=False))
  if any(x[0]=='PAGEERROR' for x in LOG['console']):print('page errors',LOG['console'][:3])
 if failed: raise SystemExit('Failed: '+', '.join(failed))

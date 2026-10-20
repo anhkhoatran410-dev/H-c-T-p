@@ -1227,12 +1227,12 @@
     // then request a student code only for the authenticated, confirmed user.
     if(new URLSearchParams(location.search).get('email_confirmed')==='1'){
       try{
-        if(!window.loadSupabase){
-          await new Promise((resolve,reject)=>{
-            const timer=setTimeout(()=>reject(new Error('Hệ thống xác thực tải quá lâu. Hãy tải lại trang sau vài giây.')),12000);
-            window.addEventListener('study-app-loaded',()=>{clearTimeout(timer);resolve();},{once:true});
-          });
+        // Poll the runtime readiness flag as well as relying on events: the
+        // loader can finish before this handler attaches its listener.
+        for(let attempt=0;attempt<48&&!window.loadSupabase;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,250));
         }
+        if(!window.loadSupabase)throw new Error('Hệ thống xác thực tải quá lâu. Hãy tải lại trang sau vài giây.');
         const db=window.loadSupabase?await window.loadSupabase():null;
         if(!db?.auth)throw new Error('Hệ thống xác thực chưa sẵn sàng.');
         const {data:sessionData,error:sessionError}=await db.auth.getSession();

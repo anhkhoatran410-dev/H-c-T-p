@@ -1245,7 +1245,7 @@
         });
         if(codeError)throw codeError;
         const code=String(codeData||'').trim();
-        if(!/^\\d{6}$/.test(code))throw new Error('Chưa cấp được mã học sinh. Hãy thử đăng nhập lại.');
+        if(!/^\d{6}$/.test(code))throw new Error('Chưa cấp được mã học sinh. Hãy thử đăng nhập lại.');
         try{await db.auth.signOut();}catch(_){}
         clearSession();
         registrationSuccess(code,user.email||'');

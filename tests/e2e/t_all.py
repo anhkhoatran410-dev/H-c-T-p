@@ -23,9 +23,13 @@ def flow_register(pg):
  return {'pending_confirmation':True,'code_hidden':True}
 def flow_confirmed(pg):
  pg.goto(BASE_URL+'/?email_confirmed=1#access_token=mock&type=signup')
- pg.wait_for_selector('#fxCreatedStudentCode',timeout=15000)
+ pg.wait_for_timeout(2500)
+ if not pg.locator('#fxCreatedStudentCode').count():
+  panel=pg.locator('.fx-register-success')
+  detail=panel.inner_text() if panel.count() else pg.locator('body').inner_text()
+  raise AssertionError('Confirmation code did not render. UI says: '+detail[:500].replace('\\n',' | '))
  code=pg.locator('#fxCreatedStudentCode').inner_text()
- if len(code)!=6 or not code.isdigit(): raise AssertionError('Invalid code after confirmation')
+ if len(code)!=6 or not code.isdigit(): raise AssertionError('Invalid code after confirmation: '+code)
  return {'code_after_confirmation':True}
 def flow_admin(pg):
  pg.goto(BASE_URL+'/admin/')

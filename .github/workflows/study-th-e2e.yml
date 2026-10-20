@@ -1,0 +1,27 @@
+name: STUDY TH regression
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  syntax-and-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm --version
+      - run: node scripts/syntax-check.mjs
+      - run: python -m pip install --upgrade pip playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m py_compile tests/e2e/harness.py tests/e2e/t_all.py tests/e2e/t_admin.py
+      - run: python tests/e2e/t_all.py
+        env:
+          E2E_BASE_URL: http://study.local
+          E2E_ARTIFACT_DIR: /tmp/study-e2e

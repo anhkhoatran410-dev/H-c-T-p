@@ -1206,6 +1206,12 @@
   }
 
   async function boot(){
+    // Supabase may clean auth tokens from the URL during initialization, so
+    // capture the email-confirmation redirect before any awaited network work.
+    const emailConfirmationRedirect =
+      new URLSearchParams(location.search).get('email_confirmed')==='1' ||
+      new URLSearchParams(String(location.hash||'').replace(/^#/, '')).get('type')==='signup';
+
     // Render the final auth shell immediately. The data/runtime loader may still
     // be fetching app.js; waiting for it here caused a permanent blank screen on
     // slow mobile connections.
@@ -1225,7 +1231,7 @@
 
     // Email-confirmation redirects must exchange the Supabase URL tokens first,
     // then request a student code only for the authenticated, confirmed user.
-    if(new URLSearchParams(location.search).get('email_confirmed')==='1'){
+    if(emailConfirmationRedirect){
       try{
         // Poll the runtime readiness flag as well as relying on events: the
         // loader can finish before this handler attaches its listener.

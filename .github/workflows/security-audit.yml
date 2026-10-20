@@ -108,4 +108,5 @@ jobs:
           if-no-files-found: ignore
 
       - name: Security static hardening checks
+        if: ${{ always() }}
         run: node scripts/security-static-hardening.mjs

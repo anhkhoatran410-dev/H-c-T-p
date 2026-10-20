@@ -734,6 +734,28 @@
     if(registerBox)registerBox.style.display=register?'none':'flex';
   }
 
+  function registrationPending(email){
+    const panel=root().querySelector('.fx-login-panel');
+    if(!panel)return;
+    panel.innerHTML=`
+      <section class="fx-register-success">
+        <span class="fx-eyebrow">KIỂM TRA EMAIL</span>
+        <div class="fx-register-success-icon">✉</div>
+        <h2>Xác nhận email để nhận mã học sinh</h2>
+        <p>Liên kết xác nhận đã được gửi tới <b>${esc(email)}</b>. Vì lý do bảo mật, mã học sinh chỉ được cấp sau khi bạn xác nhận email.</p>
+        <div class="fx-register-email-note">Mở email, bấm liên kết xác nhận, rồi quay lại trang STUDY TH. Mã học sinh sẽ xuất hiện sau khi xác nhận thành công.</div>
+        <div class="fx-success-actions">
+          <button class="fx-btn fx-primary fx-wide" type="button" id="fxGoLogin">Quay lại đăng nhập</button>
+          <button class="fx-link" type="button" id="fxRegisterAgain">Đăng ký tài khoản khác</button>
+        </div>
+      </section>`;
+    panel.querySelector('#fxGoLogin')?.addEventListener('click',()=>renderFinal());
+    panel.querySelector('#fxRegisterAgain')?.addEventListener('click',()=>{
+      renderFinal();
+      setTimeout(()=>setAuthMode('register'),0);
+    });
+  }
+
   function registrationSuccess(code,email){
     const panel=root().querySelector('.fx-login-panel');
     if(!panel)return;
@@ -809,36 +831,23 @@
         if(error)throw error;
         if(!data?.user?.id)throw new Error('Không nhận được mã tài khoản sau khi đăng ký.');
 
-        let generatedCode='';
-        for(let attempt=0;attempt<5 && !generatedCode;attempt++){
+        // Never request or reveal the student code before email confirmation.
+        // When Supabase is configured without email confirmation, a session exists
+        // and the code can be issued immediately to this authenticated user.
+        clearSession();
+        if(data?.session){
           const {data:codeData,error:codeError}=await db.rpc('get_registration_code',{
-            p_user_id:null,
+            p_user_id:data.user.id,
             p_email:email
           });
           if(codeError)throw codeError;
-          generatedCode=String(codeData||'').trim();
-          if(!generatedCode)await new Promise(r=>setTimeout(r,150));
-        }
-        if(!/^\d{6}$/.test(generatedCode)){
-          throw new Error('Tạo tài khoản xong nhưng chưa lấy được mã học sinh. Vui lòng thử lại.');
-        }
-
-        // Do not create a local logged-in session before email verification.
-        clearSession();
-        if(data?.session){
-          studentUser=data.user;
-          saveSession(n,generatedCode);
-          if(state()){
-            state().page='home';
-            state().candidate=n;
-            state().code=generatedCode;
+          const generatedCode=String(codeData||'').trim();
+          if(!/^\d{6}$/.test(generatedCode)){
+            throw new Error('Tài khoản đã tạo nhưng chưa lấy được mã học sinh. Vui lòng đăng nhập lại.');
           }
-          try{await window.loadExams?.();}catch(_){}
-          try{await window.loadHistory?.();}catch(_){}
-          renderFinal();
-          setTimeout(()=>openProfile(),120);
-        }else{
           registrationSuccess(generatedCode,email);
+        }else{
+          registrationPending(email);
         }
         return;
       }
@@ -1213,6 +1222,36 @@
     // cache so the dashboard never renders a false "0 đề" while data exists.
     try{await refreshLearnerExams();}catch(_){}
     try{await refreshLearnerFlashcards();}catch(_){}
+
+    // Email-confirmation redirects must exchange the Supabase URL tokens first,
+    // then request a student code only for the authenticated, confirmed user.
+    if(new URLSearchParams(location.search).get('email_confirmed')==='1'){
+      try{
+        const db=window.loadSupabase?await window.loadSupabase():null;
+        if(!db?.auth)throw new Error('Hệ thống xác thực chưa sẵn sàng.');
+        const {data:sessionData,error:sessionError}=await db.auth.getSession();
+        if(sessionError)throw sessionError;
+        const user=sessionData?.session?.user;
+        if(!user)throw new Error('Chưa nhận được phiên xác thực. Hãy mở lại liên kết xác nhận trong email.');
+        const {data:codeData,error:codeError}=await db.rpc('get_registration_code',{
+          p_user_id:user.id,
+          p_email:user.email||''
+        });
+        if(codeError)throw codeError;
+        const code=String(codeData||'').trim();
+        if(!/^\\d{6}$/.test(code))throw new Error('Chưa cấp được mã học sinh. Hãy thử đăng nhập lại.');
+        try{await db.auth.signOut();}catch(_){}
+        clearSession();
+        registrationSuccess(code,user.email||'');
+      }catch(error){
+        const panel=root().querySelector('.fx-login-panel');
+        if(panel){
+          panel.innerHTML=`<section class="fx-register-success"><span class="fx-eyebrow">CHƯA HOÀN TẤT</span><h2>Chưa lấy được mã học sinh</h2><p>${esc(error?.message||'Hãy mở lại liên kết xác nhận trong email.')}</p><button class="fx-btn fx-primary fx-wide" type="button" id="fxGoLogin">Quay lại đăng nhập</button></section>`;
+          panel.querySelector('#fxGoLogin')?.addEventListener('click',()=>{history.replaceState({},'',location.pathname);renderFinal();});
+        }
+      }
+      return;
+    }
 
     // Reconcile with the real server-side student session after the runtime becomes ready.
     if(window.loadSupabase){

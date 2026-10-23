@@ -2,6 +2,8 @@ name: Security Benchmark
 # Live non-destructive production security regression trigger
 
 on:
+  pull_request:
+    branches: [main]
   workflow_dispatch:
   push:
     paths:

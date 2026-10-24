@@ -55,8 +55,8 @@ def flow_exam_attempt(pg):
   if choice.count(): choice.first.check()
  pg.click('[data-exam-submit]')
  pg.wait_for_timeout(700)
- posts=[r for r in LOG['reqs'] if r and r[0]=='API' and r[1]=='POST' and r[2]=='/api/submit-attempt']
- if not posts: raise AssertionError('Submitting an exam did not call POST /api/submit-attempt')
+ posts=[r for r in LOG['reqs'] if r and r[0]=='API' and r[1]=='POST' and r[2]=='/api/attempts?route=submit']
+ if not posts: raise AssertionError('Submitting an exam did not call POST /api/attempts?route=submit')
  direct=pg.evaluate("window.__MOCK__.calls.some(c=>c.t==='user_attempts' && c.op==='insert')")
  if direct: raise AssertionError('Client bypassed /api/submit-attempt and wrote user_attempts directly')
  if not pg.locator('#app').inner_text().strip(): raise AssertionError('App is blank after exam submission')

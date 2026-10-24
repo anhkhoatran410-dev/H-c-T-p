@@ -86,7 +86,7 @@
   async function refreshLearnerExams(){
     const normalize=function(rows){
       return (Array.isArray(rows)?rows:[])
-        .filter(function(e){return e && e.flashcard_only!==true && String(e.status||'active')==='active';})
+        .filter(function(e){return e && e.flashcard_only!==true && !String(e.source_file||'').startsWith('generated-vocab:') && String(e.status||'active')==='active';})
         .map(function(e){return Object.assign({},e,{questions:Array.isArray(e.questions)?e.questions:[]});});
     };
     let lastError=null;

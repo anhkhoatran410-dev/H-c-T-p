@@ -96,7 +96,7 @@
     try{
       const base=(window.SUPABASE_URL||'https://mlqaeginqsgqacdqdzbm.supabase.co').replace(/\/$/,'');
       const key=window.SUPABASE_KEY||'sb_publishable_3YeUDTX-15GB95pP5d4M8g_ulPQczdi';
-      const r=await fetch(base+'/rest/v1/exams?select=id,title,subject,difficulty,duration,question_count,flashcard_only,status,open_at,close_at,created_at&status=eq.active&order=created_at.desc&limit=200',{
+      const r=await fetch(base+'/rest/v1/exams?select=id,title,subject,difficulty,duration,question_count,flashcard_only,status,source_file,open_at,close_at,created_at&status=eq.active&order=created_at.desc&limit=200',{
         method:'GET',cache:'no-store',
         headers:{'Accept':'application/json','apikey':key,'Authorization':'Bearer '+key}
       });

@@ -40,8 +40,27 @@ export default async function handler(req,res){
       if(!r.ok)return res.status(502).json({error:`Không đọc được nguồn ${sourceNames[i]||i+1} (HTTP ${r.status}).`});
       const declaredLength=Number(r.headers.get('content-length')||0);
       if(declaredLength>12*1024*1024)return res.status(413).json({error:`Nguồn ${sourceNames[i]||i+1} quá lớn cho một lượt AI.`});
-      const raw=Buffer.from(await r.arrayBuffer());
-      if(raw.length>12*1024*1024)return res.status(413).json({error:`Nguồn ${sourceNames[i]||i+1} quá lớn cho một lượt AI.`});
+      let raw;
+      const maxSourceBytes=12*1024*1024;
+      if(r.body&&typeof r.body.getReader==='function'){
+        const reader=r.body.getReader(),chunks=[];
+        let size=0;
+        while(true){
+          const {done,value}=await reader.read();
+          if(done)break;
+          size+=value.byteLength;
+          if(size>maxSourceBytes){
+            await reader.cancel().catch(()=>{});
+            return res.status(413).json({error:`Nguồn ${sourceNames[i]||i+1} quá lớn cho một lượt AI.`});
+          }
+          chunks.push(Buffer.from(value));
+        }
+        raw=Buffer.concat(chunks,size);
+      }else{
+        const bytes=await r.arrayBuffer();
+        if(bytes.byteLength>maxSourceBytes)return res.status(413).json({error:`Nguồn ${sourceNames[i]||i+1} quá lớn cho một lượt AI.`});
+        raw=Buffer.from(bytes);
+      }
       const original=String(r.headers.get('content-type')||'application/octet-stream').split(';')[0].trim().toLowerCase();
       const name=String(sourceNames[i]||u).toLowerCase();
       const guessed=original==='application/octet-stream'?(name.endsWith('.pdf')?'application/pdf':name.match(/\.(jpg|jpeg)$/)?'image/jpeg':name.endsWith('.png')?'image/png':name.endsWith('.webp')?'image/webp':name.endsWith('.gif')?'image/gif':name.endsWith('.bmp')?'image/bmp':name.endsWith('.svg')?'image/svg+xml':original):original;

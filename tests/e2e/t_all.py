@@ -37,8 +37,32 @@ def flow_admin(pg):
  pg.wait_for_timeout(2000)
  if not pg.locator('body').inner_text(): raise AssertionError('Admin page is blank')
  return {'admin_page':True}
+def flow_exam_attempt(pg):
+ pg.goto(BASE_URL+'/')
+ pg.wait_for_selector('#fxName',timeout=20000)
+ pg.fill('#fxName','Student Example')
+ pg.fill('#fxCode','670943')
+ pg.click('#fxAuthSubmit')
+ pg.wait_for_selector('.fx-stats',timeout=12000)
+ pg.click('[data-nav="tests"]')
+ pg.wait_for_selector('[data-exam]',timeout=12000)
+ pg.locator('[data-exam]').first.click()
+ pg.wait_for_selector('.fx-exam-question',timeout=12000)
+ count=pg.locator('.fx-exam-question').count()
+ if count<1: raise AssertionError('Exam opened with zero questions')
+ for i in range(count):
+  choice=pg.locator(f'[data-exam-choice-q="{i}"][data-exam-choice="{i%4}"]')
+  if choice.count(): choice.first.check()
+ pg.click('[data-exam-submit]')
+ pg.wait_for_timeout(700)
+ posts=[r for r in LOG['reqs'] if r and r[0]=='API' and r[1]=='POST' and r[2]=='/api/attempts?route=submit']
+ if not posts: raise AssertionError('Submitting an exam did not call POST /api/attempts?route=submit')
+ direct=pg.evaluate("window.__MOCK__.calls.some(c=>c.t==='user_attempts' && c.op==='insert')")
+ if direct: raise AssertionError('Client bypassed /api/submit-attempt and wrote user_attempts directly')
+ if not pg.locator('#app').inner_text().strip(): raise AssertionError('App is blank after exam submission')
+ return {'questions':count,'submit_api_called':True,'direct_attempt_insert':False}
 failed=[]
-for name,fn in [('student',flow_student),('register',flow_register),('confirmed',flow_confirmed),('admin',flow_admin),('admin_support',t_admin.flow)]:
+for name,fn in [('student',flow_student),('exam_attempt',flow_exam_attempt),('register',flow_register),('confirmed',flow_confirmed),('admin',flow_admin),('admin_support',t_admin.flow)]:
  LOG['reqs'].clear();LOG['console'].clear()
  try:
   out={};run(lambda pg:out.update(fn(pg)))

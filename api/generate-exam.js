@@ -153,5 +153,5 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
     const enough=collected.length>=Math.ceil(count*0.6);
     if(!enough)return res.status(422).json({error:`AI mới tạo được ${collected.length}/${count} câu hợp lệ. Hãy giảm số câu hoặc thử lại.`,code:'partial',questions:collected});
     return res.status(200).json({questions:collected,count:collected.length,requested:count,partial:collected.length<count,provider:'gemini',model,validated:true,sourceVision:sources.length>0,sourceCount:Math.max(1,sources.length)});
-    }catch(e){console.error('generate-exam:',e);const status=Number(e?.status)||500;return res.status(status).json({error:status===429||status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo nội dung lúc này.'})}finally{cleanup()}
+    }catch(e){console.error('generate-exam:',e);const status=Number(e?.status)||500;return res.status(status).json({error:status===429||status>=500?'AI generation tạm thời không khả dụng.':'Không thể tạo nội dung lúc này.'})}finally{await cleanup()}
 }

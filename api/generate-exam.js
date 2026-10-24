@@ -18,7 +18,9 @@ export default async function handler(req,res){
     const documentText=String(body.documentText||'').slice(0,450000);
     const subject=String(body.subject||'Tự xác định từ tài liệu');
     const difficulty=String(body.difficulty||'Trung bình');
-    const count=Math.max(1,Math.min(100,Number(body.questionCount||20)));
+    const rawCount=Number(body.questionCount??20);
+    if(!Number.isFinite(rawCount)||!Number.isInteger(rawCount)||rawCount<1||rawCount>100)return res.status(400).json({error:'Số câu phải là số nguyên từ 1 đến 100.',code:'invalid-question-count'});
+    const count=rawCount;
     const types=Array.isArray(body.types)?body.types:[];
     const allowed=['mcq','true_false','short','flashcard'];
     const selectedTypes=types.filter(t=>allowed.includes(t));
@@ -33,8 +35,11 @@ export default async function handler(req,res){
     /* Staged PDF/image URLs let browser requests stay small; the server fetches the original files. */
     for(let i=0;i<sourceUrls.length;i++){
       const u=sourceUrls[i];
-      const r=await fetch(u,{redirect:'follow'});
+      // Do not follow redirects from allowlisted storage URLs: a redirect could bypass host validation.
+      const r=await fetch(u,{redirect:'error',signal:AbortSignal.timeout(12000)});
       if(!r.ok)return res.status(502).json({error:`Không đọc được nguồn ${sourceNames[i]||i+1} (HTTP ${r.status}).`});
+      const declaredLength=Number(r.headers.get('content-length')||0);
+      if(declaredLength>12*1024*1024)return res.status(413).json({error:`Nguồn ${sourceNames[i]||i+1} quá lớn cho một lượt AI.`});
       const raw=Buffer.from(await r.arrayBuffer());
       if(raw.length>12*1024*1024)return res.status(413).json({error:`Nguồn ${sourceNames[i]||i+1} quá lớn cho một lượt AI.`});
       const original=String(r.headers.get('content-type')||'application/octet-stream').split(';')[0].trim().toLowerCase();
@@ -64,7 +69,7 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
     const key=String(process.env.GEMINI_API_KEY||'').replace(/^[\'"`]+|[\'"`]+$/g,'').replace(/[\u0000-\u0020\u007f-\u009f]/g,'').trim();
     if(!key)return res.status(500).json({error:'GEMINI_API_KEY chưa được cấu hình trên Vercel.'});
     const model=String(process.env.GEMINI_MODEL||'gemini-3.5-flash-lite').trim();
-    async function callAI(p){const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts:p}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:20000}})});const txt=await r.text();let d={};try{d=txt?JSON.parse(txt):{}}catch{throw Object.assign(new Error(`Gemini trả về dữ liệu không hợp lệ (HTTP ${r.status}).`),{status:r.status})}if(!r.ok)throw Object.assign(new Error('Gemini generation failed.'),{status:r.status,providerMessage:d?.error?.message||''});const out=d?.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim()||'';const clean=out.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'').trim();const a=clean.indexOf('{'),z=clean.lastIndexOf('}');if(a<0||z<=a)throw new Error('Gemini không trả về JSON hợp lệ.');return JSON.parse(clean.slice(a,z+1));}
+    async function callAI(p){const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{role:'user',parts:p}],generationConfig:{responseMimeType:'application/json',maxOutputTokens:20000}}),signal:AbortSignal.timeout(25000)});const txt=await r.text();let d={};try{d=txt?JSON.parse(txt):{}}catch{throw Object.assign(new Error(`Gemini trả về dữ liệu không hợp lệ (HTTP ${r.status}).`),{status:r.status})}if(!r.ok)throw Object.assign(new Error('Gemini generation failed.'),{status:r.status,providerMessage:d?.error?.message||''});const out=d?.candidates?.[0]?.content?.parts?.map(x=>x.text||'').join('').trim()||'';const clean=out.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/i,'').trim();const a=clean.indexOf('{'),z=clean.lastIndexOf('}');if(a<0||z<=a)throw new Error('Gemini không trả về JSON hợp lệ.');return JSON.parse(clean.slice(a,z+1));}
 
     let data;try{data=await callAI(parts)}catch(first){
       // Provider/quota failures are already retried by the global Gemini key pool.

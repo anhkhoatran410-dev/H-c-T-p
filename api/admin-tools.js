@@ -483,7 +483,7 @@ async function publicCreateVocabTest(req, res) {
       explanation: card.front + ' = ' + card.back + (card.example ? '. Ví dụ: ' + card.example : ''),
     };
   });
-  const questions = supplied.length >= Math.min(3, requested) ? supplied : fallback;
+  const questions = supplied.length >= Math.ceil(requested * 0.6) ? supplied : fallback;
   const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
   const exam = {
     title: 'Test độ nhớ · ' + String(sourceExam.title || 'Flashcard').trim().slice(0, 120) + ' · ' + stamp,

@@ -1,5 +1,6 @@
 from harness import *
 import json
+import t_admin
 def flow_student(pg):
  pg.goto(BASE_URL+'/')
  pg.wait_for_selector('#fxName',timeout=20000)
@@ -37,7 +38,7 @@ def flow_admin(pg):
  if not pg.locator('body').inner_text(): raise AssertionError('Admin page is blank')
  return {'admin_page':True}
 failed=[]
-for name,fn in [('student',flow_student),('register',flow_register),('confirmed',flow_confirmed),('admin',flow_admin)]:
+for name,fn in [('student',flow_student),('register',flow_register),('confirmed',flow_confirmed),('admin',flow_admin),('admin_support',t_admin.flow)]:
  LOG['reqs'].clear();LOG['console'].clear()
  try:
   out={};run(lambda pg:out.update(fn(pg)))

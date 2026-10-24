@@ -92,8 +92,8 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
     }
     function partsFor(prompt){
       const parts=[{text:prompt}];
-      if(documentText)parts.push({text:`\\nTEXT PHỤ TRỢ:\\n${documentText}`});
-      for(const source of sources){if(source?.data)parts.push({text:`\\nNGUỒN GỐC: ${source.fileName}`},{inlineData:{mimeType:source.mimeType,data:source.data}});}
+      if(documentText)parts.push({text:`\nTEXT PHỤ TRỢ:\n${documentText}`});
+      for(const source of sources){if(source?.data)parts.push({text:`\nNGUỒN GỐC: ${source.fileName}`},{inlineData:{mimeType:source.mimeType,data:source.data}});}
       return parts;
     }
     async function callAI(parts){
@@ -107,7 +107,7 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
       try{data=raw?JSON.parse(raw):{}}catch{throw Object.assign(new Error('Gemini trả về dữ liệu không hợp lệ.'),{status:response.status,code:'bad_json'});}
       if(!response.ok)throw Object.assign(new Error('Gemini generation failed.'),{status:response.status,providerMessage:data?.error?.message||''});
       const output=data?.candidates?.[0]?.content?.parts?.map(part=>part.text||'').join('').trim()||'';
-      const clean=output.replace(/^\`\`\`(?:json)?\\s*/i,'').replace(/\\s*\`\`\`$/i,'').trim();
+      const clean=output.replace(/^\`\`\`(?:json)?\s*/i,'').replace(/\s*\`\`\`$/i,'').trim();
       const first=clean.indexOf('{'),last=clean.lastIndexOf('}');
       if(first<0||last<=first)throw Object.assign(new Error('Gemini không trả về JSON hợp lệ.'),{code:'bad_json'});
       try{return JSON.parse(clean.slice(first,last+1));}catch{throw Object.assign(new Error('JSON AI bị cắt cụt.'),{code:'bad_json'});}
@@ -128,7 +128,7 @@ Quy tắc: mcq có đúng 4 opts và a 0..3; true_false có 4 statements + 4 ans
       if(q.type!=='flashcard'&&!q.explanation)return false;
       return true;
     }
-    const keyOf=q=>(q.q||q.front||'').toLowerCase().replace(/\\s+/g,' ').slice(0,80);
+    const keyOf=q=>(q.q||q.front||'').toLowerCase().replace(/\s+/g,' ').slice(0,80);
     const collected=[],seen=new Set();let lastErr=null;
     for(let batchIndex=0;batchIndex<plan.length;batchIndex++){
       const wanted=plan[batchIndex];let got=0;

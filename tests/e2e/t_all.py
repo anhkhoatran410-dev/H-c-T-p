@@ -61,8 +61,26 @@ def flow_exam_attempt(pg):
  if direct: raise AssertionError('Client bypassed /api/submit-attempt and wrote user_attempts directly')
  if not pg.locator('#app').inner_text().strip(): raise AssertionError('App is blank after exam submission')
  return {'questions':count,'submit_api_called':True,'direct_attempt_insert':False}
+def flow_flashcard_memory_test(pg):
+ pg.goto(BASE_URL+'/')
+ pg.wait_for_selector('#fxName',timeout=20000)
+ pg.fill('#fxName','Student Example')
+ pg.fill('#fxCode','670943')
+ pg.click('#fxAuthSubmit')
+ pg.wait_for_selector('.fx-stats',timeout=12000)
+ pg.click('[data-nav=learning]')
+ pg.wait_for_selector('[data-flashcard]',timeout=12000)
+ pg.locator('[data-flashcard]').first.click()
+ pg.wait_for_selector('[data-flash-next]',timeout=12000)
+ for _ in range(3): pg.locator('[data-flash-next]').click()
+ pg.wait_for_selector('[data-flash-quiz]',timeout=12000)
+ pg.locator('[data-flash-quiz]').click()
+ pg.wait_for_selector('[data-exam-submit]',timeout=20000)
+ posts=[r for r in LOG['reqs'] if r and r[0]=='API' and r[1]=='POST' and r[2]=='/api/admin-tools?route=public-create-vocab-test']
+ if not posts: raise AssertionError('Flashcard quiz creation route was not called')
+ return {'flashcard_finish_page':True,'server_create_called':True}
 failed=[]
-for name,fn in [('student',flow_student),('exam_attempt',flow_exam_attempt),('register',flow_register),('confirmed',flow_confirmed),('admin',flow_admin),('admin_support',t_admin.flow)]:
+for name,fn in [('student',flow_student),('exam_attempt',flow_exam_attempt),('flashcard_memory_test',flow_flashcard_memory_test),('register',flow_register),('confirmed',flow_confirmed),('admin',flow_admin),('admin_support',t_admin.flow)]:
  LOG['reqs'].clear();LOG['console'].clear()
  try:
   out={};run(lambda pg:out.update(fn(pg)))

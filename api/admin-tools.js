@@ -1,7 +1,7 @@
 import { isAdminRequest } from './admin-login.js';
 import '../lib/api/_gemini-network-guard.js';
 import { getAiKeyPool } from '../lib/api/_ai-resilience.js';
-import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
+import { applySecurityHeaders, enforceBodySize, enforceJsonContentType, enforceMethod, rateLimit, distributedRateLimit, sameOrigin, safeRequestId } from '../lib/api/_security.js';
 import adminAssistantHandler from '../lib/admin-assistant.js';
 import { handleUpload } from '@vercel/blob/client';
 import { list as listBlobs } from '@vercel/blob';
@@ -416,6 +416,100 @@ async function getAdminSummaryCounts() {
   return { tests, students, attempts };
 }
 
+async function publicCreateVocabTest(req, res) {
+  applySecurityHeaders(res);
+  res.setHeader('Cache-Control', 'no-store');
+  const requestId = safeRequestId();
+  res.setHeader('X-Request-ID', requestId);
+  if (!enforceMethod(req, res, ['POST'])) return;
+  if (!enforceBodySize(req, res, 180 * 1024)) return;
+  if (!enforceJsonContentType(req, res)) return;
+  if (!sameOrigin(req, res)) return;
+  if (!await distributedRateLimit(req, res, { max: 3, windowMs: 60_000, keyPrefix: 'public-vocab-test' })) return;
+  if (!supabasePublicReady()) return res.status(503).json({ error: 'Supabase chưa sẵn sàng.', requestId });
+  if (!SERVICE_KEYS.length) return res.status(503).json({ error: 'Dịch vụ lưu bài test chưa được cấu hình.', requestId });
+
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const sourceExamId = String(body.sourceExamId || '').trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sourceExamId)) {
+    return res.status(400).json({ error: 'Mã bộ flashcard không hợp lệ.', requestId });
+  }
+  const source = await supabasePublicRequest(
+    'exams?id=eq.' + encodeURIComponent(sourceExamId) + '&status=eq.active&flashcard_only=eq.true&select=id,title,subject,questions&limit=1',
+    { method: 'GET' }
+  );
+  const sourceExam = Array.isArray(source.data) ? source.data[0] : null;
+  if (!source.ok || !sourceExam) return res.status(404).json({ error: 'Không tìm thấy bộ flashcard đang hoạt động.', requestId });
+  const cards = (Array.isArray(sourceExam.questions) ? sourceExam.questions : []).map(q => ({
+    front: String(q?.front || q?.term || '').trim().slice(0, 500),
+    back: String(q?.back || q?.definition || q?.answer || '').trim().slice(0, 1500),
+    example: String(q?.example || '').trim().slice(0, 1000),
+  })).filter(q => q.front && q.back).slice(0, 200);
+  if (!cards.length) return res.status(422).json({ error: 'Bộ flashcard chưa có thẻ hợp lệ.', requestId });
+
+  const requestedRaw = Number(body.questionCount);
+  const requested = Math.max(1, Math.min(20, cards.length, Number.isInteger(requestedRaw) && requestedRaw > 0 ? requestedRaw : 20));
+  const grounded = q => {
+    if (!q || typeof q !== 'object' || String(q.type || 'mcq') !== 'mcq') return false;
+    if (typeof q.q !== 'string' || !q.q.trim() || q.q.length > 1200) return false;
+    if (!Array.isArray(q.opts) || q.opts.length !== 4 || q.opts.some(v => typeof v !== 'string' || !v.trim() || v.length > 1200)) return false;
+    if (!Number.isInteger(q.a) || q.a < 0 || q.a > 3) return false;
+    if (typeof q.explanation !== 'string' || !q.explanation.trim() || q.explanation.length > 3000) return false;
+    const text = [q.q, ...q.opts, q.explanation].join(' ').toLocaleLowerCase();
+    return cards.some(card => text.includes(card.front.toLocaleLowerCase()) || text.includes(card.back.toLocaleLowerCase()));
+  };
+  const supplied = Array.isArray(body.questions) ? body.questions.filter(grounded).slice(0, requested) : [];
+  const shuffle = list => {
+    const out = list.slice();
+    for (let i = out.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  };
+  const fallback = shuffle(cards).slice(0, requested).map((card, index) => {
+    const wordToMeaning = index % 2 === 0;
+    const answer = wordToMeaning ? card.back : card.front;
+    const distractors = shuffle(cards.filter(other => other.front !== card.front).map(other => wordToMeaning ? other.back : other.front).filter(v => v && v !== answer))
+      .filter((v, i, all) => all.indexOf(v) === i).slice(0, 3);
+    const fillers = ['Không có trong bài', 'Chưa xác định', 'Một đáp án khác'];
+    while (distractors.length < 3) distractors.push(fillers[distractors.length]);
+    const opts = shuffle([answer, ...distractors]);
+    return {
+      type: 'mcq',
+      q: wordToMeaning ? ('Từ "' + card.front + '" có nghĩa là gì?') : ('Từ nào có nghĩa "' + card.back + '"?'),
+      opts,
+      a: opts.indexOf(answer),
+      explanation: card.front + ' = ' + card.back + (card.example ? '. Ví dụ: ' + card.example : ''),
+    };
+  });
+  const questions = supplied.length >= Math.ceil(requested * 0.6) ? supplied : fallback;
+  const stamp = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const exam = {
+    title: 'Test độ nhớ · ' + String(sourceExam.title || 'Flashcard').trim().slice(0, 120) + ' · ' + stamp,
+    subject: String(sourceExam.subject || 'Tiếng Anh').trim().slice(0, 100),
+    difficulty: 'Trung bình',
+    duration: 15,
+    question_count: questions.length,
+    questions,
+    status: 'active',
+    flashcard_only: false,
+    source_file: 'generated-vocab:' + sourceExam.id,
+  };
+  try {
+    const rows = await sb('exams?select=id,title,subject,difficulty,duration,question_count,questions,status,flashcard_only,created_at', {
+      method: 'POST',
+      body: JSON.stringify(exam),
+    });
+    const created = Array.isArray(rows) ? rows[0] : null;
+    if (!created?.id) return res.status(502).json({ error: 'Không nhận được bài test đã lưu.', requestId });
+    return res.status(201).json({ ok: true, exam: created, requestId });
+  } catch (error) {
+    console.error('[public-create-vocab-test]', requestId, error?.message || error);
+    return res.status(502).json({ error: 'Không lưu được bài test độ nhớ.', requestId });
+  }
+}
+
 async function publicExams(req, res) {
   if (!enforceMethod(req, res, ['GET'])) return;
   if (!sameOrigin(req, res)) return;
@@ -619,6 +713,7 @@ export default async function handler(req, res) {
   if (path === 'intro-src') return introSource(req, res);
   if (path === 'intro-upload') return introUpload(req, res);
   if (path === 'public-exams') return publicExams(req, res);
+  if (path === 'public-create-vocab-test') return publicCreateVocabTest(req, res);
   if (path === 'admin-health') return health(req, res);
   if (path === 'admin-summary') return adminSummary(req, res);
   if (path === 'admin-users') return adminUsers(req, res);

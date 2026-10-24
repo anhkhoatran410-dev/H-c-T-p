@@ -47,6 +47,17 @@ def serve(route,request):
    att={"id":"att%d"%(len(MOCK.setdefault('attempts',[]))+1),"exam_id":b.get('examId'),"exam_title":ex.get('title'),"student_name":b.get('studentName'),"student_code":b.get('studentCode'),"score":round(correct/max(1,len(qs))*100),"correct":correct,"total":len(qs),"duration_seconds":b.get('durationSeconds',0),"wrong_indexes":[],"answers":ans,"created_at":"2026-10-20T10:00:00Z"}
    MOCK['attempts'].append(att)
    return route.fulfill(status=200,content_type='application/json',body=json.dumps({"ok":True,"attempt":att}))
+  if path=='/api/admin-tools' and request.method=='POST' and u.query=='route=public-create-vocab-test':
+   try: b=json.loads(request.post_data or '{}')
+   except Exception: b={}
+   source=next((x for x in EXAMS if x.get('id')==b.get('sourceExamId') and x.get('flashcard_only')),None)
+   if not source:return route.fulfill(status=404,content_type='application/json',body='{"error":"flashcards not found"}')
+   questions=b.get('questions') if isinstance(b.get('questions'),list) else []
+   exam={"id":"c88f05b8-2f26-4c1a-90d4-26e2c4d6b888","title":"Test độ nhớ · "+source.get('title','Flashcard'),"subject":source.get('subject','Tiếng Anh'),"difficulty":"Trung bình","duration":15,"question_count":len(questions),"status":"active","flashcard_only":False,"questions":questions,"created_at":"2026-10-24T10:00:00Z"}
+   EXAMS.append(exam)
+   return route.fulfill(status=201,content_type='application/json',body=json.dumps({"ok":True,"exam":exam}))
+  if path=='/api/generate-exam' and request.method=='POST':
+   return route.fulfill(status=200,content_type='application/json',body='{}')
   if path=='/api/attempts':return route.fulfill(status=200,content_type='application/json',body=json.dumps({"attempts":MOCK.get('attempts',[])}))
   return route.fulfill(status=200,content_type='application/json',body='{}')
  fp=ROOT+(path+'index.html' if path.endswith('/') else path)

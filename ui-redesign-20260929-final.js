@@ -544,8 +544,73 @@
         </section>
       </section>`;
   }
+  function flashCardsOf(e){
+    return (Array.isArray(e?.questions)?e.questions:[]).filter(function(q){return q&&String(q.front||q.term||'').trim()&&String(q.back||q.definition||q.answer||'').trim()});
+  }
+  function flashFinishPage(e,qs){
+    const opts=[5,10,15,20].filter(function(n){return n<qs.length;});opts.push(qs.length);
+    const def=Math.min(15,qs.length);
+    return '<div class="fx-page-head"><div><span class="fx-eyebrow">FLASHCARD</span><h2>Hoàn thành!</h2><p>Bạn đã xem hết '+qs.length+' thẻ của “'+esc(e.title||'Flashcard')+'”.</p></div><button class="fx-btn fx-secondary" data-nav="learning">← Thoát</button></div>'
+      +'<article class="fx-card fx-pad"><div class="fx-flash-wrap" style="text-align:center"><div style="font-size:54px">🎉</div><h3>Kiểm tra lại những từ vừa học</h3>'
+      +'<p class="fx-muted">Hệ thống sẽ lấy ngẫu nhiên các từ bạn vừa học để tạo bài trắc nghiệm, xem bạn nhớ được bao nhiêu.</p>'
+      +'<p><label>Số câu: <select id="fxQuizCount">'+opts.filter(function(n,i){return opts.indexOf(n)===i;}).map(function(n){return '<option value="'+n+'"'+(n===def?' selected':'')+'>'+n+(n===qs.length?' (tất cả)':'')+'</option>';}).join('')+'</select></label></p>'
+      +'<div class="fx-flash-actions"><button type="button" class="fx-btn fx-primary" data-flash-quiz>📝 Test độ nhớ</button><button type="button" class="fx-btn fx-secondary" data-flash-restart>↻ Học lại từ đầu</button></div>'
+      +'<div id="fxFlashQuizStatus" class="fx-muted" style="margin-top:14px"></div></div></article>';
+  }
+  function shuffleArr(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function localVocabQuestions(picked,all){
+    const front=function(q){return String(q.front||q.term||'').trim();};
+    const back=function(q){return String(q.back||q.definition||q.answer||'').trim();};
+    const fillers=['Không có trong bài','Chưa xác định','Một đáp án khác'];
+    return picked.map(function(card,i){
+      const others=shuffleArr(all.filter(function(x){return x!==card;}));
+      const wordToMeaning=i%2===0;
+      const pool=others.map(wordToMeaning?back:front).filter(function(v,k,arr){return v&&v!==(wordToMeaning?back(card):front(card))&&arr.indexOf(v)===k;}).slice(0,3);
+      while(pool.length<3)pool.push(fillers[pool.length]);
+      const right=wordToMeaning?back(card):front(card);
+      const opts=shuffleArr([right].concat(pool));
+      return {type:'mcq',q:wordToMeaning?('Từ "'+front(card)+'" có nghĩa là gì?'):('Từ nào có nghĩa "'+back(card)+'"?'),opts:opts,a:opts.indexOf(right),explanation:front(card)+' = '+back(card)+(card.example?'. Ví dụ: '+card.example:'')};
+    });
+  }
+  async function makeVocabTest(){
+    const e=state().flashcardExam,all=flashCardsOf(e);
+    const btn=root().querySelector('[data-flash-quiz]'),st=root().querySelector('#fxFlashQuizStatus');
+    const n=Math.max(1,Math.min(all.length,Number(root().querySelector('#fxQuizCount')?.value)||Math.min(15,all.length)));
+    if(!all.length||!e?.id)return;
+    if(btn){btn.disabled=true;btn.textContent='⏳ Đang tạo bài test...';}
+    const picked=shuffleArr(all).slice(0,n);
+    let qs=[],note='';
+    try{
+      const ctl=new AbortController(),timer=setTimeout(function(){ctl.abort();},15000);
+      const prompt=picked.map(function(q,i){return 'Từ '+(i+1)+': '+(q.front||q.term)+'\nNghĩa: '+(q.back||q.definition||q.answer)+(q.example?'\nVí dụ: '+q.example:'');}).join('\n\n')+'\n\nYÊU CẦU: chỉ dùng các từ ở trên; trắc nghiệm 4 lựa chọn, 1 đáp án đúng; mỗi từ một câu.';
+      let response;
+      try{response=await fetch('/api/generate-exam',{method:'POST',signal:ctl.signal,headers:{'Content-Type':'application/json'},body:JSON.stringify({fileName:'flashcard-vocabulary-source.txt',mimeType:'text/plain',fileData:'',subject:e.subject||'Tiếng Anh',difficulty:'Trung bình',questionCount:n,types:['mcq'],documentText:prompt})});}
+      finally{clearTimeout(timer);}
+      const data=await response.json().catch(function(){return {};});
+      if(response.ok&&Array.isArray(data.questions))qs=data.questions.filter(function(q){return q&&String(q.type||'mcq')==='mcq'&&Array.isArray(q.opts)&&q.opts.length===4&&Number.isInteger(Number(q.a))&&q.q&&q.explanation;});
+    }catch(_){}
+    if(qs.length<Math.ceil(n*0.6)){qs=localVocabQuestions(picked,all);note='AI đang bận hoặc thiếu câu hợp lệ nên bài test được tạo từ các từ bạn vừa học.';}
+    qs=qs.slice(0,n);
+    let savedExam=null;
+    try{
+      const response=await fetch('/api/admin-tools?route=public-create-vocab-test',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({sourceExamId:e.id,questionCount:qs.length,questions:qs})});
+      const data=await response.json().catch(function(){return {};});
+      if(!response.ok||!data.exam?.id)throw new Error(data.error||('HTTP '+response.status));
+      savedExam=data.exam;
+    }catch(error){
+      if(st)st.textContent='Không lưu được bài test nên chưa mở bài làm: '+String(error?.message||error)+'. Hãy thử lại sau.';
+      if(btn){btn.disabled=false;btn.textContent='📝 Test độ nhớ';}
+      return;
+    }
+    if(note&&st)st.textContent=note;
+    state().exam=savedExam;state().answers={};state().startedAt=Date.now();state().page='exam';state().flashDone=false;
+    renderFinal();
+    setTimeout(function(){try{window.startTimer?.();}catch(_){}},50);
+  }
+
   function flashcardPage(){
     const e=state().flashcardExam;
+    if(state().flashDone&&flashCardsOf(e).length)return flashFinishPage(e,flashCardsOf(e));
     const qs=Array.isArray(e?.questions)?e.questions.filter(function(q){return q&&String(q.front||q.term||'').trim()&&String(q.back||q.definition||q.answer||'').trim()}):[];
     const idx=Math.max(0,Math.min(Math.max(qs.length-1,0),Number(state().flashIndex||0)));
     const q=qs[idx], flipped=!!state().flashFlipped;
@@ -560,7 +625,7 @@
       +(flipped&&q.example?'<span class="fx-flash-example">'+esc(q.example)+'</span>':'')
       +(!flipped&&q.phonetic?'<span class="fx-flash-phonetic">'+esc(q.phonetic)+'</span>':'')
       +'<span class="fx-flash-hint">Chạm vào thẻ để lật ↻</span></button>'
-      +'<div class="fx-flash-actions"><button type="button" class="fx-btn fx-secondary" data-flip-card>↻ Lật thẻ</button><button type="button" class="fx-btn fx-primary" data-flash-next '+(idx>=qs.length-1?'disabled':'')+'>Tiếp theo →</button></div>'
+      +'<div class="fx-flash-actions"><button type="button" class="fx-btn fx-secondary" data-flip-card>↻ Lật thẻ</button><button type="button" class="fx-btn fx-primary" data-flash-next>'+(idx>=qs.length-1?'Hoàn thành ✓':'Tiếp theo →')+'</button></div>'
       +'<div class="fx-flash-nav"><button type="button" class="fx-btn fx-secondary" data-flash-prev '+(idx<=0?'disabled':'')+'>← Trước</button><button type="button" class="fx-btn fx-secondary" data-nav="learning">Thoát</button></div>'
       +'<div class="fx-flash-dots">'+dots+'</div></div></article>';
   }
@@ -992,7 +1057,9 @@
 
     root().querySelectorAll('[data-flip-card]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashFlipped=!state().flashFlipped;renderFinal();});});
     root().querySelector('[data-flash-prev]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.max(0,Number(state().flashIndex||0)-1);state().flashFlipped=false;renderFinal();});
-    root().querySelector('[data-flash-next]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();state().flashIndex=Math.min(Number(state().flashcardExam?.questions?.length||1)-1,Number(state().flashIndex||0)+1);state().flashFlipped=false;renderFinal();});
+    root().querySelector('[data-flash-next]')?.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();const last=flashCardsOf(state().flashcardExam).length-1;if(Number(state().flashIndex||0)>=last){state().flashDone=true;}else{state().flashIndex=Number(state().flashIndex||0)+1;}state().flashFlipped=false;renderFinal();});
+    root().querySelector('[data-flash-quiz]')?.addEventListener('click',function(e){e.preventDefault();makeVocabTest();});
+    root().querySelector('[data-flash-restart]')?.addEventListener('click',function(e){e.preventDefault();state().flashDone=false;state().flashIndex=0;state().flashFlipped=false;renderFinal();});
     root().querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{
       root().querySelectorAll('[data-filter]').forEach(x=>x.classList.remove('active')); b.classList.add('active');
       const v=b.getAttribute('data-filter')||'';
@@ -1110,7 +1177,7 @@
       if(r.ok&&Array.isArray(rows)&&rows[0])e=rows[0];
     }catch(_){}
     if(!Array.isArray(e.questions)||!e.questions.length){alert('Bộ Flashcard này chưa có dữ liệu thẻ.');return;}
-    state().flashcardExam=e;state().flashIndex=0;state().flashFlipped=false;state().page='flashcard';renderFinal();
+    state().flashcardExam=e;state().flashIndex=0;state().flashFlipped=false;state().flashDone=false;state().page='flashcard';renderFinal();
   }
   async function startExamById(id){
     if(!state())return;

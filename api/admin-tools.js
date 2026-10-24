@@ -520,7 +520,7 @@ async function publicExams(req, res) {
   );
   if (!result.ok || !Array.isArray(result.data)) return res.status(502).json({ error: 'Không tải được bài kiểm tra.' });
   const exams = result.data
-    .filter((e) => e?.flashcard_only !== true)
+    .filter((e) => e?.flashcard_only !== true && !String(e?.source_file || '').startsWith('generated-vocab:'))
     .map((e) => ({ ...e, questions: [] }));
   return res.status(200).json({ ok: true, exams });
 }

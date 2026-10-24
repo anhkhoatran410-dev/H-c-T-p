@@ -34,7 +34,38 @@
   }
 
   function correct(q,a){if(isFlash(q))return true;if(q.type==='true_false')return Array.isArray(q.answers)&&q.answers.length===4&&q.answers.every((v,j)=>a?.[j]===v);if(q.type==='short')return String(Array.isArray(a)?a.join(''):a??'').trim().toLowerCase()===String(q.answer??'').trim().toLowerCase();return Number(a)===Number(q.a)}
-  async function featureSubmit(auto){if(!state.exam)return;clearInterval(state.timer);const qs=questionsOf(state.exam),scored=qs.filter(isScored),wrong=[];let right=0;qs.forEach((q,i)=>{if(!isFlash(q)){if(correct(q,state.answers?.[i]))right++;else wrong.push(i)}});const total=scored.length,score=total?Math.round(right/total*100):100;const result={examId:state.exam.id,examTitle:state.exam.title,candidate:state.candidate,score,correct:right,total,timeSec:Math.min(Math.floor((Date.now()-state.startedAt)/1000),Number(state.exam.duration||0)*60),auto,wrongIndexes:wrong,answers:JSON.parse(JSON.stringify(state.answers||{}))};try{await loadSupabase();const payload={device_id:typeof deviceId==='function'?deviceId():null,exam_id:state.exam.id,exam_title:state.exam.title,student_name:state.candidate,student_code:state.code||null,score,correct:right,total,duration_seconds:result.timeSec,auto_submitted:!!auto,answers:result.answers,wrong_indexes:wrong,reviewed_indexes:[]};const {data,error}=await db.from('user_attempts').insert(payload).select().single();if(!error&&data)result.id=data.id;if(typeof deviceId==='function')await db.from('participants').upsert({name:state.candidate,code:state.code||deviceId()},{onConflict:'code'})}catch(e){console.warn('Không lưu lịch sử:',e)}state.lastResult=result;if(typeof loadHistory==='function')await loadHistory();state.page='result';render()}
+  async function featureSubmit(auto){
+    if(!state.exam)return;
+    clearInterval(state.timer);
+    const qs=questionsOf(state.exam),scored=qs.filter(isScored),wrong=[];
+    let right=0;
+    qs.forEach((q,i)=>{if(!isFlash(q)){if(correct(q,state.answers?.[i]))right++;else wrong.push(i)}});
+    const total=scored.length,score=total?Math.round(right/total*100):100;
+    const result={examId:state.exam.id,examTitle:state.exam.title,candidate:state.candidate,score,correct:right,total,timeSec:Math.min(Math.floor((Date.now()-state.startedAt)/1000),Number(state.exam.duration||0)*60),auto,wrongIndexes:wrong,answers:JSON.parse(JSON.stringify(state.answers||{}))};
+    let saveError=null;
+    try{
+      const r=await fetch('/api/attempts?route=submit',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({examId:state.exam.id,studentName:state.candidate,studentCode:state.code||'',answers:result.answers,durationSeconds:result.timeSec,autoSubmitted:!!auto})});
+      const data=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(data.error||('HTTP '+r.status));
+      const attempt=data.attempt||{};
+      result.id=attempt.id||result.id;
+      if(!qs.some(isFlash)){
+        result.score=Number(attempt.score??score);
+        result.correct=Number(attempt.correct??right);
+        result.total=Number(attempt.total??total);
+        result.wrongIndexes=Array.isArray(attempt.wrong_indexes)?attempt.wrong_indexes:wrong;
+      }
+    }catch(e){
+      saveError=e;
+      console.warn('Không lưu được lịch sử:',e);
+    }
+    result.saveError=saveError?String(saveError.message||saveError):null;
+    if(saveError)alert('Bài đã được chấm nhưng CHƯA lưu được vào lịch sử: '+result.saveError+'\nHãy chụp màn hình kết quả và báo admin.');
+    state.lastResult=result;
+    if(typeof loadHistory==='function')await loadHistory();
+    state.page='result';
+    render();
+  }
 
   window.studyFlipFlash=function(){state.flashFlipped=!state.flashFlipped;document.querySelectorAll('[data-flip-card]').forEach(x=>x.classList.toggle('is-flipped',state.flashFlipped));};
   window.studyNextFlash=function(){const qs=questionsOf(state.exam).filter(isFlash);if(!qs.length)return;state.flashFlipped=false;const current=Number(state.flashIndex||0);state.flashIndex=current>=qs.length-1?qs.length:current+1;render();};

@@ -68,6 +68,7 @@ def flow_flashcard_memory_test(pg):
  pg.fill('#fxCode','670943')
  pg.click('#fxAuthSubmit')
  pg.wait_for_selector('.fx-stats',timeout=12000)
+ pg.click('[data-nav=learning]')
  pg.wait_for_selector('[data-flashcard]',timeout=12000)
  pg.locator('[data-flashcard]').first.click()
  pg.wait_for_selector('[data-flash-next]',timeout=12000)

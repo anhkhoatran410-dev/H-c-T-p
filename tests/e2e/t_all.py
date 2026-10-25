@@ -51,7 +51,8 @@ def flow_exam_attempt(pg):
  count=pg.locator('.fx-exam-question').count()
  if count<1: raise AssertionError('Exam opened with zero questions')
  for i in range(count):
-  choice=pg.locator(f'[data-exam-choice-q="{i}"][data-exam-choice="{i%4}"]')
+  picked=(i+1)%4 if i==0 else i%4
+  choice=pg.locator(f'[data-exam-choice-q="{i}"][data-exam-choice="{picked}"]')
   if choice.count(): choice.first.check()
  pg.click('[data-exam-submit]')
  pg.wait_for_timeout(700)
@@ -65,8 +66,15 @@ def flow_exam_attempt(pg):
   raise AssertionError('Submit API was called but learner did not reach result page: '+pg.locator('#app').inner_text()[:500])
  if not pg.locator('.score').count(): raise AssertionError('Result page did not render the score element')
  if 'Hoàn thành' not in pg.locator('#app').inner_text(): raise AssertionError('Result page heading is missing')
+ if not pg.locator('[data-action="review-current-attempt"]').count(): raise AssertionError('Wrong-answer review action is missing after an incorrect answer')
+ pg.locator('[data-action="review-current-attempt"]').click()
+ try:
+  pg.wait_for_function("window.state && window.state.page === 'review'", timeout=5000)
+ except Exception:
+  raise AssertionError('Wrong-answer review did not open: '+pg.locator('#app').inner_text()[:500])
+ if not pg.locator('.fx-review-card').count(): raise AssertionError('Native wrong-answer review UI did not render')
  if not pg.locator('#app').inner_text().strip(): raise AssertionError('App is blank after exam submission')
- return {'questions':count,'submit_api_called':True,'result_page_rendered':True,'direct_attempt_insert':False}
+ return {'questions':count,'submit_api_called':True,'result_page_rendered':True,'wrong_answer_review_rendered':True,'direct_attempt_insert':False}
 def flow_flashcard_memory_test(pg):
  pg.goto(BASE_URL+'/')
  pg.wait_for_selector('#fxName',timeout=20000)

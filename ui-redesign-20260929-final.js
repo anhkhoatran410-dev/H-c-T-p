@@ -709,9 +709,76 @@
       '.fx-exam-statement{padding:12px 14px;border:1px solid var(--fx-line,#e4eaf4);border-radius:13px;background:var(--fx-surface,#fff)}.fx-exam-statement p{margin:0 0 10px;line-height:1.6}.fx-exam-binary{display:flex;gap:16px;flex-wrap:wrap}.fx-exam-binary label{display:inline-flex;align-items:center;gap:7px;cursor:pointer}',
       '.fx-exam-short{display:flex;gap:9px;flex-wrap:wrap}.fx-exam-short input{width:48px;height:48px;text-align:center;font-size:18px;font-weight:800;border:1px solid var(--fx-line,#dbe2ef);border-radius:12px;background:var(--fx-surface,#fff);color:var(--fx-text,#172033)}.fx-exam-help{color:var(--fx-muted,#718096);display:block;margin-top:8px}',
       '.fx-exam-missing{padding:12px;border-radius:12px;background:#fff7e6;color:#855f13;line-height:1.6}.fx-exam-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;padding-top:18px;border-top:1px solid var(--fx-line,#e4eaf4)}',
+      '.fx-result-card{max-width:900px;margin:0 auto}.fx-result-hero{text-align:center;padding:18px 10px 24px}.fx-result-score{display:block;font-size:clamp(48px,8vw,76px);font-weight:900;line-height:1.15;letter-spacing:-.04em;color:var(--fx-blue,#4169e8);margin:12px 0}.fx-result-hero p{color:var(--fx-muted,#718096);margin:0;line-height:1.6}.fx-result-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0 22px}.fx-result-stats>div{border:1px solid var(--fx-line,#e4eaf4);border-radius:14px;padding:14px;text-align:center;min-width:0}.fx-result-stats small,.fx-result-stats b{display:block}.fx-result-stats small{font-size:12px;color:var(--fx-muted,#718096)}.fx-result-stats b{font-size:22px;margin-top:5px}.fx-result-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;padding-top:18px;border-top:1px solid var(--fx-line,#e4eaf4)}.fx-review-card{max-width:980px;margin:0 auto}.fx-review-question-label{display:inline-flex;padding:7px 10px;border-radius:9px;background:var(--fx-soft,#edf2ff);color:var(--fx-blue,#4169e8);font-size:12px;font-weight:850}.fx-review-question{font-size:clamp(17px,2vw,22px);line-height:1.65;margin:14px 0 18px;white-space:pre-wrap}.fx-review-answers{display:grid;gap:9px}.fx-review-answer{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid var(--fx-line,#e4eaf4);border-radius:12px;line-height:1.5}.fx-review-answer span,.fx-review-answer b{min-width:0;overflow-wrap:anywhere}.fx-review-answer small{color:var(--fx-muted,#718096);text-align:right}.fx-review-answer.is-correct{border-color:#6cc8a5;background:#effbf5}.fx-review-explanation{margin-top:16px;padding:14px;border-radius:12px;background:var(--fx-soft,#edf2ff);line-height:1.65}.fx-review-explanation p{margin:6px 0 0;white-space:pre-wrap}@media(max-width:560px){.fx-result-stats{gap:6px}.fx-result-stats>div{padding:10px 6px}.fx-result-stats small{font-size:10px}.fx-result-stats b{font-size:18px}.fx-result-actions{display:grid}.fx-result-actions .fx-btn{width:100%;justify-content:center}.fx-review-answer{flex-direction:column;gap:5px}.fx-review-answer small{text-align:left}}',
       '@media(max-width:650px){.fx-exam-session-head{align-items:flex-start;flex-direction:column}.fx-exam-answer{margin-left:0}.fx-exam-question-title>span{flex-basis:54px}.fx-exam-question-title p{font-size:15px}.fx-exam-question{padding:17px 0}.fx-exam-actions{display:grid}.fx-exam-actions .fx-btn{width:100%;justify-content:center}}'
     ].join('');
     document.head.appendChild(s);
+  }
+
+  function learnerResultPage(){
+    const r=state()?.lastResult;
+    if(!r) return '<div class="fx-empty"><b>Chưa có kết quả để hiển thị.</b><button class="fx-btn fx-secondary" data-nav="tests">Quay lại thư viện</button></div>';
+    const score=Number(r.score||0);
+    const correct=Number(r.correct||0);
+    const total=Number(r.total||0);
+    const wrong=Array.isArray(r.wrongIndexes)?r.wrongIndexes:(Array.isArray(r.wrong_indexes)?r.wrong_indexes:[]);
+    const exam=state()?.exam;
+    const title=r.examTitle||r.exam_title||exam?.title||'Bài kiểm tra';
+    const name=r.candidate||r.student_name||userName()||'Người học';
+    const duration=Number(r.timeSec||r.duration_seconds||0);
+    const reviewButton=wrong.length&&Array.isArray(exam?.questions)&&exam.questions.length
+      ? '<button type="button" class="fx-btn fx-primary" data-action="review-current-attempt">Ôn lại '+wrong.length+' câu sai →</button>'
+      : '';
+    return '<div class="fx-page-head"><div><span class="fx-eyebrow">KẾT QUẢ BÀI THI</span><h2>Hoàn thành</h2><p>'+esc(title)+' · '+esc(name)+'</p></div><button type="button" class="fx-btn fx-secondary" data-nav="tests">← Về thư viện</button></div>'
+      +'<article class="fx-card fx-pad fx-result-card"><div class="fx-result-hero"><span class="fx-eyebrow">ĐIỂM CỦA BẠN</span><strong class="score fx-result-score">'+esc(score)+'%</strong><p>'+correct+'/'+total+' câu trả lời đúng'+(r.auto||r.auto_submitted?' · Hệ thống tự nộp khi hết giờ':' · Bài đã được nộp')+'</p></div>'
+      +'<div class="fx-result-stats"><div><small>Câu đúng</small><b>'+correct+'</b></div><div><small>Câu chưa đúng</small><b>'+Math.max(0,total-correct)+'</b></div><div><small>Thời gian làm</small><b>'+Math.floor(duration/60)+'p '+(duration%60)+'s</b></div></div>'
+      +'<div class="fx-result-actions">'+reviewButton+'<button type="button" class="fx-btn fx-secondary" data-nav="history">Xem lịch sử</button><button type="button" class="fx-btn fx-secondary" data-nav="tests">Làm bài khác</button></div></article>';
+  }
+  function startCurrentAttemptReview(){
+    const r=state()?.lastResult, exam=state()?.exam;
+    if(!r||!exam||!Array.isArray(exam.questions))return;
+    const wrong=Array.isArray(r.wrongIndexes)?r.wrongIndexes:(Array.isArray(r.wrong_indexes)?r.wrong_indexes:[]);
+    state().review={attempt:r,exam:exam,items:wrong.map(function(index){return {index:index,question:exam.questions[index],answer:(r.answers||{})[String(index)]??(r.answers||{})[index]};}).filter(function(item){return !!item.question;}),cursor:0};
+    state().page='review';
+    renderFinal();
+  }
+  function learnerReviewPage(){
+    const review=state()?.review;
+    const items=Array.isArray(review?.items)?review.items:[];
+    if(!review||!items.length) return '<div class="fx-page-head"><div><span class="fx-eyebrow">ÔN TẬP</span><h2>Không còn câu sai</h2><p>Bạn có thể quay lại thư viện để làm bài tiếp theo.</p></div></div><article class="fx-card fx-pad"><button class="fx-btn fx-primary" data-nav="result">Quay lại kết quả</button><button class="fx-btn fx-secondary" data-nav="tests">Về thư viện</button></article>';
+    const cursor=Math.min(items.length-1,Math.max(0,Number(review.cursor||0)));
+    const item=items[cursor]||{};
+    const q=item.question||{};
+    const type=String(q.type||'mcq');
+    const answer=item.answer;
+    let detail='';
+    if(type==='true_false'){
+      const statements=Array.isArray(q.statements)?q.statements:[];
+      const expected=Array.isArray(q.answers)?q.answers:[];
+      const picked=Array.isArray(answer)?answer:[];
+      detail=statements.map(function(statement,j){
+        const correct=expected[j]===true?'Đúng':expected[j]===false?'Sai':'Chưa có đáp án';
+        const yours=picked[j]===true?'Đúng':picked[j]===false?'Sai':'Chưa trả lời';
+        return '<div class="fx-review-answer"><b>'+String.fromCharCode(97+j)+'. '+esc(statement)+'</b><span>Bạn chọn: '+esc(yours)+' · Đáp án: '+esc(correct)+'</span></div>';
+      }).join('');
+    }else if(type==='short'){
+      const yours=Array.isArray(answer)?answer.join(''):String(answer??'');
+      detail='<div class="fx-review-answer"><span>Bạn trả lời</span><b>'+esc(yours||'Chưa trả lời')+'</b></div><div class="fx-review-answer"><span>Đáp án</span><b>'+esc(q.answer??'Chưa có đáp án')+'</b></div>';
+    }else{
+      const options=Array.isArray(q.opts)?q.opts:(Array.isArray(q.options)?q.options:[]);
+      const selected=Number(answer), expected=Number(q.a);
+      detail=options.map(function(option,j){
+        const tags=[];
+        if(Number.isFinite(selected)&&selected===j)tags.push('Bạn chọn');
+        if(Number.isFinite(expected)&&expected===j)tags.push('Đáp án đúng');
+        return '<div class="fx-review-answer '+(Number.isFinite(expected)&&expected===j?'is-correct':'')+'"><span>'+String.fromCharCode(65+j)+'. '+esc(option)+'</span><small>'+esc(tags.join(' · '))+'</small></div>';
+      }).join('');
+    }
+    const explanation=q.explanation||q.explain||'';
+    return '<div class="fx-page-head"><div><span class="fx-eyebrow">ÔN CÂU SAI · '+(cursor+1)+'/'+items.length+'</span><h2>'+esc(review.exam?.title||'Bài kiểm tra')+'</h2><p>Đọc lại câu hỏi và đối chiếu đáp án để hiểu phần cần cải thiện.</p></div><button class="fx-btn fx-secondary" data-nav="result">← Kết quả</button></div>'
+      +'<article class="fx-card fx-pad fx-review-card"><div class="fx-review-question-label">Câu '+(Number(item.index)+1)+'</div><h3 class="fx-review-question">'+esc(q.q||q.question||'Nội dung câu hỏi chưa có')+'</h3><div class="fx-review-answers">'+detail+'</div>'
+      +(explanation?'<div class="fx-review-explanation"><b>Giải thích</b><p>'+esc(explanation)+'</p></div>':'')
+      +'<div class="fx-result-actions"><button type="button" class="fx-btn fx-secondary" data-review-prev '+(cursor===0?'disabled':'')+'>← Câu trước</button><button type="button" class="fx-btn fx-primary" data-review-next>'+(cursor===items.length-1?'Hoàn tất ôn tập':'Câu tiếp theo →')+'</button></div></article>';
   }
 
   function content(){
@@ -727,10 +794,9 @@
       case 'support': return supportPage();
       case 'flashcard': return flashcardPage();
       case 'exam': return learnerExamPage();
-      case 'subject':
-      case 'result':
-      case 'review':
-        return typeof window.page==='function' ? window.page() : '<div class="fx-empty"><b>Chức năng đang tải...</b></div>';
+      case 'subject': return tests();
+      case 'result': return learnerResultPage();
+      case 'review': return learnerReviewPage();
       default: return dashboard();
     }
   }
@@ -1046,6 +1112,9 @@
         updateExamProgress();
       });
     });
+    root().querySelector('[data-action="review-current-attempt"]')?.addEventListener('click',startCurrentAttemptReview);
+    root().querySelector('[data-review-prev]')?.addEventListener('click',function(){if(!state()?.review)return;state().review.cursor=Math.max(0,Number(state().review.cursor||0)-1);renderFinal();});
+    root().querySelector('[data-review-next]')?.addEventListener('click',function(){if(!state()?.review)return;const total=Array.isArray(state().review.items)?state().review.items.length:0;if(Number(state().review.cursor||0)<total-1){state().review.cursor=Number(state().review.cursor||0)+1;}else{state().page='result';}renderFinal();});
     const examSubmit=root().querySelector('[data-exam-submit]');
     if(examSubmit)examSubmit.addEventListener('click',async function(){
       if(examSubmit.disabled)return;

@@ -43,8 +43,9 @@ def serve(route,request):
    except Exception: b={}
    ex=next((e for e in EXAMS if e['id']==b.get('examId')),{"title":"Bài kiểm tra","questions":[]})
    qs=ex.get('questions') or []; ans=b.get('answers') or {}
-   correct=sum(1 for i,qq in enumerate(qs) if str(ans.get(str(i)))==str(qq.get('a')))
-   att={"id":"att%d"%(len(MOCK.setdefault('attempts',[]))+1),"exam_id":b.get('examId'),"exam_title":ex.get('title'),"student_name":b.get('studentName'),"student_code":b.get('studentCode'),"score":round(correct/max(1,len(qs))*100),"correct":correct,"total":len(qs),"duration_seconds":b.get('durationSeconds',0),"wrong_indexes":[],"answers":ans,"created_at":"2026-10-20T10:00:00Z"}
+   wrong_indexes=[i for i,qq in enumerate(qs) if str(ans.get(str(i)))!=str(qq.get('a'))]
+   correct=len(qs)-len(wrong_indexes)
+   att={"id":"att%d"%(len(MOCK.setdefault('attempts',[]))+1),"exam_id":b.get('examId'),"exam_title":ex.get('title'),"student_name":b.get('studentName'),"student_code":b.get('studentCode'),"score":round(correct/max(1,len(qs))*100),"correct":correct,"total":len(qs),"duration_seconds":b.get('durationSeconds',0),"wrong_indexes":wrong_indexes,"answers":ans,"created_at":"2026-10-20T10:00:00Z"}
    MOCK['attempts'].append(att)
    return route.fulfill(status=200,content_type='application/json',body=json.dumps({"ok":True,"attempt":att}))
   if path=='/api/admin-tools' and request.method=='POST' and u.query=='route=public-create-vocab-test':

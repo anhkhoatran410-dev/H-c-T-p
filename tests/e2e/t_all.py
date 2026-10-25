@@ -59,8 +59,14 @@ def flow_exam_attempt(pg):
  if not posts: raise AssertionError('Submitting an exam did not call POST /api/attempts?route=submit')
  direct=pg.evaluate("window.__MOCK__.calls.some(c=>c.t==='user_attempts' && c.op==='insert')")
  if direct: raise AssertionError('Client bypassed /api/submit-attempt and wrote user_attempts directly')
+ try:
+  pg.wait_for_function("window.state && window.state.page === 'result'", timeout=5000)
+ except Exception:
+  raise AssertionError('Submit API was called but learner did not reach result page: '+pg.locator('#app').inner_text()[:500])
+ if not pg.locator('.score').count(): raise AssertionError('Result page did not render the score element')
+ if 'Hoàn thành' not in pg.locator('#app').inner_text(): raise AssertionError('Result page heading is missing')
  if not pg.locator('#app').inner_text().strip(): raise AssertionError('App is blank after exam submission')
- return {'questions':count,'submit_api_called':True,'direct_attempt_insert':False}
+ return {'questions':count,'submit_api_called':True,'result_page_rendered':True,'direct_attempt_insert':False}
 def flow_flashcard_memory_test(pg):
  pg.goto(BASE_URL+'/')
  pg.wait_for_selector('#fxName',timeout=20000)

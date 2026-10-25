@@ -62,11 +62,12 @@ QUY TẮC ĐỊNH DẠNG TOÁN:
     for(const model of MODELS){
       let apiEntry=null;
       try{
+        const advancedMath=/\b(vmo|imo|aime|olympiad|olympiad|olymp|number theory|combinatorics|inequality|prove|proof)\b|chứng minh|bất đẳng thức|số học|tổ hợp|hình học|tìm số tự nhiên/i.test(guardedMessage+' '+subject);
         const body={
           contents:[{role:'user',parts:[{text:prompt}]}],
           generationConfig:{
-            maxOutputTokens:1000,
-            ...(model!=='gemini-3.5-flash-lite'?{thinkingConfig:{thinkingLevel:'low'}}:{})
+            maxOutputTokens:advancedMath?6500:1800,
+            ...(model!=='gemini-3.5-flash-lite'?{thinkingConfig:{thinkingLevel:advancedMath?'high':'low'}}:{})
           }
         };
         const headers={'Content-Type':'application/json'};
